@@ -15,8 +15,8 @@ baremetal_hosts:
   #   ipv4_gateway: "192.168.140.1"
   #   name_server1: "192.168.252.5"
   #   name_server2: "192.168.252.6"
-  #   root_enc_pass: "$5$s9UWbvUkp46927cd$3AdvlZvFVfnI2YMYFB3BwQ7RHPVJ6mi29rPd/GqzmP8"
-  #   grub_enc_pass: "grub.pbkdf2.sha512.10000.5B6B4F652EC26FC5D9757CE4D473B145099852970F8534E1C49D21038AAC5467482A25436C30DA0DDE8A4EBFC611780CBEF759852DE8ABB1D3257A500C977AF0.E3348435B10EA75EBCF7578B4BDEDC25C1BC78807CC4528AE35C2AF0511277A1DE084F71BFFDC7DA247DCF67EB3D81303FF5D34EE9AE5A55586EE060C1F0920C" # noqa yaml[line-length]
+  #   root_enc_pass: "{{ encrypted_root_pass_vault }}"
+  #   grub_enc_pass: "{{ encrypted_grub_pass_vault }}"
   #   boot_disk: "sda"
   #   root_disk: "sda"
   #   # We will always use compliance layout
@@ -42,8 +42,6 @@ baremetal_hosts:
     ipv4_gateway: "192.168.140.1"
     name_server1: "192.168.252.5"
     name_server2: "192.168.252.6"
-    root_enc_pass: "$5$s9UWbvUkp46927cd$3AdvlZvFVfnI2YMYFB3BwQ7RHPVJ6mi29rPd/GqzmP8"
-    grub_enc_pass: "grub.pbkdf2.sha512.10000.5B6B4F652EC26FC5D9757CE4D473B145099852970F8534E1C49D21038AAC5467482A25436C30DA0DDE8A4EBFC611780CBEF759852DE8ABB1D3257A500C977AF0.E3348435B10EA75EBCF7578B4BDEDC25C1BC78807CC4528AE35C2AF0511277A1DE084F71BFFDC7DA247DCF67EB3D81303FF5D34EE9AE5A55586EE060C1F0920C" # noqa yaml[line-length]
     boot_disk: "sda"
     root_disk: "sda"
     # We will always use compliance layout
