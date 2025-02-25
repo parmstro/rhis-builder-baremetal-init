@@ -1,0 +1,62 @@
+---
+
+# Variables for the satellite kickstart
+
+ks_path: "ks.cfg"
+oem_dir: "/run/media/parmstro/OEMDRV"
+
+baremetal_hosts:
+  # - rhis_role: "satellite"
+  #   hostname: "satellite"
+  #   domain: "example.ca"
+  #   mac: "94:c6:91:a3:16:b8"
+  #   ipv4_address: "192.168.140.12"
+  #   ipv4_netmask: "255.255.252.0"
+  #   ipv4_gateway: "192.168.140.1"
+  #   name_server1: "192.168.252.5"
+  #   name_server2: "192.168.252.6"
+  #   root_enc_pass: "$5$s9UWbvUkp46927cd$3AdvlZvFVfnI2YMYFB3BwQ7RHPVJ6mi29rPd/GqzmP8"
+  #   grub_enc_pass: "grub.pbkdf2.sha512.10000.5B6B4F652EC26FC5D9757CE4D473B145099852970F8534E1C49D21038AAC5467482A25436C30DA0DDE8A4EBFC611780CBEF759852DE8ABB1D3257A500C977AF0.E3348435B10EA75EBCF7578B4BDEDC25C1BC78807CC4528AE35C2AF0511277A1DE084F71BFFDC7DA247DCF67EB3D81303FF5D34EE9AE5A55586EE060C1F0920C" # noqa yaml[line-length]
+  #   boot_disk: "sda"
+  #   root_disk: "sda"
+  #   # We will always use compliance layout
+  #   boot_mb: 1024
+  #   boot_efi_mb: 2048
+  #   lv_root_mb: 65536
+  #   lv_home_mb: 20480
+  #   lv_tmp_mb: 6144
+  #   lv_var_tmp_mb: 6144
+  #   lv_var_log_mb: 6144
+  #   lv_var_log_audit_mb: 6144
+  #   lv_var_mb: 112640
+  #   username: "ansiblerunner"
+  #   ssh_pub_key: "{{ ssh_pub_key_vault }}"
+  #   org: "{{ org_number_vault }}"
+  #   activation_key: "{{ activation_key_vault }}"
+  - rhis_role: "idm"
+    hostname: "idm"
+    domain: "example.ca"
+    mac: "ec:a8:6b:f1:e3:48"
+    ipv4_address: "192.168.140.5"
+    ipv4_netmask: "255.255.252.0"
+    ipv4_gateway: "192.168.140.1"
+    name_server1: "192.168.252.5"
+    name_server2: "192.168.252.6"
+    root_enc_pass: "$5$s9UWbvUkp46927cd$3AdvlZvFVfnI2YMYFB3BwQ7RHPVJ6mi29rPd/GqzmP8"
+    grub_enc_pass: "grub.pbkdf2.sha512.10000.5B6B4F652EC26FC5D9757CE4D473B145099852970F8534E1C49D21038AAC5467482A25436C30DA0DDE8A4EBFC611780CBEF759852DE8ABB1D3257A500C977AF0.E3348435B10EA75EBCF7578B4BDEDC25C1BC78807CC4528AE35C2AF0511277A1DE084F71BFFDC7DA247DCF67EB3D81303FF5D34EE9AE5A55586EE060C1F0920C" # noqa yaml[line-length]
+    boot_disk: "sda"
+    root_disk: "sda"
+    # We will always use compliance layout
+    boot_mb: 1024
+    boot_efi_mb: 2048
+    lv_root_mb: 65536
+    lv_home_mb: 20480
+    lv_tmp_mb: 6144
+    lv_var_tmp_mb: 6144
+    lv_var_log_mb: 6144
+    lv_var_log_audit_mb: 6144
+    lv_var_mb: 112640
+    username: "ansiblerunner"
+    ssh_pub_key: "{{ ssh_pub_key_vault }}"
+    org: "{{ org_number_vault }}"
+    activation_key: "{{ activation_key_vault }}"

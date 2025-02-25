@@ -1,0 +1,12 @@
+---
+# tasks file for baremetal_init
+
+# Download the defined iso, if necessary
+# Mount the defined iso, if necessary
+# Create temporary copy, if necessary
+
+- name: "Generate baremetal host kickstart isos"
+  ansible.builtin.include_tasks: "generate_iso.yml"
+  loop: "{{ baremetal_hosts }}"
+  loop_control:
+    loop_var: host

@@ -1,0 +1,128 @@
+# This kickstart file was by ansible for satellite.example.ca running RedHat 9 x86_64
+# This creates the minimal install on baremetal for rhis-builder-satellite
+
+lang en_US.UTF-8
+selinux --enforcing
+keyboard us
+skipx
+
+network --device={{ host.mac }} --hostname {{ host.hostname }}.{{ host.domain }} --noipv6 --bootproto static --ip={{ host.ipv4_address }} --netmask={{ host.ipv4_netmask }} --gateway={{ host.ipv4_gateway }} --mtu=1500 --nameserver={{ host.name_server1 }},{{ host.name_server2 }}
+
+rootpw --iscrypted {{ host.root_enc_pass }}
+firewall --service=ssh
+authselect --useshadow --passalgo=sha512 --kickstart
+
+# We are going to use an ansible role to assign time services, so just set the time zone
+# --ntpservers is deprecated in RHEL9 
+timezone --utc UTC
+
+services --disabled gpm,sendmail,cups,pcmcia,isdn,rawdevices,hpoj,bluetooth,openibd,avahi-daemon,avahi-dnsconfd,hidd,hplip,pcscd
+
+{% if host.grub_enc_pass is defined and host.grub_enc_pass != "" %}
+bootloader --append="nofb quiet splash=quiet" --iscrypted --password={{ host.grub_enc_pass }}
+{% else %}
+bootloader --append="nofb quiet splash=quiet"
+{% endif %}
+
+# boot + efi + swap + tmp + vtmp + vlog + vlaudit + var + root + home = 191 GB
+
+zerombr
+clearpart --all
+
+part /boot --fstype ext4 --size={{ host.boot_mb }} --ondisk={{ host.boot_disk }}
+part /boot/efi --fstype="efi" --size={{ host.boot_efi_mb }} --ondisk={{ host.boot_disk }}
+part pv.01 --size=1 --grow --ondisk={{ host.root_disk }}
+
+# The following volume configuration meets most major Compliance Profiles (CPGPC, DISA-STIG, CIS, PCI-DSS, etc..)
+volgroup vg_root pv.01
+logvol swap --recommended --vgname=vg_root --name=lv_swap
+logvol /  --vgname=vg_root --size={{ host.lv_root_mb }} --name=lv_root --fstype=xfs
+logvol /home  --vgname=vg_root --size={{ host.lv_home_mb }} --name=lv_home --fstype=xfs
+logvol /tmp  --vgname=vg_root --size={{ host.lv_tmp_mb }} --name=lv_tmp --fstype=xfs
+logvol /var/tmp  --vgname=vg_root --size={{ host.lv_var_tmp_mb }} --name=lv_var_tmp --fstype=xfs
+logvol /var/log --vgname=vg_root --size={{ host.lv_var_log_mb }} --name=lv_var_log --fstype=xfs
+logvol /var/log/audit --vgname=vg_root --size={{ host.lv_var_log_audit_mb }} --name=lv_var_log_audit --fstype=xfs
+logvol /var --vgname=vg_root --size={{ host.lv_var_mb }} --grow --name=lv_var --fstype=xfs
+
+text
+reboot
+
+%packages
+bash-completion
+man-pages
+net-tools
+tmux
+xfsdump
+yum-utils
+zip
+yum
+chrony
+-ntp
+@Core
+%end
+
+
+%post --nochroot
+exec < /dev/tty3 > /dev/tty3
+chvt 3
+(
+
+chvt 1
+) 2>&1 | tee /mnt/sysimage/root/install.postnochroot.log
+%end
+
+
+%post
+exec < /dev/tty3 > /dev/tty3
+chvt 3
+(
+logger "Starting anaconda satellite.example.ca postinstall"
+
+
+# enp0s25 interface
+real=`grep -l {{ host.mac }} /sys/class/net/*/{bonding_slave/perm_hwaddr,address} 2>/dev/null | awk -F '/' '// {print $5}' | head -1`
+sanitized_real=`echo $real | sed s/:/_/`
+
+cat << EOF >/etc/sysconfig/network-scripts/ifcfg-$sanitized_real
+BOOTPROTO="none"
+IPADDR="{{ host.ipv4_address }}"
+NETMASK="{{ host.ipv4_netmask }}"
+GATEWAY="{{ host.ipv4_gateway }}"
+DOMAIN="{{ host.domain }}"
+DEVICE=$real
+HWADDR="{{ host.mac }}"
+ONBOOT=yes
+PEERDNS=yes
+PEERROUTES=yes
+DEFROUTE=yes
+ZONE=public
+DNS1="{{ host.name_server1 }}"
+DNS2="{{ host.name_server2 }}"
+MTU=1500
+
+EOF
+
+useradd -G wheel {{ host.username }}
+mkdir -p -m 0700 ~{{ host.username }}/.ssh
+cat >> ~{{ host.username }}/.ssh/authorized_keys <<EOF
+{{ host.ssh_pub_key }}
+EOF
+chown -R {{ host.username }}:{{ host.username }} ~{{ host.username }}/.ssh
+chmod -R go= ~{{ host.username }}/.ssh
+
+subscription-manager register --org={{ host.org }} --activationkey={{ host.activation_key }}
+
+echo "Updating system time"
+systemctl enable --now chronyd
+/usr/bin/chronyc -a makestep
+/usr/sbin/hwclock --systohc
+
+
+dnf -y update
+  
+chvt 1
+) 2>&1 | tee /root/install.post.log
+
+sync
+
+%end
