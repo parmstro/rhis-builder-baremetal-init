@@ -44,6 +44,8 @@ baremetal_hosts:
     name_server2: "192.168.252.6"
     boot_disk: "sda"
     root_disk: "sda"
+    root_enc_pass: "{{ encrypted_root_pass_vault }}"
+    grub_enc_pass: "{{ encrypted_grub_pass_vault }}"
     # We will always use compliance layout
     boot_mb: 1024
     boot_efi_mb: 2048
