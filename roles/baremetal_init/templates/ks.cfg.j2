@@ -102,13 +102,20 @@ MTU=1500
 
 EOF
 
-useradd -G wheel {{ host.username }}
+# add our provisioner user - this user is deleted later
+
+useradd -G wheel {{ host.username }} -p {{ host.user_enc_pass }}
 mkdir -p -m 0700 ~{{ host.username }}/.ssh
 cat >> ~{{ host.username }}/.ssh/authorized_keys <<EOF
 {{ host.ssh_pub_key }}
 EOF
 chown -R {{ host.username }}:{{ host.username }} ~{{ host.username }}/.ssh
 chmod -R go= ~{{ host.username }}/.ssh
+
+cat >> /etc/sudoers.d/{{ host.username }} <<EOF
+{{ host.user_sudoer_policy }}
+EOF
+
 
 subscription-manager register --org={{ host.org }} --activationkey={{ host.activation_key }}
 
