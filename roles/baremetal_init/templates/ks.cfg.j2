@@ -104,7 +104,7 @@ EOF
 
 # add our provisioner user - this user is deleted later
 
-useradd -G wheel {{ host.username }} -p {{ host.user_enc_pass }}
+useradd -G wheel {{ host.username }} --iscrypted -p {{ host.user_enc_pass }}
 mkdir -p -m 0700 ~{{ host.username }}/.ssh
 cat >> ~{{ host.username }}/.ssh/authorized_keys <<EOF
 {{ host.ssh_pub_key }}
