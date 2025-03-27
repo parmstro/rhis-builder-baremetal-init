@@ -1,4 +1,9 @@
 # rhis-builder-baremetal-init
+
+Fork it. Clone it. Configure it. Test it. Change it. Commit it. Create a PR.
+
+***
+
 This project provides multiple methods to initialize the first identity management node (idm.example.ca) and satellite (satellite.example.ca) node on baremetal with a minimal install of RHEL9.
 
 1) Download iso, generate ks.cfg from template. Create usb drives. Automated install from boot. (Complete)
