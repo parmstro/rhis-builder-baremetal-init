@@ -3,7 +3,13 @@
 Fork it. Clone it. Configure it. Test it. Change it. Commit it. Create a PR.
 
 ***
-I know that most of you have experience with these things, but we also work with people with less experience. So bear with us if a lot of things that you know are spelled out. If you have any comments or suggestions to add to the documentation or README.md file, PRs are greatly appreciated. Let's share the wealth.
+
+#### Helping out
+I know that most of you have experience with these things, but we also work with people with less experience. So, please bear with us if a lot of items that you know are spelled out. If you have any comments, tips, tricks or suggestions to add to the documentation or README.md file, PRs are greatly appreciated. Let's share the wealth!
+
+If you haven't been there yet, please visit [rhis-builder-provisioner](https://github.com/parmstro/rhis-builder-provisioner) first
+
+***
 
 This repository provides multiple methods to initialize the first identity management node (idm.example.ca) and satellite (satellite.example.ca) node on baremetal with a minimal install of RHEL9.
 
