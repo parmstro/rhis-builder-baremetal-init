@@ -9,6 +9,23 @@ This project provides multiple methods to initialize the first identity manageme
 1) Download iso, generate ks.cfg from template. Create usb drives. Automated install from boot. (Complete)
 2) Generate automated install iso from image builder on console.redhat.com, transfer to bootable location (BMC managed). Automated install from boot. (In-progress)
 
+### Vaulted Variables that you will need. 
+You can add the following variables to your rhis-builder-vault.yml file or create a separate vault file specifically for this repository.
+***Remember:*** Keep your vault files out of your project. Ensure you have a global exclude set for any vault or credential files. Be safe. It is always good to implement [secret scanning](https://docs.github.com/en/code-security/secret-scanning/introduction/about-secret-scanning) of some kind.
+
+```
+# Stuff that gets passed to the ks.cfg template
+# We don't leave this around in the environment afterwards.
+
+encrypted_root_pass_vault:           # an appropriately encrypted root password
+encrypted_user_pass_vault:           # an appropriately encrypted user password
+encrypted_grub_pass_vault:           # an appropriately encrypted grub password
+user_sudoer_policy_vault:            # "my_ansible_user  ALL=(ALL) ALL" needs to be able to access sudo
+builder_key_file_vault:              # allow user to access systems... this is cleaned up after install
+builder_pub_file_vault:              # pub file for above
+builder_authorized_keys_file_vault:  # authorized keys file.
+```
+
 ## Method 1
 
 - Create a baremetal_init_vars.yml configuration file for your idm and satellite systems from the SAMPLE file. 
@@ -92,8 +109,8 @@ Downloading all the repositories for all the samples requires ~900 GiB or a litt
 
 Your first Satellite server must be registered to the CDN to get content. Your IdM server needs to be to start. We will later, unregister it and re-register it to the Satellite server after it is built. 
 
-**org** - your Red Hat CDN organization. Always set to "{{ org_number_vault }}". Store this in the vault file.
+**org** - your Red Hat CDN organization. Always set to "{{ cdn_organization_vault }}". Store this in the vault file.
 
-**activation_key** - an activation key to register the node to the Red Hat CDN. Always set to "{{ activation_key_vault }}". Store this in the vault file.
+**activation_key** - an activation key to register the node to the Red Hat CDN. Always set to "{{ cdn_activation_key_vault }}". Store this in the vault file.
 
 
