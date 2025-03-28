@@ -4,7 +4,14 @@ Fork it. Clone it. Configure it. Test it. Change it. Commit it. Create a PR.
 
 ***
 
-This project provides multiple methods to initialize the first identity management node (idm.example.ca) and satellite (satellite.example.ca) node on baremetal with a minimal install of RHEL9.
+#### Helping out
+I know that most of you have experience with these things, but we also work with people with less experience. So, please bear with us if a lot of items that you know are spelled out. If you have any comments, tips, tricks or suggestions to add to the documentation or README.md file, PRs are greatly appreciated. Let's share the wealth!
+
+If you haven't been there yet, please visit [rhis-builder-provisioner](https://github.com/parmstro/rhis-builder-provisioner) first
+
+***
+
+This repository provides multiple methods to initialize the first identity management node (idm.example.ca) and satellite (satellite.example.ca) node on baremetal with a minimal install of RHEL9.
 
 1) Download iso, generate ks.cfg from template. Create usb drives. Automated install from boot. (Complete)
 2) Generate automated install iso from image builder on console.redhat.com, transfer to bootable location (BMC managed). Automated install from boot. (In-progress)
@@ -28,7 +35,9 @@ builder_authorized_keys_file_vault:  # authorized keys file.
 
 ## Method 1
 
-- Create a baremetal_init_vars.yml configuration file for your idm and satellite systems from the SAMPLE file. 
+- Create a baremetal_init_vars.yml configuration file for your idm and satellite systems from the SAMPLE file.
+- Place the baremetal_init_vars.yml file in a group_vars/provisioner folder under the project.
+- the .gitignore should prevent it from being uploaded to your repo.
 - Create a vault file to contain the secrets.
 - Download the RHEL9 bootable dvd iso and create a bootable installer usb device. Follow documentation instructions.
 - Create a usb (ext4 or xfs formated works) and label it OEMDRV. Connect it to the system you run this code from.
