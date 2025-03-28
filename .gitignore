@@ -1,3 +1,4 @@
 /.vscode
 /host_vars/*
+/group_vars/*
 /rhis-builder-baremetal-init.code-workspace
