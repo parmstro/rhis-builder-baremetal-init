@@ -5,7 +5,7 @@
     src: "ks.cfg.j2"
     dest: "{{ host.rhis_role }}_{{ host.hostname }}.{{ host.domain }}.ks.cfg"
     mode: "0644"
-  no_log: true
+  # no_log: true
 
 - name: "Copy the kickstart to the OEMDRV volume on the usb directory as ks.cfg"
   ansible.builtin.copy:

@@ -1,5 +1,8 @@
-# This kickstart file was by ansible for satellite.example.ca running RedHat 9 x86_64
-# This creates the minimal install on baremetal for rhis-builder-satellite
+# This kickstart file was created by ansible for {{ host.hostname }}.{{ host.domain }} running RedHat 9 x86_64
+# This creates the minimal install on baremetal for bootstrapping:
+# - rhis-builder-provisioner (optional)
+# - rhis-builder-idm
+# - rhis-builder-satellite
 
 lang en_US.UTF-8
 selinux --enforcing
@@ -32,9 +35,16 @@ clearpart --all
 part /boot --fstype ext4 --size={{ host.boot_mb }} --ondisk={{ host.boot_disk }}
 part /boot/efi --fstype="efi" --size={{ host.boot_efi_mb }} --ondisk={{ host.boot_disk }}
 part pv.01 --size=1 --grow --ondisk={{ host.root_disk }}
+{% set pvs = [] %}
+{% if host.additional_disks is defined -%}
+  {% for disk in host.additional_disks -%}
+part pv.{{ disk[-3:] }} --size=1 --grow --ondisk={{ disk }}
+    {% set _ = pvs.append("pv." + disk[-3:]) -%}
+  {% endfor -%}
+{% endif %}
 
 # The following volume configuration meets most major Compliance Profiles (CPGPC, DISA-STIG, CIS, PCI-DSS, etc..)
-volgroup vg_root pv.01
+volgroup vg_root pv.01 {{ pvs | join(' ') }}
 logvol swap --recommended --vgname=vg_root --name=lv_swap
 logvol /  --vgname=vg_root --size={{ host.lv_root_mb }} --name=lv_root --fstype=xfs
 logvol /home  --vgname=vg_root --size={{ host.lv_home_mb }} --name=lv_home --fstype=xfs

@@ -1,6 +1,6 @@
 ---
-- name: "Run Task"
-  hosts: all
+- name: "Create the kickstart thumbdrive"
+  hosts: provisioner
   become: true
   gather_facts: true
 
@@ -26,5 +26,6 @@
       ansible.builtin.include_vars:
         dir: "{{ vars_dir }}"
 
-    - name: "Run task - {{ task_name }}"
-      ansible.builtin.include_tasks: tasks/{{ task_name }}.yml
+    - name: "Apply role baremetal_init"
+      ansible.builtin.include_role:
+        name: "baremetal_init"
