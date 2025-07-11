@@ -19,8 +19,8 @@ baremetal_hosts:                         # noqa var-naming[no-role-prefix]
     grub_enc_pass: "{{ encrypted_grub_pass_vault }}"
     boot_disk: "nvme0n1"
     root_disk: "nvme0n1"
-    additional_disks:
-      - "/dev/sda"
+#    additional_disks:
+#      - "/dev/sda"
     # We will always use compliance layout
     boot_mb: 1024
     boot_efi_mb: 2048
