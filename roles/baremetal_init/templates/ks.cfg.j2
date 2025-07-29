@@ -30,7 +30,7 @@ bootloader --append="nofb quiet splash=quiet"
 # boot + efi + swap + tmp + vtmp + vlog + vlaudit + var + root + home = 191 GB
 
 zerombr
-clearpart --all
+clearpart --initlabel --drives={{ host.boot_disk }}
 
 part /boot --fstype ext4 --size={{ host.boot_mb }} --ondisk={{ host.boot_disk }}
 part /boot/efi --fstype="efi" --size={{ host.boot_efi_mb }} --ondisk={{ host.boot_disk }}
@@ -69,6 +69,10 @@ yum
 chrony
 -ntp
 @Core
+{% if "provisioner" in host.hostname %}
+@container-management
+ansible-core
+{% endif %}
 %end
 
 

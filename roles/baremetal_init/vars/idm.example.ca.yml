@@ -3,7 +3,7 @@
 # Variables for the satellite kickstart
 
 ks_path: "ks.cfg"                        # noqa var-naming[no-role-prefix]
-oem_dir: "/run/media/parmstro/OEMDRV"    # noqa var-naming[no-role-prefix]
+oem_dir: "/run/media/ansiblerunner/OEMDRV"    # noqa var-naming[no-role-prefix]
 
 baremetal_hosts:                         # noqa var-naming[no-role-prefix]
   - rhis_role: "idm"

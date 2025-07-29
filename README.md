@@ -5,12 +5,18 @@ Fork it. Clone it. Configure it. Test it. Change it. Commit it. Create a PR.
 ***
 
 #### Helping out
-I know that most of you have experience with these things, but we also work with people with less experience. So, please bear with us if a lot of items that you know are spelled out. If you have any comments, tips, tricks or suggestions to add to the documentation or README.md file, PRs are greatly appreciated. Let's share the wealth!
+I know that most of you have experience with these things, but we also work with people with less experience. So, please bear with us if a lot of activities that you know well are spelled out. If you have any comments, tips, tricks or suggestions to add to the documentation or README.md file, PRs are greatly appreciated. Let's share the wealth!
 
 If you haven't been there yet, please visit [rhis-builder-provisioner](https://github.com/parmstro/rhis-builder-provisioner) first
+We are in the process of migrating this over to [rhis-provisioner-container](https://github.com/parmstro/rhis-provisioner-container), our containerized version of the provisioner.
 
-See rhis-builder-vault-SAMPLE repo for secrets definitions.
+See [rhis-builder-inventory](https://github.com/parmstro/rhis-builder-inventory) repo for all sample configurations and secrets definitions.
+
+With [rhis-provisioner-container](https://github.com/parmstro/rhis-provisioner-container) and [rhis-builder-inventory](https://github.com/parmstro/rhis-builder-inventory) it should be all you need to get going!
+
 ***
+
+Everyone has their own method to start building an environment. It really depends on your requirements. This repo is focused on building the ks.cfg files for baremetal systems. We take advantage of anaconda's capability to automate a system build when supplied a ks.cfg file on a drive labeled **OEMDRV**
 
 This repository provides multiple methods to initialize the first identity management node (idm.example.ca) and satellite (satellite.example.ca) node on baremetal with a minimal install of RHEL9.
 
@@ -34,15 +40,21 @@ builder_pub_file_vault:              # pub file for above
 builder_authorized_keys_file_vault:  # authorized keys file.
 ```
 
-## Method 1
+## Method 1: Boot from USBs (lab method)
 
 - Create a baremetal_init_vars.yml configuration file for your idm and satellite systems from the SAMPLE file.
 - Place the baremetal_init_vars.yml file in a group_vars/provisioner folder under the project.
 - the .gitignore should prevent it from being uploaded to your repo.
 - Create a vault file to contain the secrets.
 - Download the RHEL9 bootable dvd iso and create a bootable installer usb device. Follow documentation instructions.
-- Create a usb (ext4 or xfs formated works) and label it OEMDRV. Connect it to the system you run this code from.
+- **Create a usb (ext4 or xfs formated works) and label it OEMDRV.** Connect it to the system you run this code from and mount it. The automount for rhel should mount the usb at /run/media/<username>/OEMDRV. Change the value of oem_drv to suit your environment.
+
 - run the baremetal_init role using your satellite or idm configuration.
+
+e.g.
+~~~
+ansible-playbook -i inventory -e "vault_dir=/home/ansiblerunner/.ansible/vault/" -e "vars_path=/home/ansiblerunner/rhis/vars/idm.example.ca.yml" main.yml
+~~~
 
 The process will create a ks.cfg file. 
 Insert both USBs in your baremetal machine destined to be the machine you ran the role for and power it on. Ensure that it boots the usb.
@@ -63,9 +75,15 @@ PRs are always welcome.
 ENJOY!
 
 
+## Method 2: Boot from BMC managed volume (datacenter method)
+
+The exact method is highly dependent on your environment and how your enterprise systems provide base board management control. All major manufactures provide facilities to create virtual DVD drives and other devices to boot the system from. They also provide methodologies for managing the boot order. 
+
+See your system providers documentation for details on how to present the dvd iso and ks.cfg file to your system.
+
 <hr>
 
-### Appendix
+## Appendix
 
 Baremetal Init Variables.
 
