@@ -1,144 +1,542 @@
 # rhis-builder-baremetal-init
 
-Fork it. Clone it. Configure it. Test it. Change it. Commit it. Create a PR.
-***
-**NOTE:** All ansible variables, files and templates for rhis-builder-* repos are now configured through the unified inventory project [rhis-builder-inventory](https://github.com/parmstro/rhis-builder-inventory)
+Generates OEMDRV kickstart files to bootstrap RHEL 9 baremetal and virtual hosts
+for the **rhis-builder** family of projects.
 
-#### Helping out
-I know that most of you have experience with these things, but we also work with people with less experience. So, please bear with us if a lot of activities that you know well are spelled out. If you have any comments, tips, tricks or suggestions to add to the documentation or README.md file, PRs are greatly appreciated. Let's share the wealth!
+Kickstart files are delivered either directly to a USB-mounted OEMDRV volume
+(lab method) or as ISO9660 images for iDRAC, iLO, or Redfish virtual media
+(datacenter method).
 
-If you haven't been there yet, please visit [rhis-builder-provisioner](https://github.com/parmstro/rhis-builder-provisioner) first
-We are in the process of migrating this over to [rhis-provisioner-container](https://github.com/parmstro/rhis-provisioner-container), our containerized version of the provisioner.
+Supported host roles: `provisioner`, `idm`, `satellite`, `kvm`
 
-See [rhis-builder-inventory](https://github.com/parmstro/rhis-builder-inventory) repo for all sample configurations and secrets definitions.
+---
 
-With [rhis-provisioner-container](https://github.com/parmstro/rhis-provisioner-container) and [rhis-builder-inventory](https://github.com/parmstro/rhis-builder-inventory) it should be all you need to get going!
+## RHIS Infrastructure Bootstrap Workflow
 
-***
-
-Everyone has their own method to start building an environment. It really depends on your requirements. This repo is focused on building the ks.cfg files for baremetal systems. We take advantage of anaconda's capability to automate a system build when supplied a ks.cfg file on a drive labeled **OEMDRV**
-
-This repository provides multiple methods to initialize the first identity management node (idm.example.ca) and satellite (satellite.example.ca) node on baremetal with a minimal install of RHEL9.
-
-1) Download iso, generate ks.cfg from template. Create usb drives. Automated install from boot. (Complete)
-2) Generate automated install iso from image builder on console.redhat.com, transfer to bootable location (BMC managed). Automated install from boot. (In-progress)
-
-### Vaulted Variables that you will need. 
-You can add the following variables to your rhis-builder-vault.yml file or create a separate vault file specifically for this repository.
-***Remember:*** Keep your vault files out of your project. Ensure you have a global exclude set for any vault or credential files. Be safe. It is always good to implement [secret scanning](https://docs.github.com/en/code-security/secret-scanning/introduction/about-secret-scanning) of some kind.
+This repository is **Phase 1** in the RHIS infrastructure lifecycle:
 
 ```
-# Stuff that gets passed to the ks.cfg template
-# We don't leave this around in the environment afterwards.
-
-encrypted_root_pass_vault:           # an appropriately encrypted root password
-encrypted_user_pass_vault:           # an appropriately encrypted user password
-encrypted_grub_pass_vault:           # an appropriately encrypted grub password
-user_sudoer_policy_vault:            # "my_ansible_user  ALL=(ALL) ALL" needs to be able to access sudo
-builder_key_file_vault:              # allow user to access systems... this is cleaned up after install
-builder_pub_file_vault:              # pub file for above
-builder_authorized_keys_file_vault:  # authorized keys file.
+┌─────────────────────────────────────────────────────────────────────────┐
+│  rhis-builder-inventory                                                 │
+│  Generate deployment configs (inventory, group_vars, host_vars, vault)  │
+└─────────────────────────────────────┬───────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│  rhis-builder-baremetal-init   ← THIS REPO                             │
+│  Generate OEMDRV kickstart files for each baremetal host                │
+└─────────────────────────────────────┬───────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│  Baremetal Install                                                      │
+│  Anaconda reads ks.cfg from OEMDRV → unattended RHEL 9 install          │
+└─────────────────────────────────────┬───────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│  rhis-provisioner container                                             │
+│  Configure IdM (Phase 2) → Satellite (Phase 3) → AAP (Phase 4)         │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
-## Method 1: Boot from USBs (lab method)
+> **Note:** All unified deployment configurations — group_vars, host_vars,
+> inventory, and vault templates — are managed through
+> [rhis-builder-inventory](https://github.com/parmstro/rhis-builder-inventory).
+> Start there before running this repository.
 
-- Create a baremetal_init_vars.yml configuration file for your idm and satellite systems from the SAMPLE file.
-- Place the baremetal_init_vars.yml file in a group_vars/provisioner folder under the project.
-- the .gitignore should prevent it from being uploaded to your repo.
-- Create a vault file to contain the secrets.
-- Download the RHEL9 bootable dvd iso and create a bootable installer usb device. Follow documentation instructions.
-- **Create a usb (ext4 or xfs formated works) and label it OEMDRV.** Connect it to the system you run this code from and mount it. The automount for rhel should mount the usb at /run/media/<username>/OEMDRV. Change the value of oem_drv to suit your environment.
+---
 
-- run the baremetal_init role using your satellite or idm configuration.
+## Role Status
 
-e.g.
-~~~
-ansible-playbook -i inventory -e "vault_dir=/home/ansiblerunner/.ansible/vault/" -e "vars_path=/home/ansiblerunner/rhis/vars/idm.example.ca.yml" main.yml
-~~~
+| Role | Status |
+|---|---|
+| `bootstrap_init` | Active — all new deployments use this role |
+| `baremetal_init` | Deprecated — kept for backwards compatibility only |
 
-The process will create a ks.cfg file. 
-Insert both USBs in your baremetal machine destined to be the machine you ran the role for and power it on. Ensure that it boots the usb.
-Because there is a USB drv labeled OEMDRV, anaconda will inspect that drive and use ks.cfg on that drive to build the box.
-When the system reboots, pull the USB drives.
+Do not use `baremetal_init` for new environments. Refer to `bootstrap_init_vars.SAMPLE.yml`
+for the current variable format.
 
-Repeat the process for your other system, idm or satellite. which every you did not create yet.
+---
 
-When you are done, you are ready to start with rhis-builder-idm.
+## Prerequisites
 
-See baremetal_init_vars.yml.SAMPLE
+### Provisioner node
 
-This ensures that the two bootstrap systems to create an RHIS infrastructure are in place for the RHIS provisioner node to configure.
-See **[rhis-builder-provisioner wiki](https://github.com/parmstro/rhis-builder-provisioner/wiki)**
+The provisioner is the RHEL 9 system you run this playbook from. It can be the
+system you are also bootstrapping (if you are rebuilding it), a laptop, or an
+existing management node.
 
-PRs are always welcome.
+- RHEL 9 with `ansible-core` 2.14 or later
+- `community.general` collection (installed via `requirements.yml`)
+- Root or sudo access to mount the OEMDRV volume
+- Network connectivity to the internet (for CDN registration in the kickstart)
+
+Install the required collection:
+
+```bash
+ansible-galaxy collection install -r requirements.yml
+```
+
+### Red Hat account
+
+- Active Red Hat subscription
+- CDN organization ID
+- Activation key configured for RHEL 9 minimal install
+
+### SSH key pair
+
+An SSH key pair for the automation user (`ansiblerunner` by convention). The
+public key will be embedded in the kickstart so the provisioner can reach the
+bootstrapped hosts immediately after install.
+
+### Vault file
+
+Sensitive values (passwords, keys, org credentials) must be stored in an
+Ansible Vault encrypted file. See [Vault variables](#vault-variables) below.
+
+---
+
+## Workflow
+
+### Step 1: Generate your deployment inventory
+
+Use [rhis-builder-inventory](https://github.com/parmstro/rhis-builder-inventory)
+to generate a consistent set of group_vars, host_vars, inventory, and vault
+templates for your deployment domain.
+
+**Do not clone rhis-builder-inventory directly.** Cloning leaves the upstream
+remote in place and risks pushing your environment-specific configuration back
+to the template repository. Instead, download the archive and initialise a fresh
+repository pointed at your own remote:
+
+```bash
+wget https://github.com/parmstro/rhis-builder-inventory/archive/refs/heads/main.zip
+unzip main.zip
+mv rhis-builder-inventory-main rhis-builder-inventory
+cd rhis-builder-inventory
+
+git init -b main
+git add --all
+git commit -m "Initial commit"
+
+# Point origin at your own repository — not the upstream template
+git remote add origin https://github.com/<your_org_or_login>/rhis-builder-inventory.git
+git remote -v
+git push -u origin main
+```
+
+Copy and edit the base variables file for your domain:
+
+```bash
+cp inventory_basevars.yml your-domain_inventory_basevars.yml
+```
+
+Edit `your-domain_inventory_basevars.yml` to set your domain name, network
+ranges, timezone, and the number of hosts of each type:
+
+```yaml
+global_domain_name: "your.domain"
+
+default_network: "192.168.0.0"
+default_network_prefix: "22"
+default_network_mask: "255.255.252.0"
+
+rhis_timezone: "America/New_York"
+rhis_locale: "en"
+
+rhis_aap_release_version: "2.6"
+
+rhis_system_count:
+  satellite: 1
+  idm: 2
+  aapcontroller: 1
+  aaphub: 1
+  capsule: 1
+  quadlet: 2
+```
+
+Generate the deployment:
+
+```bash
+./inventory_update.sh -b your-domain_inventory_basevars.yml
+```
+
+This creates `deployments/your.domain/` containing:
+
+```
+deployments/your.domain/
+├── group_vars/          # Group-level Ansible variables
+├── host_vars/           # Per-host variable files
+├── inventory/           # Ansible inventory
+├── templates/           # Jinja2 configuration templates
+├── vault_SAMPLES/       # Vault variable templates (copy and encrypt)
+└── vars/                # Additional variable files
+```
+
+### Step 2: Prepare your vault file
+
+Copy the vault sample and populate it with your secrets:
+
+```bash
+cp deployments/your.domain/vault_SAMPLES/rhis_builder_vault_SAMPLE.yml.j2 \
+   /path/to/secure/vault/rhis_builder_vault.yml
+```
+
+At minimum, populate the following variables for this repository:
+
+```yaml
+encrypted_root_pass_vault:      # Generated with openssl passwd -6 (see below)
+encrypted_grub_pass_vault:      # Generated with grub2-mkpasswd-pbkdf2 (see below)
+encrypted_user_pass_vault:      # Generated with openssl passwd -6
+user_sudoer_policy_vault:       # e.g. "ansiblerunner ALL=(ALL) NOPASSWD: ALL"
+ssh_pub_key_vault:              # Contents of ~/.ssh/id_*.pub
+cdn_organization_vault:         # Your Red Hat CDN organization ID
+cdn_activation_key_vault:       # Your activation key name
+```
+
+Encrypt the vault file:
+
+```bash
+ansible-vault encrypt /path/to/secure/vault/rhis_builder_vault.yml
+```
+
+> **Note:** The variables listed above cover kickstart generation only. The full
+> RHIS deployment (IdM, Satellite, AAP) requires many additional vault variables.
+> See the `README.md` in
+> [rhis-builder-inventory](https://github.com/parmstro/rhis-builder-inventory)
+> for the complete vault variable reference and the `vault_SAMPLES/` directory
+> in your generated deployment for the full template.
+
+> **Security note:** Keep vault files outside of your project directory.
+> Ensure `.gitignore` excludes any vault or credential files before committing.
+> Consider enabling [secret scanning](https://docs.github.com/en/code-security/secret-scanning)
+> on your repository.
+
+### Step 3: Configure host variable files
+
+Clone this repository and set up your host configuration files under
+`group_vars/provisioner/`. The `.gitignore` excludes these files from commits.
+
+```bash
+git clone https://github.com/parmstro/rhis-builder-baremetal-init.git
+cd rhis-builder-baremetal-init
+mkdir -p group_vars/provisioner
+```
+
+Copy the sample and create one file per host group (or combine all hosts in one file):
+
+```bash
+cp bootstrap_init_vars.SAMPLE.yml group_vars/provisioner/your_init_vars.yml
+```
+
+Edit the file to define your hosts. Each entry in `bootstrap_init_hosts` generates
+one kickstart file. See [Variable reference](#variable-reference) for all fields.
+
+### Step 4: Generate kickstart files
+
+Run the playbook, specifying which host list to use via `bootstrap_init_hosts`:
+
+```bash
+ansible-playbook -i inventory --limit provisioner main.yml \
+  -e "vault_path=/path/to/secure/vault/rhis_builder_vault.yml" \
+  -e "bootstrap_init_hosts={{ satellite_bootstrap_init_hosts }}" \
+  --ask-vault-pass
+```
+
+The `bootstrap_init_hosts` extra variable selects a named list from your
+`group_vars/provisioner/` file (e.g. `satellite_bootstrap_init_hosts`,
+`idm_bootstrap_init_hosts`). Run the playbook once per host group, or pass
+a combined list if generating all kickstarts in one pass.
+
+### Step 5: Install the baremetal nodes
+
+#### Method 1: USB boot (lab method)
+
+Prepare the install media:
+
+1. Download the RHEL 9 bootable DVD ISO from [access.redhat.com](https://access.redhat.com).
+2. Write the ISO to a USB drive and verify it is bootable.
+3. Format a second USB drive with an `xfs` or `ext4` filesystem and label it **OEMDRV**.
+   Mount it at the path configured in `bootstrap_init_oem_dir` (default: `/mnt/OEMDRV`).
+4. Run the playbook (Step 4). The `ks.cfg` file is written directly to the OEMDRV volume.
+5. Unmount the OEMDRV drive.
+
+Install the node:
+
+1. Insert both USB drives into the target baremetal system.
+2. Power on and boot from the RHEL 9 installer USB.
+3. Anaconda detects the OEMDRV drive and reads `ks.cfg` automatically.
+4. The system installs and reboots unattended. Remove the USB drives before the
+   second boot, or the system will re-read the kickstart.
+
+Repeat for each target host.
+
+#### Method 2: ISO via virtual media (datacenter method)
+
+This method attaches both the RHEL 9 installer ISO and an OEMDRV ISO as virtual
+DVD drives via iDRAC, iLO, Redfish, or your hypervisor's virtual media facility.
+
+Set `generate_oemdrv_iso: true` in your host entry:
+
+```yaml
+bootstrap_init_hosts:
+  - hostname: "satellite1"
+    ...
+    generate_oemdrv_iso: true
+```
+
+Run the playbook. The role writes `ks.cfg` to `bootstrap_init_oem_dir` and then
+generates an ISO9660 image at:
+
+```
+bootstrap_init_iso_dir/<rhis_role>_<hostname>.<domain>.oemdrv.iso
+```
+
+Attach both the RHEL 9 DVD ISO and this OEMDRV ISO as virtual media to the
+target system and boot. Anaconda will detect both drives and automate the install.
+
+The exact procedure for attaching virtual media depends on your hardware vendor.
+See your BMC documentation for details.
+
+### Step 6: Continue with rhis-provisioner
+
+Once all baremetal nodes are installed and reachable over SSH, proceed to the
+[rhis-provisioner container](https://github.com/parmstro/rhis-provisioner-container)
+to configure IdM, Satellite, and AAP.
+
+When `inventory_update.sh` generated your deployment it also created two
+container launch scripts in the `rhis-builder-inventory` root directory:
+
+```
+your.domain.24.sh    # AAP 2.4 — being phased out, use only if required
+your.domain.25.sh    # AAP 2.5 and later — recommended
+```
+
+These scripts are pre-configured with all the correct deployment paths and
+call `run_container.sh` internally — you do not need to pass any arguments:
+
+```bash
+cd rhis-builder-inventory
+./your.domain.25.sh
+```
+
+**Why two scripts?** The `ansible.controller` collection introduced a breaking
+API change in AAP 2.5 due to significant architectural changes in that release.
+The two scripts launch different container images that bundle the correct
+collection version for each AAP generation. The containers are otherwise
+identical.
+
+> **Recommendation:** Use the `.25.sh` script. AAP 2.4 support is being phased
+> out and the 2.4-specific script will be removed in a future release of
+> rhis-builder-inventory, after which a single launch script will be generated.
+
+The container mounts your deployment configuration and executes the RHIS
+provisioning playbooks in sequence: IdM → Satellite → AAP.
+
+---
+
+## Variable reference
+
+### Role-level variables
+
+These are set once per playbook run, either in `group_vars/provisioner/` or
+passed as extra variables.
+
+| Variable | Default | Description |
+|---|---|---|
+| `bootstrap_init_ks_path` | `ks.cfg` | Filename written to the OEMDRV volume |
+| `bootstrap_init_oem_dir` | `/mnt/OEMDRV` | Path to the mounted OEMDRV volume |
+| `bootstrap_init_iso_dir` | `/mnt/OEMDRV/ISO` | Directory for generated OEMDRV ISO files |
+| `bootstrap_init_hosts` | `[]` | List of host definitions (required) |
+
+### Per-host variables
+
+Each entry in `bootstrap_init_hosts` defines one system.
+
+#### Identity
+
+| Variable | Required | Description |
+|---|---|---|
+| `rhis_role` | Yes | One of: `provisioner`, `idm`, `satellite`, `kvm` |
+| `hostname` | Yes | Short hostname (no domain) |
+| `domain` | Yes | DNS domain name |
+
+#### Network
+
+| Variable | Required | Description |
+|---|---|---|
+| `mac` | Yes | MAC address of the primary NIC (`xx:xx:xx:xx:xx:xx`) |
+| `ipv4_address` | Yes | Static IPv4 address |
+| `ipv4_netmask` | Yes | Dotted-decimal subnet mask (used by kickstart `network` directive) |
+| `ipv4_prefix` | Yes | CIDR prefix length integer (used by NetworkManager keyfile) |
+| `ipv4_gateway` | Yes | Default gateway |
+| `name_server1` | Yes | Primary DNS server |
+| `name_server2` | Yes | Secondary DNS server |
+
+Network configuration is written as a NetworkManager keyfile in `%post` with
+MAC-based interface matching. Legacy `ifcfg` profiles are removed during install.
+
+#### Storage
+
+| Variable | Required | Description |
+|---|---|---|
+| `boot_disk` | Yes | Disk path for `/boot` and `/boot/efi` (e.g. `/dev/nvme0n1`) |
+| `root_disk` | Yes | Disk path for the root volume group (often same as `boot_disk`) |
+| `additional_disks` | No | List of additional disk paths to extend the root VG |
+| `filesystem` | No | `xfs` (default) or `ext4`. Use `ext4` for KVM hosts if online resize is needed |
+
+Both `boot_disk` and `root_disk` are fully initialized by `clearpart`. If they
+are the same disk, it is targeted once. This satisfies the IdM and Satellite
+installation criteria that require a fully dedicated system.
+
+#### Partition sizes (all in MiB)
+
+The compliance layout below meets CIS Level 2, DISA-STIG, and PCI-DSS
+partition requirements. Satellite requires a large `lv_var` — set to `1` to
+instruct anaconda to grow it into all remaining space.
+
+| Variable | Recommended (IdM/KVM) | Recommended (Satellite) | Description |
+|---|---|---|---|
+| `boot_mb` | `1024` | `1024` | `/boot` partition |
+| `boot_efi_mb` | `2048` | `2048` | `/boot/efi` partition |
+| `lv_root_mb` | `65536` | `65536` | `/` logical volume |
+| `lv_home_mb` | `20480` | `20480` | `/home` logical volume |
+| `lv_tmp_mb` | `6144` | `6144` | `/tmp` logical volume |
+| `lv_var_tmp_mb` | `6144` | `6144` | `/var/tmp` logical volume |
+| `lv_var_log_mb` | `6144` | `6144` | `/var/log` logical volume |
+| `lv_var_log_audit_mb` | `6144` | `6144` | `/var/log/audit` logical volume |
+| `lv_var_mb` | `1` | `1` | `/var` — set to `1` to grow into remaining space |
+
+A 256 GiB minimum drive is recommended for IdM and KVM. Satellite should have
+a 1 TiB or larger drive; downloading all standard RHEL repositories requires
+approximately 900 GiB.
+
+##### Disconnected and air-gapped environments
+
+RHIS fully supports disconnected environments using Satellite's content
+export/import workflow. Storage sizing for `/var` must account for the
+additional space that the export and transfer process requires.
+
+**Connected Satellite (exporting content)**
+
+The connected Satellite needs at least **2x** the space required for the
+exported content set in `/var` — 1x for the live Satellite content and 1x
+for the export archive. For a full Library export covering RHEL 8, 9, and 10
+content, a **2 TiB `/var`** is recommended.
+
+**Disconnected Satellite (importing content)**
+
+The space required on the disconnected host depends on how the transfer
+media is presented:
+
+| Import method | `/var` required | Notes |
+|---|---|---|
+| Mount transfer drive, import directly | **2x** export size | 1x tar extraction + 1x final content (tar files remain on the transfer drive) |
+| Copy from transfer drive then import | **3x** export size | 1x tar files + 1x tar extraction + 1x final content |
+
+The copy-then-import method requires the most headroom because all three
+artifacts — the tar archives, the extracted content, and the final imported
+content — coexist on `/var` simultaneously during the import process. When
+mounting the transfer drive directly, the tar files never land on the
+disconnected host's `/var`, reducing the requirement by one full copy.
+
+When sizing the disconnected Satellite, set `lv_var_mb: 1` as usual to
+consume all remaining disk space, and provision the drive accordingly before
+running the kickstart.
+
+#### User and access
+
+| Variable | Required | Description |
+|---|---|---|
+| `username` | Yes | Automation user created during install |
+| `user_enc_pass` | Yes | Encrypted password (vault reference) |
+| `user_sudoer_policy` | Yes | Sudoers policy line (vault reference) |
+| `ssh_pub_key` | Yes | SSH public key string for the user (vault reference) |
+
+#### Credentials
+
+| Variable | Required | Description |
+|---|---|---|
+| `root_enc_pass` | Yes | Encrypted root password (vault reference) |
+| `grub_enc_pass` | No | Encrypted GRUB2 bootloader password (vault reference) |
+| `org` | Yes | Red Hat CDN organization ID (vault reference) |
+| `activation_key` | Yes | CDN activation key name (vault reference) |
+
+The node is registered to the CDN during kickstart `%post` to pull the minimal
+package set. IdM nodes are later re-registered to Satellite by `rhis-builder-idm`.
+
+#### Delivery
+
+| Variable | Default | Description |
+|---|---|---|
+| `generate_oemdrv_iso` | `false` | When `true`, generates an ISO9660 image instead of writing directly to the OEMDRV volume |
+
+---
+
+## Vault variables
+
+Generate encrypted values with the following commands:
+
+### Root and user passwords
+
+```bash
+openssl passwd -6
+```
+
+`openssl passwd -6` generates a SHA-512 hashed password (`$6$...`). Run it
+without arguments and enter the password at the prompt to avoid the plaintext
+appearing in your shell history. `openssl` is included by default on RHEL and
+Fedora — no additional packages are required on the provisioner or your
+workstation.
+
+### GRUB2 bootloader password
+
+```bash
+grub2-mkpasswd-pbkdf2
+```
+
+Copy the full `grub.pbkdf2.sha512.…` string into your vault file.
+
+### Vault file structure
+
+```yaml
+encrypted_root_pass_vault:      "$6$rounds=..."
+encrypted_grub_pass_vault:      "grub.pbkdf2.sha512.10000...."
+encrypted_user_pass_vault:      "$6$rounds=..."
+user_sudoer_policy_vault:       "ansiblerunner ALL=(ALL) NOPASSWD: ALL"
+ssh_pub_key_vault:              "ssh-ed25519 AAAA... ansiblerunner@provisioner"
+cdn_organization_vault:         "12345678"
+cdn_activation_key_vault:       "rhis-bootstrap"
+```
+
+---
+
+## Linting
+
+The project is validated against the `ansible-lint` production profile:
+
+```bash
+ansible-lint
+```
+
+The configuration is in `.ansible-lint` and `.yamllint`. The `baremetal_init`
+role is excluded from linting. The `bootstrap_init` role must pass with 0
+failures before merging.
+
+Install ansible-lint under the same Python version as your system ansible-core:
+
+```bash
+python3.12 -m pip install --user ansible-lint
+```
+
+---
+
+## Contributing
+
+Fork it. Clone it. Configure it. Change it. Test it. Commit it. Create a PR.
+
+If you have comments, tips, or suggestions, PRs are greatly appreciated.
+Let's share the wealth!
 
 ENJOY!
-
-
-## Method 2: Boot from BMC managed volume (datacenter method)
-
-The exact method is highly dependent on your environment and how your enterprise systems provide base board management control. All major manufactures provide facilities to create virtual DVD drives and other devices to boot the system from. They also provide methodologies for managing the boot order. 
-
-See your system providers documentation for details on how to present the dvd iso and ks.cfg file to your system.
-
-<hr>
-
-## Appendix
-
-Baremetal Init Variables.
-
-**ks_path** - the name of the kickstart file. This should always be "ks.cfg"
-
-**oem_dir** - this is the path that your OEMDRV USB drive will mount on. e.g.  "/run/media/yourusername/OEMDRV"
-
-**baremetal_hosts** - the dictionary that contains the baremetal hosts
-
-baremetal_host attributes
-
-**rhis_role** - for our bookkeeping. e.g. "satellite"
-
-**hostname** - the hostname for the current system "satellite"
-
-**domain** - the domain for the current system. e.g. "example.ca"
-
-**mac** - the mac address of the primary interface for the system: e.g. "ff:ff:ff:ff:ff:fe"
-    
-**ipv4_address** - the IPv4 address. This should be a private range address e.g. "10.10.8.21"
-    
-**ipv4_netmask** - the IPv4 netmask. Ensure there are enough addresses in your range for your lab. e.g. "255.255.252.0" give 1020 addresses
-    
-**ipv4_gateway** - the IPv4 gateway. We need access to the internet to patch the systems and download content. e.g. "10.10.8.1"
-    
-**name_server1** - the IPv4 address of the first DNS server. e.g. "10.20.8.5"
-
-**name_server2** - the IPv4 address of the second DNS server. e.g.  "10.20.8.6"
-
-**root_enc_pass** - the encrypted root password for the system. Always set to "{{ encrypted_root_pass_vault }}". Create an encrypted password string with mkpasswd and store it in your vault file.
-
-**grub_enc_pass** - Optional. the encrypted grub bootloader password. Always set to "{{ encrypted_grub_pass_vault }}". Create an encrytped password string with grub2-mkpasswd-pbkdf2 and store the value in your vault file.
-
-**boot_disk** - the disk to create /boot and /boot/efi on. e.g. "nvme0n1"
-    
-**root_disk** - the disk to create the root volume group on. usuallly the same as boot_disk e.g. "nvme0n1"
-
-We create a compliance compatible volume layout. This satisfies most checklists, e.g. CIS Server Level 2, DISA STIG, and similar  
-See the sample file. The volume sizes are reasonable and expect a 256GB drive at minimum. Your satellite server should have a 1TB drive.
-
-lv_var is set to 1mb, however, the ks.cfg.j2 template tells anaconda to grow it to fill the rest of the drive
-Downloading all the repositories for all the samples requires ~900 GiB or a little more. If you put on more distributions, more than 1 TB easily.
-
-**username** - the user that run all the playbooks from the Provisioner node. Needs sudo access. e.g. "rhisbuilder"
-    
-**user_enc_pass** - the above users encrypted password. Always set to "{{ encrypted_user_pass_vault }}". Use mkpasswd as before to create an encrypted string for your vault file.
-
-**user_sudoer_policy** - the sudoer policy for the above user. Always set to "{{ user_sudoer_policy_vault }}". Use the ansible commandline to pass the sudoer password.
-
-**ssh_pub_key** - the above users ssh public key from the Provisioner node. Always set to "{{ ssh_pub_key_vault }}". This is the actual public key string stored in the vault file.
-
-Your first Satellite server must be registered to the CDN to get content. Your IdM server needs to be to start. We will later, unregister it and re-register it to the Satellite server after it is built. 
-
-**org** - your Red Hat CDN organization. Always set to "{{ cdn_organization_vault }}". Store this in the vault file.
-
-**activation_key** - an activation key to register the node to the Red Hat CDN. Always set to "{{ cdn_activation_key_vault }}". Store this in the vault file.
-
-
