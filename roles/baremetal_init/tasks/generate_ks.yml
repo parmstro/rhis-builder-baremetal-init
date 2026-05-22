@@ -14,7 +14,7 @@
     remote_src: true
     mode: "0644"
 
-# set generate_oemdrv_iso to true if you are deploying using a hypervisor, 
+# set generate_oemdrv_iso to true if you are deploying using a hypervisor,
 # iDRAC, iLO or someother method that requires you to mount a file as an iso
 - name: "Generate OEMDRV iso"
   when: host.generate_oemdrv_iso

@@ -42,9 +42,12 @@ main.yml
 
 ## Running the playbook
 
+Add the bootstrap_init_hosts variable assignment to pick a host list from your group_vars variable files.
+
 ```bash
 ansible-playbook -i inventory --limit provisioner main.yml \
   -e "vault_path=/path/to/vault.yml" \
+  -e "bootstrap_init_hosts={{ idm_bootstrap_init_hosts }}" \
   --ask-vault-pass
 ```
 
