@@ -3,10 +3,10 @@
 # Sample vars
 # You can also use this to build your Provisioner node! :-)
 
-ks_path: "ks.cfg"
-oem_dir: "/run/media/joeuser/OEMDRV"
+bootstrap_init_ks_path: "ks.cfg"
+bootstrap_init_oem_dir: "/run/media/joeuser/OEMDRV"
 
-baremetal_hosts:
+bootstrap_init_hosts:
   - rhis_role: "satellite"
     hostname: "satellite"
     domain: "example.ca"
@@ -21,7 +21,7 @@ baremetal_hosts:
     boot_disk: "/dev/nvme0n1"
     root_disk: "/dev/nvme0n1"
     # Default filesystem is xfs, uncomment next line to utilize ext4
-    # filesystem: ext4"
+    # filesystem: "ext4"
     # We will always use compliance layout
     boot_mb: 1024
     boot_efi_mb: 2048
@@ -52,7 +52,7 @@ baremetal_hosts:
     root_enc_pass: "{{ encrypted_root_pass_vault }}"
     grub_enc_pass: "{{ encrypted_grub_pass_vault }}"
     # Default filesystem is xfs, uncomment next line to utilize ext4
-    # filesystem: ext4"
+    # filesystem: "ext4"
     # We will always use compliance layout
     boot_mb: 1024
     boot_efi_mb: 2048
@@ -84,7 +84,7 @@ baremetal_hosts:
     grub_enc_pass: "{{ encrypted_grub_pass_vault }}"
     # Default to ext4 filesystem on kvm hosts to permit potenital filesystem
     # size reduction needs
-    filesystem: ext4"
+    filesystem: "ext4"
     # We will always use compliance layout
     boot_mb: 1024
     boot_efi_mb: 2048

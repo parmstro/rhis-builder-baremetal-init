@@ -1,0 +1,9 @@
+---
+
+- name: "Create an OEMDRV iso with the ks.cfg on it"
+  community.general.iso_create:
+    src_files:
+      - "{{ host.rhis_role }}_{{ host.hostname }}.{{ host.domain }}.ks.cfg"
+    dest_iso: "{{ host.rhis_role }}_{{ host.hostname }}.{{ host.domain }}.oemdrv.iso"
+    interchange_level: 3
+    vol_ident: "OEMDRV"

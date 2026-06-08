@@ -5,9 +5,9 @@
 # Mount the defined iso, if necessary
 # Create temporary copy, if necessary
 
-- name: "Generate baremetal host kickstart isos"
-  ansible.builtin.include_tasks: "generate_iso.yml"
+- name: "Generate baremetal host kickstart"
+  ansible.builtin.include_tasks: "generate_ks.yml"
   loop: "{{ baremetal_hosts }}"
   loop_control:
     loop_var: host
-  # no_log: true
+  no_log: true

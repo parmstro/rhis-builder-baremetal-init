@@ -5,7 +5,7 @@
     src: "ks.cfg.j2"
     dest: "{{ host.rhis_role }}_{{ host.hostname }}.{{ host.domain }}.ks.cfg"
     mode: "0644"
-  # no_log: true
+  no_log: true
 
 - name: "Copy the kickstart to the OEMDRV volume on the usb directory as ks.cfg"
   ansible.builtin.copy:
@@ -13,3 +13,9 @@
     dest: "{{ oem_dir }}/ks.cfg"
     remote_src: true
     mode: "0644"
+
+# set generate_oemdrv_iso to true if you are deploying using a hypervisor,
+# iDRAC, iLO or someother method that requires you to mount a file as an iso
+- name: "Generate OEMDRV iso"
+  when: host.generate_oemdrv_iso
+  ansible.builtin.include_tasks: "generate_oemdrv_iso.yml"

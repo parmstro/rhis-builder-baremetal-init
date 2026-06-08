@@ -1,0 +1,11 @@
+---
+profile: production
+
+warn_list:
+  - experimental
+
+exclude_paths:
+  - roles/baremetal_init/
+
+mock_modules:
+  - community.general.iso_create
