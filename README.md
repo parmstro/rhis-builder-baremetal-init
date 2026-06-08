@@ -1,5 +1,17 @@
 # rhis-builder-baremetal-init
 
+> [!WARNING]
+> **bootstrap_init has moved — 2026-06-08**
+>
+> The `bootstrap_init` role now has a dedicated home at
+> **[rhis-builder-bootstrap-init](https://github.com/parmstro/rhis-builder-bootstrap-init)**.
+> All new deployments and active development should use the new repository.
+>
+> This repository is retained for users of the `baremetal_init` role only.
+> The `bootstrap_init` role remains here during the transition period to avoid
+> breaking existing users, but it will not receive enhancements here.
+> See [Migration](#migration) below.
+
 Generates OEMDRV kickstart files to bootstrap RHEL 9 baremetal and virtual hosts
 for the **rhis-builder** family of projects.
 
@@ -51,11 +63,38 @@ This repository is **Phase 1** in the RHIS infrastructure lifecycle:
 
 | Role | Status |
 |---|---|
-| `bootstrap_init` | Active — all new deployments use this role |
+| `bootstrap_init` | Moved — canonical home is [rhis-builder-bootstrap-init](https://github.com/parmstro/rhis-builder-bootstrap-init) |
 | `baremetal_init` | Deprecated — kept for backwards compatibility only |
 
-Do not use `baremetal_init` for new environments. Refer to `bootstrap_init_vars.SAMPLE.yml`
-for the current variable format.
+Do not use `baremetal_init` for new environments. New deployments should clone
+[rhis-builder-bootstrap-init](https://github.com/parmstro/rhis-builder-bootstrap-init)
+directly. The `bootstrap_init` role is retained here only during the user migration period.
+
+---
+
+## Migration
+
+### Migrating from baremetal_init to bootstrap_init
+
+If you are currently using the `baremetal_init` role:
+
+1. Review `bootstrap_init_vars.SAMPLE.yml` — the variable format has changed significantly.
+   `bootstrap_init` uses a `bootstrap_init_hosts` list with per-host entries and the
+   `bootstrap_init_` prefix on all role-level variables.
+2. Clone [rhis-builder-bootstrap-init](https://github.com/parmstro/rhis-builder-bootstrap-init)
+   instead of this repository.
+3. Update your host variable files to the `bootstrap_init_hosts` format.
+4. Update any scripts that reference this repo path to point to `rhis-builder-bootstrap-init`.
+
+### Migrating from rhis-builder-baremetal-init to rhis-builder-bootstrap-init
+
+If you are already using the `bootstrap_init` role from this repository:
+
+1. Clone [rhis-builder-bootstrap-init](https://github.com/parmstro/rhis-builder-bootstrap-init).
+2. Copy your `group_vars/provisioner/` variable files to the new clone.
+3. Update any scripts (e.g. `build_highside_isos.sh`) that reference this repo path
+   to point to `rhis-builder-bootstrap-init` instead.
+4. The variable format is identical — no changes to your host definitions are required.
 
 ---
 

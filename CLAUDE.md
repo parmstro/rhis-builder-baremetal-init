@@ -1,5 +1,11 @@
 # CLAUDE.md — rhis-builder-baremetal-init
 
+> **bootstrap_init has moved — 2026-06-08.**
+> The canonical home for `bootstrap_init` is now
+> [rhis-builder-bootstrap-init](https://github.com/parmstro/rhis-builder-bootstrap-init).
+> This repo is retained for `baremetal_init` users during transition.
+> Do not add new features or enhancements to `bootstrap_init` here.
+
 ## Project purpose
 
 Generates OEMDRV kickstart files to bootstrap RHEL 9 baremetal and virtual hosts
@@ -11,11 +17,12 @@ OEMDRV volume or as ISO9660 images for iDRAC/iLO/Redfish virtual media.
 
 | Role | Status |
 |---|---|
-| `bootstrap_init` | Active — all new work goes here |
-| `baremetal_init` | Deprecated — bug fixes only, no enhancements |
+| `bootstrap_init` | Moved — canonical home is [rhis-builder-bootstrap-init](https://github.com/parmstro/rhis-builder-bootstrap-init) |
+| `baremetal_init` | Deprecated — no enhancements; do not touch |
 
-**Do not enhance `baremetal_init`.** It is kept for backwards compatibility only.
-Touch it only if something is actively broken.
+**Do not enhance either role in this repo.** `baremetal_init` is fully deprecated.
+`bootstrap_init` is retained here only during the user migration period — all active
+development happens in `rhis-builder-bootstrap-init`.
 
 ## Variable conventions
 
