@@ -145,13 +145,7 @@ cat >> /etc/hosts <<EOF
 {{ host.hostname }}.{{ host.domain }}    {{ host.ipv4_address }}
 EOF
 
-{% if not (basevars_disconnected_domain | default(false)) %}
 subscription-manager register --org={{ host.org }} --activationkey={{ host.activation_key }}
-{% else %}
-# Disconnected deployment — CDN registration skipped.
-# This system will register to the highside Satellite after it is operational.
-# The RHIS build playbook handles registration via the local Satellite activation key.
-{% endif %}
 
 echo "Updating system time"
 systemctl enable --now chronyd
