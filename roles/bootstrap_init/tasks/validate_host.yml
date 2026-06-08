@@ -93,7 +93,14 @@
       - bootstrap_init_host.user_enc_pass is defined and bootstrap_init_host.user_enc_pass | length > 0
       - bootstrap_init_host.user_sudoer_policy is defined and bootstrap_init_host.user_sudoer_policy | length > 0
       - bootstrap_init_host.ssh_pub_key is defined and bootstrap_init_host.ssh_pub_key | length > 0
-      - bootstrap_init_host.org is defined and bootstrap_init_host.org | length > 0
-      - bootstrap_init_host.activation_key is defined and bootstrap_init_host.activation_key | length > 0
     fail_msg: "One or more required credential fields are missing for {{ bootstrap_init_host.hostname }}"
   no_log: true
+
+- name: "Assert CDN registration fields are present for connected hosts"
+  ansible.builtin.assert:
+    that:
+      - bootstrap_init_host.org is defined and bootstrap_init_host.org | length > 0
+      - bootstrap_init_host.activation_key is defined and bootstrap_init_host.activation_key | length > 0
+    fail_msg: "org and activation_key are required for connected hosts — set disconnected: true to skip CDN registration for {{ bootstrap_init_host.hostname }}"
+  no_log: true
+  when: not (bootstrap_init_host.disconnected | default(false))

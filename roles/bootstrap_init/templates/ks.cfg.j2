@@ -145,14 +145,18 @@ cat >> /etc/hosts <<EOF
 {{ bootstrap_init_host.ipv4_address }} {{ bootstrap_init_host.hostname }}.{{ bootstrap_init_host.domain }}
 EOF
 
+{% if not (bootstrap_init_host.disconnected | default(false)) %}
 subscription-manager register --org={{ bootstrap_init_host.org }} --activationkey={{ bootstrap_init_host.activation_key }}
+{% endif %}
 
 echo "Updating system time"
 systemctl enable --now chronyd
 /usr/bin/chronyc makestep
 /usr/sbin/hwclock --systohc
 
+{% if not (bootstrap_init_host.disconnected | default(false)) %}
 dnf -y update
+{% endif %}
 
 chvt 1
 ) 2>&1 | tee /root/install.post.log
