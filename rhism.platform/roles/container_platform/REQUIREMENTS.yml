@@ -1,0 +1,92 @@
+---
+# Functional requirements — container_platform (requirements->test-case layer +
+# Tier-3 elevation, wave-3+ standard). This is the DISPATCHER role: its FRs are
+# about correct distribution SELECTION and shared orchestration (install/
+# configure/storage/registry/ingress wiring), not any single product's
+# behaviour — each selected product role carries its own REQUIREMENTS.yml.
+# Capability curated from README + tasks/ (main/install/configure/storage/
+# registry/ingress/baseline) and grounded in the Kubernetes Ingress /
+# distribution docs. Family lab: playbooks/container_platform.yml.
+functional_requirements:
+  - req_id: CONTAINER_PLATFORM-FR-001
+    statement: >-
+      The role SHALL validate cp_action against the supported action set and
+      reject any invalid value (negative dispatcher test).
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: CONTAINER_PLATFORM-FR-002
+    statement: >-
+      The role SHALL validate cp_type against the four supported distributions
+      (k3s, rke2, okd, ocp) and reject any invalid value.
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: CONTAINER_PLATFORM-FR-003
+    statement: >-
+      The role SHALL load the type-specific variable file for the selected
+      cp_type (RHSM-required, built-in-ingress, built-in-registry, and
+      service-name facts differ per distribution).
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: CONTAINER_PLATFORM-FR-004
+    statement: >-
+      The role SHALL select the container-platform distribution via cp_type and
+      delegate install/configure to that product role (include_role name=cp_type)
+      with the shared action interface — deploying a real cluster.
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#install
+
+  - req_id: CONTAINER_PLATFORM-FR-005
+    statement: >-
+      The role SHALL wire cluster storage by selecting storage_<cp_storage_type>
+      (local-path, nfs, longhorn, ocs) and provisioning the StorageClass on the
+      cluster.
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#storage
+
+  - req_id: CONTAINER_PLATFORM-FR-006
+    statement: >-
+      The role SHALL wire the container registry by selecting
+      registry_<cp_registry_type> (internal, generic).
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#registry
+
+  - req_id: CONTAINER_PLATFORM-FR-007
+    statement: >-
+      The role SHALL wire the ingress controller by selecting
+      ingress_<cp_ingress_type> (default, nginx, traefik, haproxy) with one
+      identical include_role call and no per-backend code.
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#ingress
+
+  - req_id: CONTAINER_PLATFORM-FR-008
+    statement: >-
+      The baseline orchestrator SHALL run install -> configure -> storage ->
+      registry -> ingress in order, each gated by its cp_apply_* boolean toggle.
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: CONTAINER_PLATFORM-FR-009
+    statement: >-
+      The okd/ocp install path SHALL be fail-closed on the cp_install_execute
+      dry-run gate (no openshift-install invoked until explicitly enabled).
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: CONTAINER_PLATFORM-FR-010
+    statement: >-
+      A real OCP cluster install SHALL register the bastion via RHSM and consume
+      a valid Red Hat pull secret (cp_pull_secret) through the IPI installer.
+    tier: 3
+    verified_by: []

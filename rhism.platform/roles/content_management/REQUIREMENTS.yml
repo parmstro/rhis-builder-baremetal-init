@@ -1,0 +1,102 @@
+---
+# Functional requirements — content_management (requirements->test-case layer +
+# Tier-3 elevation, owner rules 2026-07-12). This is the DISPATCHER role: its
+# FRs are about correct backend SELECTION (foreman | satellite) and shared
+# content-lifecycle ORCHESTRATION (install/configure/repos/sync/content_views/
+# activation_keys/baseline), not any single product's behaviour — each product
+# role (foreman, satellite) carries its own REQUIREMENTS.yml. Capability curated
+# from README + tasks/ (main/install/configure/repos/sync/content_views/
+# activation_keys/baseline) and grounded in the Foreman/Katello + Red Hat
+# Satellite content-management docs. Family lab: playbooks/content_management.yml.
+functional_requirements:
+  - req_id: CONTENT_MANAGEMENT-FR-001
+    statement: >-
+      The role SHALL validate content_action against the supported action set
+      and reject any invalid value (negative dispatcher test).
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: CONTENT_MANAGEMENT-FR-002
+    statement: >-
+      The role SHALL validate content_type against the two supported backends
+      (foreman, satellite) and reject any invalid value.
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: CONTENT_MANAGEMENT-FR-003
+    statement: >-
+      The role SHALL load the type-specific variable file for the selected
+      content_type (RHSM/manifest/CDN facts differ between foreman and satellite).
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: CONTENT_MANAGEMENT-FR-004
+    statement: >-
+      The 'install' action SHALL honour the content_install_execute dry-run
+      gate (fail-closed) and select foreman-installer or satellite-installer
+      per content_type without running it until enabled.
+    tier: 1
+    verified_by:
+      - molecule: foreman
+
+  - req_id: CONTENT_MANAGEMENT-FR-005
+    statement: >-
+      With content_install_execute enabled, the role SHALL deploy the selected
+      Foreman/Satellite server and configure the organization, location, and
+      lifecycle environments.
+    tier: 3
+    verified_by:
+      - lab: playbooks/content_management.yml#install
+
+  - req_id: CONTENT_MANAGEMENT-FR-006
+    statement: >-
+      The 'repos' action SHALL create the configured products and repositories
+      (Foreman custom URLs; Satellite CDN repository sets) via the backend's
+      collection.
+    tier: 3
+    verified_by:
+      - lab: playbooks/content_management.yml#repos
+
+  - req_id: CONTENT_MANAGEMENT-FR-007
+    statement: >-
+      The 'sync' action SHALL create sync plans, assign products, and optionally
+      trigger an immediate sync (content_sync_now).
+    tier: 3
+    verified_by:
+      - lab: playbooks/content_management.yml#sync
+
+  - req_id: CONTENT_MANAGEMENT-FR-008
+    statement: >-
+      The 'content_views' action SHALL create content views, publish a version,
+      and promote it through the configured lifecycle environments.
+    tier: 3
+    verified_by:
+      - lab: playbooks/content_management.yml#content_views
+
+  - req_id: CONTENT_MANAGEMENT-FR-009
+    statement: >-
+      The 'activation_keys' action SHALL create host collections and activation
+      keys bound to a content view and lifecycle environment.
+    tier: 3
+    verified_by:
+      - lab: playbooks/content_management.yml#activation_keys
+
+  - req_id: CONTENT_MANAGEMENT-FR-010
+    statement: >-
+      The 'baseline' orchestrator SHALL run only the actions enabled by their
+      content_apply_* boolean toggles, each dispatched through the same
+      type-selected code path.
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: CONTENT_MANAGEMENT-FR-011
+    statement: >-
+      A real Satellite backend SHALL register the host with RHSM and upload the
+      subscription manifest — genuinely uncoverable by CI (needs a Red Hat
+      subscription + entitlement).
+    tier: 3
+    verified_by: []

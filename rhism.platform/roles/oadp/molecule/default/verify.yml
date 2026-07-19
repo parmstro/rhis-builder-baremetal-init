@@ -1,0 +1,32 @@
+---
+- name: Verify standalone variable contract
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Load role defaults
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../../defaults/main.yml"
+      delegate_to: localhost
+
+    - name: Assert standalone interface defaults resolve
+      ansible.builtin.assert:
+        that:
+          - action == 'verify'
+          - backup_oadp_namespace == 'openshift-adp'
+          - backup_oadp_operator_package == 'redhat-oadp-operator'
+          - backup_oadp_operator_channel == 'stable'
+          - backup_oadp_dpa_name == 'dpa-sample'
+          - "'openshift' in backup_oadp_default_plugins"
+          - backup_oadp_node_agent_enable | bool
+          - backup_oadp_node_agent_uploader_type == 'kopia'
+          - backup_oadp_credential_secret == 'cloud-credentials'
+          - backup_oadp_credential_key == 'cloud'
+          - backup_oadp_ttl == '720h0m0s'
+          - backup_oadp_restore_existing_policy == 'none'
+        fail_msg: "oadp defaults did not resolve to the expected standalone contract"
+      delegate_to: localhost
+
+    - name: Report verification passed
+      ansible.builtin.debug:
+        msg: "PASS — oadp standalone contract verified"
+      delegate_to: localhost

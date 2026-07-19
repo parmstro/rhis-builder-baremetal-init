@@ -1,0 +1,20 @@
+---
+_cp_install_script_url: ""
+_cp_packages:
+  - openshift-clients
+_cp_config_dir: /etc/kubernetes
+_cp_config_file: /etc/kubernetes/kubeconfig
+_cp_kubeconfig_path: "{{ cp_install_dir }}/auth/kubeconfig"
+_cp_service_name: ""
+_cp_service_name_agent: ""
+_cp_binary: openshift-install
+_cp_kubectl_cmd: /usr/local/bin/oc
+_cp_rhsm_required: false
+_cp_has_builtin_registry: true
+_cp_has_builtin_ingress: true
+_cp_builtin_ingress_name: default-ingress-controller
+_cp_firewall_ports:
+  - 6443/tcp
+  - 22623/tcp
+  - 443/tcp
+  - 80/tcp

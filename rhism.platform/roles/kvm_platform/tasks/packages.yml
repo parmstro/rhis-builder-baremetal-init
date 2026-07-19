@@ -1,0 +1,12 @@
+---
+# Shared package-list resolution used by both install.yml and upgrade.yml — kept in one
+# place so the two actions can never drift on what "the KVM/libvirt package set" means.
+- name: Resolve OS-specific package list when kvm_platform_packages is not overridden
+  ansible.builtin.set_fact:
+    _kvm_platform_resolved_packages: >-
+      {{
+        kvm_platform_packages
+        if (kvm_platform_packages | length > 0)
+        else (_kvm_platform_packages_map[ansible_facts['os_family'] | default('RedHat')]
+              | default(_kvm_platform_packages_map['RedHat']))
+      }}

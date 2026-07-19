@@ -1,0 +1,97 @@
+---
+# tasks/secure.yml — TLS certificates, DKIM key generation, SASL relay credentials.
+
+- name: Secure full mail stack (TLS + DKIM + SASL)
+  become: true
+  when: mail_execute | bool
+  block:
+    - name: Deploy TLS certificate
+      ansible.builtin.copy:
+        src: "{{ mail_tls_cert_file }}"
+        dest: "{{ mail_tls_cert_file }}"
+        owner: root
+        group: root
+        mode: "0644"
+        remote_src: true
+      when: mail_tls_cert_file | length > 0
+
+    - name: Deploy TLS private key
+      ansible.builtin.copy:
+        src: "{{ mail_tls_key_file }}"
+        dest: "{{ mail_tls_key_file }}"
+        owner: root
+        group: postfix
+        mode: "0640"
+        remote_src: true
+      no_log: true
+      when: mail_tls_key_file | length > 0
+
+    - name: Ensure OpenDKIM keys directory exists
+      ansible.builtin.file:
+        path: /etc/opendkim/keys
+        state: directory
+        owner: opendkim
+        group: opendkim
+        mode: "0700"
+      when: mail_dkim_enabled | bool
+
+    - name: Generate DKIM private key
+      ansible.builtin.command:
+        cmd: >-
+          openssl genrsa -out /etc/opendkim/keys/{{ mail_dkim_selector }}.private
+          {{ mail_dkim_key_size }}
+        creates: /etc/opendkim/keys/{{ mail_dkim_selector }}.private
+      when: mail_dkim_enabled | bool
+
+    - name: Restrict DKIM private key permissions
+      ansible.builtin.file:
+        path: /etc/opendkim/keys/{{ mail_dkim_selector }}.private
+        owner: opendkim
+        group: opendkim
+        mode: "0600"
+      when: mail_dkim_enabled | bool
+
+    - name: Extract DKIM public key for DNS TXT record
+      ansible.builtin.command:
+        cmd: >-
+          openssl rsa -in /etc/opendkim/keys/{{ mail_dkim_selector }}.private
+          -pubout -outform DER
+      register: _mail_full_dkim_pubkey_raw
+      changed_when: false
+      when: mail_dkim_enabled | bool
+
+    - name: Display DKIM DNS TXT record instruction
+      ansible.builtin.debug:
+        msg: >-
+          Add a DNS TXT record for {{ mail_dkim_selector }}._domainkey.{{ mail_domain }}
+          using the public key at /etc/opendkim/keys/{{ mail_dkim_selector }}.private.
+          Run: opendkim-testkey -d {{ mail_domain }} -s {{ mail_dkim_selector }} -vvv
+          after configuring DNS.
+      when: mail_dkim_enabled | bool
+
+    - name: Deploy opendkim.conf
+      ansible.builtin.template:
+        src: opendkim.conf.j2
+        dest: /etc/opendkim.conf
+        owner: root
+        group: opendkim
+        mode: "0640"
+      notify: mail_full - restart opendkim
+      when: mail_dkim_enabled | bool
+
+    - name: Deploy SASL password file for relay
+      ansible.builtin.template:
+        src: sasl_passwd.j2
+        dest: /etc/postfix/sasl_passwd
+        owner: root
+        group: root
+        mode: "0600"
+      no_log: true
+      when: mail_relay_user | length > 0
+
+    - name: Build SASL password hash database
+      ansible.builtin.command:
+        cmd: postmap {{ mail_db_type }}:/etc/postfix/sasl_passwd
+      changed_when: true
+      no_log: true
+      when: mail_relay_user | length > 0

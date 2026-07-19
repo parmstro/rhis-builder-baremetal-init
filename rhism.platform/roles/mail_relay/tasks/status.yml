@@ -1,0 +1,27 @@
+---
+# mail_relay — status action (show postfix status and queue)
+
+- name: Show Postfix status and queue
+  become: true
+  block:
+    - name: Run postfix status
+      ansible.builtin.command:
+        cmd: postfix status
+      register: _mail_relay_postfix_status
+      changed_when: false
+      failed_when: false
+
+    - name: Run mailq
+      ansible.builtin.command:
+        cmd: mailq
+      register: _mail_relay_mailq
+      changed_when: false
+      failed_when: false
+
+    - name: Display postfix status
+      ansible.builtin.debug:
+        msg: "{{ _mail_relay_postfix_status.stdout_lines }}"
+
+    - name: Display mail queue
+      ansible.builtin.debug:
+        msg: "{{ _mail_relay_mailq.stdout_lines }}"

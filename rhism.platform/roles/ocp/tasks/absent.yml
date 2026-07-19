@@ -1,0 +1,5 @@
+---
+# Action: absent — delegates to present.yml (consolidated present/absent)
+
+- name: Run present/absent consolidated logic
+  ansible.builtin.include_tasks: present.yml

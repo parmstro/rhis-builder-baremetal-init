@@ -1,0 +1,23 @@
+---
+- name: Manage IDM DNS zones
+  freeipa.ansible_freeipa.ipadnszone:
+    ipaadmin_password: "{{ idm_admin_password }}"
+    name: "{{ item.name }}"
+    forwarders: "{{ item.forwarders | default(omit) }}"
+    forward_policy: "{{ item.forward_policy | default(omit) }}"
+    state: "{{ item.state | default('present') }}"
+  loop: "{{ idm_dns_zones | default([]) }}"
+  no_log: true
+  when: idm_dns_zones | default([]) | length > 0
+
+- name: Manage IDM DNS records
+  freeipa.ansible_freeipa.ipadnsrecord:
+    ipaadmin_password: "{{ idm_admin_password }}"
+    zone_name: "{{ item.zone }}"
+    name: "{{ item.name }}"
+    record_type: "{{ item.type }}"
+    record_value: "{{ item.value }}"
+    state: "{{ item.state | default('present') }}"
+  loop: "{{ idm_dns_records | default([]) }}"
+  no_log: true
+  when: idm_dns_records | default([]) | length > 0

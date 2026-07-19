@@ -1,0 +1,46 @@
+---
+# restore — apply a Velero Restore CR (velero.io/v1, kind Restore) that recreates the
+# workloads captured by a named Backup (or the latest Backup of a Schedule). Waits for
+# .status.phase == Completed. namespaceMapping relocates namespaces on restore;
+# existingResourcePolicy controls how already-present resources are handled.
+
+- name: Validate restore requirements
+  ansible.builtin.assert:
+    that:
+      - backup_oadp_restore_name | length > 0
+      - backup_oadp_restore_backup_name | length > 0
+    fail_msg: "backup_oadp_restore_name and backup_oadp_restore_backup_name are required for restore"
+
+- name: Create a Velero Restore
+  kubernetes.core.k8s:
+    kubeconfig: "{{ backup_oadp_kubeconfig | default(omit) }}"
+    state: present
+    apply: true
+    definition:
+      apiVersion: velero.io/v1
+      kind: Restore
+      metadata:
+        name: "{{ backup_oadp_restore_name }}"
+        namespace: "{{ backup_oadp_namespace }}"
+      spec:
+        backupName: "{{ backup_oadp_restore_backup_name }}"
+        restorePVs: "{{ backup_oadp_restore_pvs | bool }}"
+        existingResourcePolicy: "{{ backup_oadp_restore_existing_policy }}"
+        namespaceMapping: "{{ backup_oadp_restore_namespace_mapping }}"
+
+- name: Wait for the Restore to complete
+  kubernetes.core.k8s_info:
+    kubeconfig: "{{ backup_oadp_kubeconfig | default(omit) }}"
+    api_version: velero.io/v1
+    kind: Restore
+    name: "{{ backup_oadp_restore_name }}"
+    namespace: "{{ backup_oadp_namespace }}"
+  register: _oadp_restore
+  retries: "{{ (backup_oadp_wait_timeout | int / 10) | int }}"
+  delay: 10
+  until: >-
+    _oadp_restore['resources'] | default([])
+    | selectattr('status.phase', 'defined')
+    | selectattr('status.phase', 'equalto', 'Completed')
+    | list | length > 0
+  when: backup_oadp_wait | bool

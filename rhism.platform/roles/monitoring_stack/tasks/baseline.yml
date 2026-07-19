@@ -1,0 +1,28 @@
+---
+- name: Deploy Nagios server
+  ansible.builtin.include_tasks: nagios_server.yml
+  when: mon_apply_nagios_server
+
+- name: Deploy NRPE client
+  ansible.builtin.include_tasks: nagios_client.yml
+  when: mon_apply_nagios_client
+
+- name: Deploy Splunk server
+  ansible.builtin.include_tasks: splunk_server.yml
+  when: mon_apply_splunk_server
+
+- name: Deploy Splunk forwarder
+  ansible.builtin.include_tasks: splunk_forwarder.yml
+  when: mon_apply_splunk_forwarder
+
+- name: Deploy Elasticsearch server
+  ansible.builtin.include_tasks: elastic_server.yml
+  when: mon_apply_elastic_server
+
+- name: Deploy Elastic agent
+  ansible.builtin.include_tasks: elastic_agent.yml
+  when: mon_apply_elastic_agent
+
+- name: Deploy EDA rulebooks
+  ansible.builtin.include_tasks: eda_rulebooks.yml
+  when: mon_apply_eda_rulebooks

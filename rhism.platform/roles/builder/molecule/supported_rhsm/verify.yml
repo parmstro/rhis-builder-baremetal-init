@@ -1,0 +1,69 @@
+---
+- name: Verify RH IDM is operational
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Check IPA service is active
+      ansible.builtin.systemd:
+        name: ipa
+      register: _ipa_service
+      failed_when: (_ipa_service.status.ActiveState | default('inactive')) != 'active'
+      become: true
+
+    - name: Verify Kerberos — kinit admin
+      ansible.builtin.shell:
+        cmd: "echo '{{ idm_admin_password }}' | kinit admin"
+      register: _kinit
+      changed_when: false
+      no_log: true
+      failed_when: _kinit.rc != 0
+
+    - name: Verify IPA LDAP — ipa user-find admin
+      ansible.builtin.command:
+        cmd: ipa user-find admin --all
+      register: _ipa_user_find
+      changed_when: false
+      failed_when: _ipa_user_find.rc != 0
+
+    - name: Probe IDM HTTPS web UI
+      ansible.builtin.uri:
+        url: "https://{{ ansible_fqdn }}/ipa/ui/"
+        validate_certs: false
+        return_content: false
+        timeout: 15
+        status_code: [200, 301, 302]
+      register: _ipa_web
+      delegate_to: localhost
+
+    - name: Check RHSM subscription is current
+      ansible.builtin.command:
+        cmd: subscription-manager status
+      register: _rhsm_status
+      changed_when: false
+      failed_when: false
+      become: true
+
+    - name: Destroy Kerberos ticket (cleanup)
+      ansible.builtin.command:
+        cmd: kdestroy
+      changed_when: false
+      failed_when: false
+
+    - name: Determine RHSM status string
+      ansible.builtin.set_fact:
+        _rhsm_display: >-
+          {{ 'Current' if 'Overall Status: Current' in
+             (_rhsm_status.stdout | default(''))
+             else (_rhsm_status.stdout | default('N/A') | truncate(60)) }}
+
+    - name: Report rhism RHSM verification results
+      ansible.builtin.debug:
+        msg: |
+          rhism RHSM Verification Report
+          ================================
+          IPA service    : {{ _ipa_service.status.ActiveState | default('N/A') }}
+          kinit admin    : {{ 'PASS' if _kinit.rc | default(1) == 0 else 'FAIL' }}
+          ipa user-find  : {{ 'PASS' if _ipa_user_find.rc | default(1) == 0 else 'FAIL' }}
+          Web UI probe   : HTTP {{ _ipa_web.status | default('N/A') }}
+          RHSM status    : {{ _rhsm_display }}
+      delegate_to: localhost

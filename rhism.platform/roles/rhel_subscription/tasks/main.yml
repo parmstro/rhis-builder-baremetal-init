@@ -1,0 +1,7 @@
+---
+# rhel_subscription_action + the full variable contract are declared and validated in
+# meta/argument_specs.yml (ansible-core validates automatically at role entry).
+
+- name: "RHSM: {{ rhel_subscription_action }}"
+  ansible.builtin.include_tasks:
+    file: "{{ rhel_subscription_action }}.yml"

@@ -1,0 +1,94 @@
+---
+# pm_ansible — audit action.
+# Reads credential metadata and checks ISM policy compliance.
+# Writes a compliance report to pm_audit_report_path.
+
+- name: Check that metadata file exists
+  ansible.builtin.stat:
+    path: "{{ pm_ansible_cred_dir }}/{{ pm_target }}.meta.yml"
+  register: _pm_meta_stat
+  delegate_to: localhost
+  become: "{{ pm_ansible_become | bool }}"
+
+- name: Assert metadata file exists (credential must be created first)
+  ansible.builtin.assert:
+    that:
+      - _pm_meta_stat.stat.exists
+    fail_msg: >-
+      No credential metadata found for '{{ pm_target }}' in {{ pm_ansible_cred_dir }}.
+      Run pm_action=create first.
+
+- name: Load credential metadata
+  ansible.builtin.slurp:
+    src: "{{ pm_ansible_cred_dir }}/{{ pm_target }}.meta.yml"
+  register: _pm_meta_raw
+  delegate_to: localhost
+  become: "{{ pm_ansible_become | bool }}"
+
+- name: Parse metadata
+  ansible.builtin.set_fact:
+    _pm_meta: "{{ _pm_meta_raw.content | b64decode | from_yaml }}"
+
+- name: Get current timestamp (epoch)
+  ansible.builtin.command:
+    cmd: "date +%s"
+  register: _pm_now_epoch
+  changed_when: false
+  delegate_to: localhost
+
+- name: Calculate days since creation
+  ansible.builtin.set_fact:
+    _pm_created_epoch: "{{ (_pm_meta.created_at | to_datetime('%Y-%m-%dT%H:%M:%SZ')).strftime('%s') | int }}"
+    _pm_now: "{{ _pm_now_epoch.stdout | int }}"
+
+- name: Calculate password age in days
+  ansible.builtin.set_fact:
+    _pm_age_days: "{{ ((_pm_now | int - _pm_created_epoch | int) / 86400) | int }}"
+
+- name: Build ISM compliance report
+  ansible.builtin.set_fact:
+    _pm_audit_report:
+      target: "{{ pm_target }}"
+      service: "{{ _pm_meta.service | default('') }}"
+      backend: ansible
+      audit_timestamp: "{{ lookup('pipe', 'date -u +%Y-%m-%dT%H:%M:%SZ') }}"
+      password_age_days: "{{ _pm_age_days | int }}"
+      expiry_days: "{{ _pm_meta.expiry_days | int }}"
+      days_until_expiry: "{{ (_pm_meta.expiry_days | int - _pm_age_days | int) }}"
+      ism_checks:
+        ISM_0406_length_compliant: "{{ _pm_meta.length | int >= pm_length }}"
+        ISM_0410_not_expired: "{{ _pm_age_days | int < _pm_meta.expiry_days | int }}"
+        ISM_0410_expiry_warning: "{{ (_pm_meta.expiry_days | int - _pm_age_days | int) <= 14 }}"
+      overall_compliant: >-
+        {{
+          (_pm_meta.length | int >= pm_length) and
+          (_pm_age_days | int < _pm_meta.expiry_days | int)
+        }}
+
+- name: Write audit report
+  ansible.builtin.copy:
+    content: "{{ _pm_audit_report | to_nice_yaml }}"
+    dest: "{{ pm_audit_report_path }}"
+    mode: "0600"
+  delegate_to: localhost
+  become: "{{ pm_ansible_become | bool }}"
+  when: pm_audit_report_format == 'text'
+
+- name: Write audit report (JSON format)
+  ansible.builtin.copy:
+    content: "{{ _pm_audit_report | to_nice_json }}"
+    dest: "{{ pm_audit_report_path }}"
+    mode: "0600"
+  delegate_to: localhost
+  become: "{{ pm_ansible_become | bool }}"
+  when: pm_audit_report_format == 'json'
+
+- name: Assert ISM compliance (fail if non-compliant)
+  ansible.builtin.assert:
+    that:
+      - _pm_audit_report.overall_compliant | bool
+    fail_msg: >-
+      ISM compliance failure for '{{ pm_target }}':
+      age={{ _pm_age_days }} days, expiry={{ _pm_meta.expiry_days }} days,
+      length={{ _pm_meta.length }}. See {{ pm_audit_report_path }} for details.
+    success_msg: "ISM audit passed for '{{ pm_target }}': {{ _pm_age_days }} days old, expires in {{ _pm_audit_report.days_until_expiry }} days."

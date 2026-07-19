@@ -1,0 +1,35 @@
+---
+# mail_relay — package management (present / absent)
+#
+# Handles package install/remove and firewall ports.
+# action var is used directly as package state (present/absent).
+# Node-changing tasks are gated on mail_execute (false = dry-run).
+
+- name: Manage Postfix relay packages
+  ansible.builtin.package:
+    name: "{{ _mail_packages }}"
+    state: "{{ action }}"
+  become: true
+  when: mail_execute | bool
+
+- name: Manage SMTP firewall port (25)
+  ansible.posix.firewalld:
+    port: "25/tcp"
+    state: "{{ 'enabled' if action == 'present' else 'disabled' }}"
+    permanent: true
+    immediate: true
+  become: true
+  when:
+    - mail_execute | bool
+    - mail_open_smtp | bool
+
+- name: Manage submission firewall port (587)
+  ansible.posix.firewalld:
+    port: "587/tcp"
+    state: "{{ 'enabled' if action == 'present' else 'disabled' }}"
+    permanent: true
+    immediate: true
+  become: true
+  when:
+    - mail_execute | bool
+    - mail_open_submission | bool

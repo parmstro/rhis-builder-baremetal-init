@@ -1,0 +1,55 @@
+---
+# restic has no dry-run gate and its actions install packages / write files via `become`,
+# which fails on a minimal container (no sudo). So this scenario validates the STANDALONE
+# CONTRACT on the control host: argument-spec enforcement (a real negative test — the role
+# loads fine on Linux), the shared backup_restic_* default contract, and the presence of every
+# dispatch task file. Functional backup is validated in the full-stack test lab, not molecule.
+- name: Validate restic dispatcher + standalone variable contract (control host only)
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Load role defaults
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../../defaults/main.yml"
+
+    - name: Negative test — argument spec rejects a bogus action
+      block:
+        - name: Call role with invalid action
+          ansible.builtin.include_role:
+            name: restic
+          vars:
+            action: bogus_action
+        - name: Fail if validation did not catch invalid action
+          ansible.builtin.fail:
+            msg: "argument_spec should have rejected the bogus action"
+      rescue:
+        - name: Confirm expected failure was caught
+          ansible.builtin.debug:
+            msg: "PASS — bogus action correctly rejected"
+
+    - name: Assert standalone variable/default contract
+      ansible.builtin.assert:
+        that:
+          - action == 'client'
+          - backup_restic_repository is defined
+          - backup_restic_retention_daily | int == 7
+          # verify-depth contract: structure check always on; checksum + restore-test
+          # opt-in and off by default (expensive) — see docs/backup-integrity.
+          - backup_restic_verify_read_data | bool == false
+          - backup_restic_verify_restore_test | bool == false
+          - backup_restic_verify_read_data_subset == '5%'
+        fail_msg: "restic standalone default contract not satisfied"
+
+    - name: Verify a dispatch task file exists for every declared action
+      ansible.builtin.stat:
+        path: "{{ playbook_dir }}/../../tasks/{{ item }}.yml"
+      register: _restic_action_stat
+      failed_when: not _restic_action_stat.stat.exists
+      loop:
+        - server
+        - client
+        - install
+        - configure
+        - backup
+        - restore
+        - snapshots

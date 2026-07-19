@@ -1,0 +1,129 @@
+---
+# roles/pm_vault/defaults/main.yml
+# Variable contract for the HashiCorp Vault role.
+# Covers server lifecycle (install, configure, start, stop, remove) AND
+# secret management (create, read, delete, audit, rotate).
+# Standalone role — set pm_vault_action directly OR call via password_management.
+
+# --- Action dispatcher ---
+# pm_vault_action: install | configure | start | stop | remove | baseline
+#                  create | read | delete | audit | rotate
+pm_vault_action: ""
+
+# Shared family dry-run gate (pm_ansible/pm_vault/pm_thycotic all honour it) —
+# set false to validate inputs without dispatching the action.
+# Used by rhism.platform.builder's Phase 3.5 secrets dry-run.
+pm_execute: true
+
+# --- Target identity (used for secret operations) ---
+pm_target: ""
+pm_service: ""
+
+# =============================================================================
+# SERVER INSTALLATION & CONFIGURATION
+# =============================================================================
+
+# --- Package ---
+pm_vault_package: vault
+pm_vault_version: ""               # pin to a specific version; empty = latest stable
+pm_vault_user: vault
+pm_vault_group: vault
+
+# --- Directories ---
+pm_vault_config_dir: /etc/vault.d
+pm_vault_data_dir: /opt/vault/data
+pm_vault_tls_dir: /opt/vault/tls
+pm_vault_log_dir: /var/log/vault
+
+# --- Listener ---
+pm_vault_listener_address: "0.0.0.0:8200"
+pm_vault_cluster_address: "0.0.0.0:8201"
+pm_vault_ui_enabled: true
+pm_vault_log_level: info
+
+# --- TLS (set to empty to disable TLS — dev/lab only) ---
+pm_vault_tls_enabled: true
+pm_vault_tls_cert_file: "{{ pm_vault_tls_dir }}/tls.crt"
+pm_vault_tls_key_file: "{{ pm_vault_tls_dir }}/tls.key"
+pm_vault_tls_min_version: tls12
+
+# --- Storage backend ---
+# raft = integrated Raft storage (single-node or cluster; no Consul dependency)
+# consul = Consul-backed storage (requires existing Consul cluster)
+pm_vault_storage_type: raft
+pm_vault_raft_node_id: "{{ inventory_hostname }}"
+# For Consul storage:
+pm_vault_consul_address: "127.0.0.1:8500"
+pm_vault_consul_path: vault/
+
+# --- Initialisation ---
+pm_vault_init_key_shares: 5        # number of unseal key shares generated
+pm_vault_init_key_threshold: 3     # minimum shares required to unseal
+# Path to write init output (unseal keys + root token). Protect with ansible-vault.
+pm_vault_init_output_path: /root/.vault_init.json
+
+# --- Baseline orchestrator toggles ---
+pm_vault_baseline_install: true
+pm_vault_baseline_configure: true
+pm_vault_baseline_kv_engine: true
+pm_vault_baseline_approle_auth: true
+
+# Apply firewall policy after install via roles/firewall.
+# Set false in molecule and on hosts that use iptables or have no firewalld.
+# The inventory firewall: variable must include 8200/tcp and 8201/tcp for vault servers.
+pm_vault_apply_firewall: true
+
+# Manage the vault systemd service during install/start/stop.
+# Set false in containers (no systemd) and when using the vault binary directly.
+pm_vault_manage_service: true
+
+# =============================================================================
+# SECRET MANAGEMENT (create, read, delete, audit, rotate)
+# =============================================================================
+
+# --- Vault connection (for secret operations) ---
+pm_vault_url: ""                   # e.g. https://vault.example.com:8200
+pm_vault_namespace: ""             # Vault Enterprise namespace; empty for OSS
+
+# --- Authentication method ---
+# approle | token | ldap | aws_iam | jwt
+pm_vault_auth_method: approle
+
+# AppRole auth (recommended for Ansible playbooks — ISM-1416 no shared credentials)
+pm_vault_role_id: ""               # set via vault_pm_vault_role_id
+pm_vault_secret_id: ""             # set via vault_pm_vault_secret_id
+
+# Token auth (avoid in production — no audit identity)
+pm_vault_token: ""
+
+# LDAP auth
+pm_vault_ldap_username: ""
+pm_vault_ldap_password: ""
+
+# JWT / OIDC auth
+pm_vault_jwt: ""
+pm_vault_jwt_role: ""
+
+# --- KV store ---
+pm_vault_kv_mount: secret
+pm_vault_kv_version: 2             # KV v2 by default (versioning + metadata)
+
+# Path within the KV mount. Defaults to "password_management/<pm_target>".
+pm_vault_path: ""
+
+# --- ISM policy (for locally generated passwords) ---
+pm_length: 20
+pm_min_uppercase: 1
+pm_min_lowercase: 1
+pm_min_digits: 1
+pm_min_special: 1
+pm_special_chars: "!@#$%^&*()-_=+[]{}|;:,.<>?"
+pm_expiry_days: 90
+pm_history_count: 5
+
+# --- Audit report ---
+pm_audit_report_path: /tmp/pm_vault_audit_report.txt
+pm_audit_report_format: text       # text | json
+
+# --- Python interpreter for local generation ---
+pm_vault_python: python3

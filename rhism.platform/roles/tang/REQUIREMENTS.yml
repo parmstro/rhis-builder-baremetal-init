@@ -1,0 +1,128 @@
+---
+# Functional requirements — tang (requirements->test-case layer, owner rule
+# 2026-07-12; user-story schema, owner rule 2026-07-16 — see
+# docs/scaffolding-templates.md's REQUIREMENTS.yml template. New role, first
+# content authored directly in the new schema). Renderer contract: see
+# roles/cmdb/templates/requirements_traceability.md.j2.
+functional_requirements:
+  - req_id: TANG-FR-001
+    persona: administrator
+    capability: >-
+      to deploy a Tang key-escrow server built from the official,
+      digest-pinned Red Hat image, with no custom-built image to trust
+    benefit: >-
+      the disk-encryption key-escrow layer runs on a supply-chain-verified
+      artifact, not a locally re-derived one
+    acceptance:
+      - given: the official Tang image repository and a resolved digest
+        when: deploy runs with the dry-run gate enabled
+        then: a running container serves Tang on the configured port,
+          backed by a persistent key volume
+    statement: >-
+      As an administrator, I want to deploy a Tang key-escrow server from
+      the official, digest-pinned Red Hat image, so that the disk-encryption
+      key-escrow layer runs on a supply-chain-verified artifact.
+    tier: 3
+    verified_by:
+      - manual: >-
+          needs a real target host with podman available (discovered:
+          roles/podman's containers.podman modules shell out to a real
+          podman CLI, which the EE itself doesn't have) — no Tier-3 lab
+          playbook exists for this role yet; real functional proof is a
+          queued next step, not yet executed
+      - molecule: default
+
+  - req_id: TANG-FR-002
+    persona: administrator
+    capability: >-
+      to prove a deployed Tang server actually serves working key material,
+      not just that its port is open
+    benefit: >-
+      confidence the NBDE layer will actually unlock protected hosts, not
+      just look deployed
+    acceptance:
+      - given: a running Tang server
+        when: verify runs
+        then: a real clevis encrypt/decrypt round-trip returns the original
+          plaintext unchanged
+    statement: >-
+      As an administrator, I want to prove a deployed Tang server actually
+      serves working key material, so that I have confidence the NBDE layer
+      will actually unlock protected hosts.
+    tier: 3
+    verified_by:
+      - manual: >-
+          same real-target gap as TANG-FR-001 — not yet executed
+
+  - req_id: TANG-FR-003
+    persona: administrator
+    capability: >-
+      existing escrowed keys to survive a re-deploy or restart of the Tang
+      container
+    benefit: >-
+      hosts already bound to this Tang server don't lose access to their
+      disk-encryption keys after a routine re-deploy
+    acceptance:
+      - given: a Tang server with existing key material
+        when: deploy re-applies
+        then: the same persistent key volume is reused and existing keys
+          remain readable
+    statement: >-
+      As an administrator, I want existing escrowed keys to survive a
+      re-deploy of the Tang container, so that already-bound hosts don't
+      lose access to their disk-encryption keys.
+    tier: 3
+    verified_by:
+      - manual: >-
+          same real-target gap as TANG-FR-001 — not yet executed
+
+  - req_id: TANG-FR-004
+    persona: administrator
+    capability: >-
+      a dry-run mode for the deploy action, so a run can be validated
+      without touching a real target
+    benefit: >-
+      the role's dispatch and argument contract can be proven safe in CI
+      without needing a real podman-capable target host
+    acceptance:
+      - given: tang_deploy_execute left at its default (false)
+        when: deploy runs
+        then: no image pull, container, firewalld, or SELinux change is
+          made
+    statement: >-
+      As an administrator, I want a dry-run mode for deploy, so that the
+      role's contract can be validated safely without a real target.
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: TANG-FR-005
+    persona: administrator
+    capability: >-
+      the escrow key material to be backed up off the Tang server itself,
+      onto the control node running the build, whenever a real deployment
+      happens
+    benefit: >-
+      a single Tang server is a network-reachability point of failure for
+      every host bound to it — losing its key volume with no other copy
+      can permanently strand those hosts; a vault-encrypted control-node
+      backup removes that single point of failure
+    acceptance:
+      - given: a real deploy (tang_deploy_execute true) with
+          tang_backup_keys true
+        when: deploy completes
+        then: the escrow key material is fetched and written
+          vault-encrypted to tang_key_backup_dir on the control node
+      - given: tang_backup_keys true but no vault password file configured
+        when: deploy runs
+        then: the role fails closed rather than writing key material to
+          disk unencrypted
+    statement: >-
+      As an administrator, I want the escrow key material backed up
+      vault-encrypted to the control node on every real deploy, so that a
+      lost Tang server is never a single point of failure for bound hosts.
+    tier: 3
+    verified_by:
+      - manual: >-
+          real-world-only path (owner ask 2026-07-16), deliberately never
+          exercised in molecule/CI — not yet executed against a real target

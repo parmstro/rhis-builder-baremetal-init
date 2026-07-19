@@ -1,0 +1,21 @@
+---
+# Restart cobblerd, then httpd — order matters: cobblerd regenerates the XML-RPC
+# shared secret (/var/lib/cobbler/web.ss) on restart, so httpd's mod_wsgi
+# cobbler_api must be restarted AFTER to re-read it, otherwise every subsequent
+# `cobbler` CLI call fails 'login failed'. Gated by prov_manage_service so
+# non-systemd contexts (containers) skip it.
+- name: cobbler - restart cobbler
+  ansible.builtin.service:
+    name: cobblerd
+    state: restarted
+  become: true
+  when: prov_manage_service | bool
+  listen: cobbler - restart cobbler
+
+- name: cobbler - restart httpd
+  ansible.builtin.service:
+    name: httpd
+    state: restarted
+  become: true
+  when: prov_manage_service | bool
+  listen: cobbler - restart cobbler

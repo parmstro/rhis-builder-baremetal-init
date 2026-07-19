@@ -1,0 +1,13 @@
+---
+# Shared: manage firewall ports for k3s
+# Used by: present.yml, absent.yml
+# Expects: _k3s_firewall_state ('enabled' or 'disabled')
+
+- name: Manage firewall ports for k3s
+  ansible.posix.firewalld:
+    port: "{{ item }}"
+    state: "{{ _k3s_firewall_state }}"
+    permanent: true
+    immediate: true
+  become: true
+  loop: "{{ _cp_firewall_ports }}"

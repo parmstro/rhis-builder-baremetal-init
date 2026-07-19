@@ -1,0 +1,25 @@
+---
+# ── Report rke2 cluster status ───────────────────────────────────────────────
+
+- name: Get node list
+  ansible.builtin.command:
+    cmd: "{{ _cp_kubectl_cmd }} get nodes -o wide"
+  become: true
+  register: _rke2_nodes
+  changed_when: false
+
+- name: Get rke2 version
+  ansible.builtin.command:
+    cmd: rke2 --version
+  become: true
+  register: _rke2_version
+  changed_when: false
+  failed_when: false
+
+- name: Display cluster status
+  ansible.builtin.debug:
+    msg:
+      - "=== rke2 nodes ==="
+      - "{{ _rke2_nodes.stdout_lines }}"
+      - "=== rke2 version ==="
+      - "{{ _rke2_version.stdout_lines }}"

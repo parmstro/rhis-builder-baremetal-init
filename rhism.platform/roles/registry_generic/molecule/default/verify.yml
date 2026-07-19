@@ -1,0 +1,27 @@
+---
+- name: Verify standalone variable contract
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Load role defaults
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../../defaults/main.yml"
+      delegate_to: localhost
+
+    - name: Assert shared interface defaults resolve for standalone use
+      ansible.builtin.assert:
+        that:
+          - action == 'registry'
+          - cp_type == 'k3s'
+          - cp_kubeconfig_path == '/etc/rancher/k3s/k3s.yaml'
+          - cp_registry_execute | bool
+          - cp_registry_secret_name == 'registry-pull-secret'
+          - cp_registry_config_dir == '/etc/rancher/k3s'
+          - not (cp_registry_trust_cluster | bool)
+        fail_msg: "registry_generic defaults did not resolve to the expected standalone contract"
+      delegate_to: localhost
+
+    - name: Report verification passed
+      ansible.builtin.debug:
+        msg: "PASS — registry_generic standalone contract verified"
+      delegate_to: localhost

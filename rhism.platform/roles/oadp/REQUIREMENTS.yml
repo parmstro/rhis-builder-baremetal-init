@@ -1,0 +1,68 @@
+---
+# Functional requirements — oadp (requirements→test-case layer, owner rule
+# 2026-07-12). Written from a capability / user-story lens: what an operator
+# needs, solution-agnostic — never the action/variable/module/CR that satisfies
+# it today. The verification method is a separate, later choice.
+functional_requirements:
+  - req_id: OADP-FR-001
+    statement: >-
+      An operator SHALL be able to protect OpenShift/Kubernetes application
+      workloads — their namespaced resources and persistent volumes — with
+      backup and restore, and SHALL be able to drive it either directly or
+      through the platform's single backup-product selection.
+    tier: 1
+    verified_by:
+      - molecule: default
+      - molecule: backup_management/default
+
+  - req_id: OADP-FR-002
+    statement: >-
+      A backed-up application SHALL be restorable end-to-end with its data
+      intact — its workloads and persistent-volume contents recreated
+      faithfully, optionally into a different namespace.
+    tier: 3
+    verified_by:
+      - manual: not yet executed
+
+  - req_id: OADP-FR-003
+    statement: >-
+      An operator SHALL be able to schedule recurring, unattended backups of
+      selected application namespaces on a defined cadence.
+    tier: 3
+    verified_by:
+      - manual: not yet executed
+
+  - req_id: OADP-FR-004
+    statement: >-
+      Backups SHALL be retained for a configurable period and expired
+      automatically, so storage does not grow unbounded.
+    tier: 3
+    verified_by:
+      - manual: not yet executed
+
+  - req_id: OADP-FR-005
+    statement: >-
+      An operator SHALL be able to confirm, without making changes, that the
+      backup service is healthy and that a given backup completed successfully
+      before relying on it for recovery.
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: OADP-FR-006
+    statement: >-
+      Persistent-volume data SHALL be captured either via storage-native
+      snapshots or via filesystem-level copy, so the platform can protect
+      volumes regardless of the underlying storage's snapshot capability.
+    tier: 3
+    verified_by:
+      - manual: not yet executed
+
+  - req_id: OADP-FR-007
+    statement: >-
+      Backup data SHALL be stored on operator-provided object storage,
+      including on-premises S3-compatible endpoints, without depending on a
+      specific public-cloud provider.
+    tier: 3
+    verified_by:
+      - manual: not yet executed

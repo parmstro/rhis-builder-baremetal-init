@@ -1,0 +1,34 @@
+---
+- name: Validate restore requirements
+  ansible.builtin.assert:
+    that:
+      - scm_restore_file | length > 0
+    fail_msg: "scm_restore_file (path to backup .tar) is required for the restore action"
+
+- name: Stop GitLab services before restore
+  ansible.builtin.command:
+    cmd: "{{ _scm_ctl_cmd }} stop unicorn puma sidekiq"
+  become: true
+  changed_when: true
+
+- name: Restore GitLab from backup
+  ansible.builtin.command:
+    cmd: >-
+      {{ _scm_rake_cmd }} gitlab:backup:restore
+      RAILS_ENV=production
+      BACKUP={{ scm_restore_file | basename | regex_replace('_gitlab_backup.tar$', '') }}
+      force=yes
+  become: true
+  changed_when: true
+
+- name: Start GitLab services after restore
+  ansible.builtin.command:
+    cmd: "{{ _scm_ctl_cmd }} start"
+  become: true
+  changed_when: true
+
+- name: Run GitLab sanity check
+  ansible.builtin.command:
+    cmd: "{{ _scm_rake_cmd }} gitlab:check RAILS_ENV=production"
+  become: true
+  changed_when: false

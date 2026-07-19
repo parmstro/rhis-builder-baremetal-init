@@ -1,0 +1,12 @@
+{% for svc in mon_nagios_service_checks %}
+define service {
+    use                             generic-service
+    hostgroup_name                  {{ svc.host_template }}
+    service_description             {{ svc.name }}
+    check_command                   {{ svc.check_command }}
+{% if mon_nagios_eda_webhook_enabled %}
+    event_handler                   eda-webhook-handler
+{% endif %}
+}
+
+{% endfor %}

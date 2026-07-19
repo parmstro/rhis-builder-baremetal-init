@@ -1,0 +1,37 @@
+---
+# Shared — generate an ISM-compliant password and register it as _pm_generated.
+# Uses Python secrets module (os.urandom backed — ISM-0406/0407 compliant).
+# Retries until all four character classes are present.
+# Caller must set no_log: true on any task referencing _pm_generated.password.
+#
+# pm_special_chars is passed via `environment:` rather than interpolated directly
+# into the Python source string — a group_vars override (e.g. a per-product-group
+# pm_special_chars in group_vars/<group>/vars.yml) containing a quote or backslash
+# would otherwise break out of the embedded string literal. Passing it as an env
+# var keeps arbitrary charset overrides safe.
+
+- name: Generate ISM-compliant password ({{ pm_length }} chars, 4 character classes)
+  ansible.builtin.shell:
+    cmd: |
+      {{ pm_ansible_python }} -c "
+      import os, secrets, string
+      upper  = string.ascii_uppercase
+      lower  = string.ascii_lowercase
+      digits = string.digits
+      special = os.environ['PM_SPECIAL_CHARS']
+      chars = upper + lower + digits + special
+      while True:
+          pwd = ''.join(secrets.choice(chars) for _ in range({{ pm_length }}))
+          if (sum(1 for c in pwd if c in upper)   >= {{ pm_min_uppercase }} and
+              sum(1 for c in pwd if c in lower)   >= {{ pm_min_lowercase }} and
+              sum(1 for c in pwd if c in digits)  >= {{ pm_min_digits }}   and
+              sum(1 for c in pwd if c in special) >= {{ pm_min_special }}):
+              print(pwd, end='')
+              break
+      "
+  register: _pm_generated
+  changed_when: false
+  delegate_to: localhost
+  environment:
+    PM_SPECIAL_CHARS: "{{ pm_special_chars }}"
+  no_log: true

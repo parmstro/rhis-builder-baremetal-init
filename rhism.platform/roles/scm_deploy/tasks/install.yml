@@ -1,0 +1,6 @@
+---
+- name: Install GitLab ({{ scm_type }})
+  ansible.builtin.include_role:
+    name: "{{ scm_type }}"
+  vars:
+    action: present

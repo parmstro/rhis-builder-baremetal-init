@@ -1,0 +1,40 @@
+---
+- name: Verify type vars loading
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Load gitlab_ce vars
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../../vars/gitlab_ce.yml"
+      delegate_to: localhost
+
+    - name: Assert gitlab_ce edition and package are correct
+      ansible.builtin.assert:
+        that:
+          - _scm_edition is defined
+          - _scm_edition == 'ce'
+          - _scm_package_name == 'gitlab-ce'
+          - _scm_rhsm_required == false
+        fail_msg: "gitlab_ce.yml did not load expected vars"
+      delegate_to: localhost
+
+    - name: Load gitlab_ee vars
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../../vars/gitlab_ee.yml"
+      delegate_to: localhost
+
+    - name: Assert gitlab_ee edition and package are correct
+      ansible.builtin.assert:
+        that:
+          - _scm_edition is defined
+          - _scm_edition == 'ee'
+          - _scm_package_name == 'gitlab-ee'
+        fail_msg: "gitlab_ee.yml did not load expected vars"
+      delegate_to: localhost
+
+    - name: Report verification passed
+      ansible.builtin.debug:
+        msg: >-
+          PASS — scm_deploy type vars verified.
+          CE package: gitlab-ce | EE package: gitlab-ee
+      delegate_to: localhost

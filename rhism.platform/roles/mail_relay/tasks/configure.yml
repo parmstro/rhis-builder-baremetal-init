@@ -1,0 +1,29 @@
+---
+# mail_relay — configure action
+
+- name: Configure Postfix relay
+  become: true
+  when: mail_execute | bool
+  block:
+    - name: Deploy /etc/postfix/main.cf
+      ansible.builtin.template:
+        src: main.cf.j2
+        dest: /etc/postfix/main.cf
+        owner: root
+        group: root
+        mode: "0644"
+      notify: mail_relay - restart postfix
+
+    - name: Ensure /etc/aliases is present
+      ansible.builtin.file:
+        path: /etc/aliases
+        state: touch
+        owner: root
+        group: root
+        mode: "0644"
+      changed_when: false
+
+    - name: Rebuild aliases database
+      ansible.builtin.command:
+        cmd: newaliases
+      changed_when: false

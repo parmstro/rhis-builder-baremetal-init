@@ -1,0 +1,26 @@
+---
+# Actions: present, absent
+# Package and firewall management — state driven by action variable.
+
+- name: Manage foreman-proxy packages
+  ansible.builtin.package:
+    name: "{{ _prov_packages }}"
+    state: "{{ action }}"
+  become: true
+
+- name: Manage foreman-proxy firewall services
+  ansible.posix.firewalld:
+    service: "{{ item }}"
+    state: "{{ 'enabled' if action == 'present' else 'disabled' }}"
+    permanent: true
+    immediate: true
+  become: true
+  loop: "{{ _prov_firewall_services }}"
+
+- name: Manage foreman-proxy API port firewall rule
+  ansible.posix.firewalld:
+    port: "8443/tcp"
+    state: "{{ 'enabled' if action == 'present' else 'disabled' }}"
+    permanent: true
+    immediate: true
+  become: true

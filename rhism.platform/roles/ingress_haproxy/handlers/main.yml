@@ -1,0 +1,15 @@
+---
+- name: ingress_haproxy - restart ingress
+  kubernetes.core.k8s:
+    kubeconfig: "{{ cp_kubeconfig_path | default('/etc/rancher/k3s/k3s.yaml') }}"
+    api_version: apps/v1
+    kind: Deployment
+    name: haproxy-kubernetes-ingress
+    namespace: haproxy-controller
+    definition:
+      spec:
+        template:
+          metadata:
+            annotations:
+              kubectl.kubernetes.io/restartedAt: "{{ ansible_date_time.iso8601 }}"
+  listen: ingress_haproxy - restart ingress

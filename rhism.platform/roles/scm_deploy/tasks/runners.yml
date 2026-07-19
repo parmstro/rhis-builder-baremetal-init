@@ -1,0 +1,62 @@
+---
+- name: Validate runner configuration
+  ansible.builtin.assert:
+    that:
+      - scm_runners | length > 0
+    fail_msg: "scm_runners must be a non-empty list for the runners action"
+
+- name: Download gitlab-runner repository setup script
+  ansible.builtin.get_url:
+    url: https://packages.gitlab.com/install/repositories/runner/gitlab-runner/script.rpm.sh
+    dest: /tmp/gitlab_runner_repo_setup.sh
+    mode: "0755"
+  become: true
+
+- name: Run gitlab-runner repository setup script
+  ansible.builtin.command:
+    cmd: bash /tmp/gitlab_runner_repo_setup.sh
+  become: true
+  args:
+    creates: /etc/yum.repos.d/runner_gitlab-runner.repo
+
+- name: Remove gitlab-runner repository setup script
+  ansible.builtin.file:
+    path: /tmp/gitlab_runner_repo_setup.sh
+    state: absent
+  become: true
+
+- name: Install gitlab-runner package
+  ansible.builtin.dnf:
+    name: gitlab-runner
+    state: present
+  become: true
+
+- name: Enable and start gitlab-runner service
+  ansible.builtin.service:
+    name: gitlab-runner
+    state: started
+    enabled: true
+  become: true
+
+- name: Register runners with GitLab
+  ansible.builtin.command:
+    cmd: >-
+      gitlab-runner register
+      --non-interactive
+      --url "{{ item.url | default(scm_external_url) }}"
+      --registration-token "{{ item.token }}"
+      --name "{{ item.name }}"
+      --executor "{{ item.executor | default('shell') }}"
+      {% if item.executor | default('shell') == 'docker' %}
+      --docker-image "{{ item.docker_image | default('alpine:latest') }}"
+      {% endif %}
+      {% for tag in item.tags | default([]) %}
+      --tag-list "{{ tag }}"
+      {% endfor %}
+      {% if item.run_untagged | default(true) %}
+      --run-untagged
+      {% endif %}
+  become: true
+  no_log: true
+  loop: "{{ scm_runners }}"
+  changed_when: true

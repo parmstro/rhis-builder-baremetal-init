@@ -1,0 +1,22 @@
+---
+# Functional requirements — k3s (requirements→test-case layer, owner rule
+# 2026-07-12).
+functional_requirements:
+  - req_id: K3S-FR-001
+    statement: >-
+      The role SHALL consume the shared container_platform family interface
+      (cp_*) with absolute binary paths surviving sudo secure_path (BUG-041)
+      and pass its contract scenario without a cluster.
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: K3S-FR-002
+    statement: >-
+      A REAL single-node cluster SHALL deploy and reach Ready in CI under
+      rootless podman with zero host exposure (KubeletInUserNamespace,
+      private cgroupns, cpuset delegation — the k3s-rootless recipe), and
+      the service SHALL be active.
+    tier: 2
+    verified_by:
+      - molecule: functional

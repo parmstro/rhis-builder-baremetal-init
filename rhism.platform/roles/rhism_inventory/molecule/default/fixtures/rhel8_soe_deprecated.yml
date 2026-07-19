@@ -1,0 +1,22 @@
+---
+# Molecule fixture — a DEPRECATED bundle proving the lifecycle filter drops it
+# from every action (validate summary, aggregate output, publish directory).
+name: rhel8_soe
+description: "Red Hat Enterprise Linux 8 x86_64 SOE (retired)"
+lifecycle_state: deprecated
+content:
+  repository_sets:
+    - name: "Red Hat Enterprise Linux 8 for x86_64 - BaseOS (RPMs)"
+      product: "Red Hat Enterprise Linux for x86_64"
+  custom_products: []
+  content_views:
+    - name: "SOE8"
+      description: "Red Hat Enterprise Linux 8 x86_64 SOE content"
+lifecycle:
+  lifecycle_environments:
+    - name: "Development"
+  activation_keys:
+    - name: "SOE8_dev"
+      lifecycle_environment: "Development"
+      content_view: "SOE8"
+  hostgroups: []

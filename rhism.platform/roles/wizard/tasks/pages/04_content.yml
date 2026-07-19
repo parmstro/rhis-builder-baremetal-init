@@ -1,0 +1,46 @@
+---
+- name: Select content management platform
+  ansible.builtin.command:
+    cmd: >-
+      {{ wizard_tui_backend }} --title "{{ wizard_tui_title }}"
+      --radiolist "Select content management platform:" {{ wizard_tui_height }} {{ wizard_tui_width }} 3
+      "foreman"  "Foreman/Katello (open source)"          ON
+      "satellite" "Red Hat Satellite (subscription required)" OFF
+      "none"     "None — manage packages manually"         OFF
+      3>&1 1>&2 2>&3
+  register: _wizard_content_result
+  changed_when: false
+  failed_when: _wizard_content_result.rc not in [0, 1]
+  tags: infra_wizard
+
+- name: Handle content cancel
+  ansible.builtin.fail:
+    msg: "Wizard cancelled by user at content management selection."
+  when: _wizard_content_result.rc == 1
+  tags: infra_wizard
+
+- name: Record content management choice
+  ansible.builtin.set_fact:
+    wizard_components: >-
+      {{ wizard_components | combine({
+        'content': {
+          'enabled': (_wizard_content_result.stdout | trim) != 'none',
+          'type': _wizard_content_result.stdout | trim
+        }
+      }) }}
+  tags: infra_wizard
+
+# Satellite and Foreman both include an integrated Smart Proxy that provides
+# PXE (TFTP), DHCP, and DNS. Pre-populate the provisioning component so the
+# provisioning page is skipped when either is selected.
+- name: Record Satellite/Foreman handles provisioning
+  ansible.builtin.set_fact:
+    wizard_components: >-
+      {{ wizard_components | combine({
+        'provisioning': {
+          'enabled': true,
+          'type': (_wizard_content_result.stdout | trim) + '_proxy'
+        }
+      }) }}
+  when: (_wizard_content_result.stdout | trim) in ['satellite', 'foreman']
+  tags: infra_wizard

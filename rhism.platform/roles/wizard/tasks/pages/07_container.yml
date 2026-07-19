@@ -1,0 +1,33 @@
+---
+- name: Select container platform
+  ansible.builtin.command:
+    cmd: >-
+      {{ wizard_tui_backend }} --title "{{ wizard_tui_title }}"
+      --radiolist "Select container platform:" {{ wizard_tui_height }} {{ wizard_tui_width }} 4
+      "k3s"  "K3s        (lightweight Kubernetes, easy to deploy)"  ON
+      "rke2" "RKE2       (production Kubernetes with CIS hardening)" OFF
+      "okd"  "OKD        (OpenShift upstream, free)"                 OFF
+      "ocp"  "OpenShift  (Red Hat OCP, subscription required)"       OFF
+      "none" "None       — no container platform"                    OFF
+      3>&1 1>&2 2>&3
+  register: _wizard_cp_result
+  changed_when: false
+  failed_when: _wizard_cp_result.rc not in [0, 1]
+  tags: infra_wizard
+
+- name: Handle container platform cancel
+  ansible.builtin.fail:
+    msg: "Wizard cancelled by user at container platform selection."
+  when: _wizard_cp_result.rc == 1
+  tags: infra_wizard
+
+- name: Record container platform choice
+  ansible.builtin.set_fact:
+    wizard_components: >-
+      {{ wizard_components | combine({
+        'container_platform': {
+          'enabled': (_wizard_cp_result.stdout | trim) != 'none',
+          'type': _wizard_cp_result.stdout | trim
+        }
+      }) }}
+  tags: infra_wizard

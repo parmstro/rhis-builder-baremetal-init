@@ -1,0 +1,15 @@
+---
+- name: Manage IPA sudo rules
+  freeipa.ansible_freeipa.ipasudorule:
+    ipaadmin_password: "{{ idm_admin_password }}"
+    name: "{{ item.name }}"
+    description: "{{ item.description | default(omit) }}"
+    cmdcategory: "{{ item.cmdcategory | default(omit) }}"
+    usercategory: "{{ item.usercategory | default(omit) }}"
+    hostcategory: "{{ item.hostcategory | default(omit) }}"
+    state: "{{ item.state | default('present') }}"
+  loop: "{{ idm_sudo_rules | default([]) }}"
+  no_log: true
+  when:
+    - idm_sudo_rules is defined
+    - idm_sudo_rules | length > 0

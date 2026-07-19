@@ -1,0 +1,49 @@
+---
+# Service handlers carry their own mail_manage_service guard (handler-guard
+# pattern, BUG-117/BUG-026 class — containers have no systemd; daemons are
+# started by the container entrypoint instead). postmap handlers stay ungated:
+# they only rebuild lookup tables and are container-safe.
+
+- name: mail_full - restart postfix
+  when: mail_manage_service | bool
+  ansible.builtin.service:
+    name: postfix
+    state: restarted
+  become: true
+  listen: mail_full - restart postfix
+
+- name: mail_full - reload postfix
+  when: mail_manage_service | bool
+  ansible.builtin.service:
+    name: postfix
+    state: reloaded
+  become: true
+  listen: mail_full - reload postfix
+
+- name: mail_full - restart dovecot
+  when: mail_manage_service | bool
+  ansible.builtin.service:
+    name: dovecot
+    state: restarted
+  become: true
+  listen: mail_full - restart dovecot
+
+- name: mail_full - restart opendkim
+  when: mail_manage_service | bool
+  ansible.builtin.service:
+    name: opendkim
+    state: restarted
+  become: true
+  listen: mail_full - restart opendkim
+
+- name: mail_full - postmap virtual
+  ansible.builtin.command:
+    cmd: postmap {{ mail_db_type }}:/etc/postfix/virtual
+  become: true
+  listen: mail_full - postmap virtual
+
+- name: mail_full - postmap vmailbox
+  ansible.builtin.command:
+    cmd: postmap {{ mail_db_type }}:/etc/postfix/vmailbox
+  become: true
+  listen: mail_full - postmap vmailbox

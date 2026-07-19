@@ -1,0 +1,13 @@
+---
+# server — restic has no server daemon; this action installs restic and
+# initialises the repository on the host that will store backups.
+# Chains: install restic → configure repository.
+
+- name: Install restic packages
+  ansible.builtin.package:
+    name: "{{ _restic_packages }}"
+    state: present
+  become: true
+
+- name: Configure restic repository
+  ansible.builtin.include_tasks: configure.yml

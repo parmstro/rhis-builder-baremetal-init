@@ -1,0 +1,78 @@
+---
+- name: Converge — relay baseline no-op (dispatcher + var loading)
+  hosts: all
+  gather_facts: false
+  vars:
+    mail_action: baseline
+    mail_type: relay
+    mail_apply_install: false
+    mail_apply_configure: false
+    mail_apply_secure: false
+  roles:
+    - role: rhism.platform.mail_server
+
+- name: Converge — full baseline no-op (dispatcher + var loading)
+  hosts: all
+  gather_facts: false
+  vars:
+    mail_action: baseline
+    mail_type: full
+    mail_apply_install: false
+    mail_apply_configure: false
+    mail_apply_secure: false
+  roles:
+    - role: rhism.platform.mail_server
+
+- name: Converge — relay install dry-run (mail_execute false)
+  hosts: all
+  gather_facts: false
+  vars:
+    mail_action: install
+    mail_type: relay
+    mail_execute: false
+  roles:
+    - role: rhism.platform.mail_server
+
+- name: Converge — full install dry-run (mail_execute false)
+  hosts: all
+  gather_facts: false
+  vars:
+    mail_action: install
+    mail_type: full
+    mail_execute: false
+  roles:
+    - role: rhism.platform.mail_server
+
+- name: Converge — negative test (bogus action)
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Attempt bogus mail_action (must fail)
+      block:
+        - name: Call role with invalid action
+          ansible.builtin.include_role:
+            name: rhism.platform.mail_server
+          vars:
+            mail_action: bogus_action
+            mail_type: relay
+      rescue:
+        - name: Confirm expected failure was caught
+          ansible.builtin.debug:
+            msg: "PASS — bogus mail_action correctly rejected"
+
+- name: Converge — negative test (bogus type)
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Attempt bogus mail_type (must fail)
+      block:
+        - name: Call role with invalid type
+          ansible.builtin.include_role:
+            name: rhism.platform.mail_server
+          vars:
+            mail_action: baseline
+            mail_type: bogus_type
+      rescue:
+        - name: Confirm expected failure was caught
+          ansible.builtin.debug:
+            msg: "PASS — bogus mail_type correctly rejected"

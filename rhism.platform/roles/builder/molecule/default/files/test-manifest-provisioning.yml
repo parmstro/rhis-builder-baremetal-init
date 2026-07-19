@@ -1,0 +1,56 @@
+---
+# Dedicated fixture for the rhism Phase D bare-host provisioning dispatch
+# (Step 3b in tasks/deploy.yml). Every OTHER component stays disabled so this
+# converge play exercises exactly the new dispatch, nothing more. type: cobbler
+# is the fixture's baseline; the "satellite skip" converge play overrides
+# pb_provisioning_type: satellite_proxy at deploy time rather than needing a
+# second fixture file.
+profile: custom
+components:
+  identity:
+    enabled: false
+    type: freeipa
+    ad_trust:
+      enabled: false
+      domain: ""
+      admin: Administrator
+      range_type: ipa-ad-trust
+  provisioning:
+    enabled: true
+    type: cobbler       # dnsmasq | cobbler | satellite_proxy | foreman_proxy
+    hosts:
+      # cobbler shape: name, profile, mac, ip, hostname (roles/cobbler
+      # meta/argument_specs.yml — prov_cobbler_systems)
+      - name: pxe-test01
+        profile: rhel9-basic
+        mac: "aa:bb:cc:dd:ee:01"
+        ip: 192.168.100.50
+        hostname: pxe-test01.molecule.test.local
+  secrets:
+    enabled: false
+    type: ansible
+  content:
+    enabled: false
+    type: foreman
+  mail:
+    enabled: false
+    type: relay
+  scm:
+    enabled: false
+    type: gitlab_ce
+  backup:
+    enabled: false
+    type: restic
+  container_platform:
+    enabled: false
+    type: k3s
+  security:
+    enabled: false
+    type: default
+  monitoring:
+    enabled: false
+    type: default
+network: {}
+sizing: {}
+credentials: {}
+licensing: {}

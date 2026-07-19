@@ -1,0 +1,12 @@
+---
+- name: Validate pb_action
+  ansible.builtin.assert:
+    that:
+      - pb_action is defined
+      - pb_action in _pb_valid_actions
+    fail_msg: >-
+      pb_action '{{ pb_action | default('') }}' is invalid.
+      Valid actions: {{ _pb_valid_actions | join(', ') }}
+
+- name: Dispatch to action
+  ansible.builtin.include_tasks: "{{ pb_action }}.yml"

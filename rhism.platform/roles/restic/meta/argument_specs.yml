@@ -1,0 +1,146 @@
+---
+argument_specs:
+  main:
+    short_description: Install and operate the restic backup client.
+    description: >-
+      Standalone-first backup product role. Installs restic, initialises an encrypted
+      repository, deploys backup/restore scripts and a cron schedule, and runs the full
+      snapshot lifecycle (backup, restore, forget, prune, snapshots, verify, unlock). Consumes
+      the shared backup family interface (backup_restic_* vars), the SAME names the
+      backup_management dispatcher exposes, so the dispatcher selects this product with one
+      call passing only `action` and every value flows straight through. The argument spec
+      enforces the action + variable contract at role entry, so no hand-written assert is
+      needed.
+    options:
+      action:
+        description: >-
+          Lifecycle action (bare shared var). server/client install restic and configure the
+          repository; present/absent manage the package; configure (re)initialises the repo;
+          backup/restore/forget/prune/snapshots/verify/unlock run the restic CLI;
+          schedule manages the cron job; deploy_scripts writes the helper scripts.
+        type: str
+        default: client
+        choices:
+          - server
+          - client
+          - present
+          - absent
+          - configure
+          - backup
+          - restore
+          - forget
+          - prune
+          - snapshots
+          - verify
+          - unlock
+          - schedule
+          - deploy_scripts
+      backup_restic_repository:
+        description: >-
+          Repository location — local path, sftp:, s3:, b2:, rest:, rclone:, etc. Required for
+          any action that touches the repository (configure/backup/restore and friends).
+        type: str
+        default: ""
+      backup_restic_password:
+        description: Repository password (vault-backed). Encrypts the entire repository.
+        type: str
+        default: ""
+      backup_restic_paths:
+        description: Directories to back up.
+        type: list
+        elements: str
+        default:
+          - /etc
+          - /home
+          - /root
+          - /var/log
+      backup_restic_exclude_patterns:
+        description: Path/glob exclude patterns applied to backups.
+        type: list
+        elements: str
+        default:
+          - /proc
+          - /sys
+          - /dev
+          - /run
+          - "*.sock"
+          - "*.pid"
+      backup_restic_extra_args:
+        description: Extra arguments appended to the restic backup command line (role-only).
+        type: str
+        default: ""
+      backup_restic_retention_daily:
+        description: Retention — daily snapshots to keep (forget action).
+        type: int
+        default: 7
+      backup_restic_retention_weekly:
+        description: Retention — weekly snapshots to keep (forget action).
+        type: int
+        default: 4
+      backup_restic_retention_monthly:
+        description: Retention — monthly snapshots to keep (forget action).
+        type: int
+        default: 12
+      backup_restic_retention_yearly:
+        description: Retention — yearly snapshots to keep (forget action).
+        type: int
+        default: 1
+      backup_restic_restore_snapshot:
+        description: Snapshot ID (or 'latest') to restore.
+        type: str
+        default: latest
+      backup_restic_restore_path:
+        description: Target directory for restore output.
+        type: str
+        default: /var/restore
+      backup_restic_verify_read_data:
+        description: >-
+          verify action — also re-read pack data and verify its checksums
+          (restic check --read-data-subset). Off by default (expensive).
+        type: bool
+        default: false
+      backup_restic_verify_read_data_subset:
+        description: Subset spec for the checksum read ("N%", "N/M", or "100%").
+        type: str
+        default: "5%"
+      backup_restic_verify_restore_test:
+        description: >-
+          verify action — restore a snapshot to a scratch dir and assert data
+          returns (proves the backup is RESTORABLE, not just consistent).
+        type: bool
+        default: false
+      backup_restic_verify_restore_test_snapshot:
+        description: Snapshot to restore for the restore-test.
+        type: str
+        default: latest
+      backup_restic_verify_restore_test_path:
+        description: Scratch dir for the restore-test (created clean, removed after).
+        type: str
+        default: /var/restore-verify
+      backup_restic_env:
+        description: >-
+          Extra environment variables for cloud backends (AWS_ACCESS_KEY_ID,
+          AWS_SECRET_ACCESS_KEY, B2_ACCOUNT_ID, B2_ACCOUNT_KEY, etc.). Merged into the restic
+          command environment.
+        type: dict
+        default: {}
+      backup_restic_cron_enabled:
+        description: Manage the restic backup cron job (schedule action). false removes it.
+        type: bool
+        default: true
+      backup_restic_cron_hour:
+        description: Cron hour field for the scheduled backup.
+        type: str
+        default: "2"
+      backup_restic_cron_minute:
+        description: Cron minute field for the scheduled backup.
+        type: str
+        default: "0"
+      backup_restic_cron_user:
+        description: User that owns the restic backup cron job.
+        type: str
+        default: root
+      backup_restic_script_dir:
+        description: Directory where the backup/restore helper scripts are deployed.
+        type: str
+        default: /usr/local/bin

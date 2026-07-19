@@ -1,0 +1,41 @@
+---
+- name: Install audit package
+  ansible.builtin.package:
+    name: audit
+    state: present
+
+- name: Ensure audit rules directory exists
+  ansible.builtin.file:
+    path: /etc/audit/rules.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+
+- name: Deploy audit rules
+  ansible.builtin.template:
+    src: audit.rules.j2
+    dest: /etc/audit/rules.d/linux_auditing.rules
+    owner: root
+    group: root
+    mode: "0640"
+  notify: linux_auditing - restart auditd
+
+- name: Configure auditd.conf settings
+  ansible.builtin.lineinfile:
+    path: /etc/audit/auditd.conf
+    regexp: "^{{ item.key }}\\s*="
+    line: "{{ item.key }} = {{ item.value }}"
+    create: false
+  loop:
+    - {key: max_log_file, value: "{{ linux_auditing_log_size }}"}
+    - {key: num_logs, value: "{{ linux_auditing_num_logs }}"}
+    - {key: space_left_action, value: "{{ linux_auditing_space_left_action }}"}
+  notify: linux_auditing - restart auditd
+
+- name: Enable and start auditd service
+  ansible.builtin.service:
+    name: auditd
+    state: started
+    enabled: true
+  when: ansible_service_mgr == 'systemd' and linux_auditing_start_service | bool

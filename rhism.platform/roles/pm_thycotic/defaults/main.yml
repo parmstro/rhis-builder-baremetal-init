@@ -1,0 +1,51 @@
+---
+# roles/pm_thycotic/defaults/main.yml
+# Variable contract for Delinea/Thycotic Secret Server password management.
+# Standalone role — can be called directly OR via roles/password_management.
+# All variables use the pm_thycotic_ prefix.
+
+# --- Action dispatcher ---
+# pm_thycotic_action: create | delete | audit | rotate
+pm_thycotic_action: ""
+
+# Shared family dry-run gate (pm_ansible/pm_vault/pm_thycotic all honour it) —
+# set false to skip real TSS API calls (forces pm_thycotic_skip_api: true).
+# Used by rhism.platform.builder's Phase 3.5 secrets dry-run.
+pm_execute: true
+
+# --- Target identity (inherited from pm_ namespace when called via dispatcher) ---
+pm_target: ""
+pm_service: ""
+
+# --- Secret Server connection ---
+pm_thycotic_server_url: ""         # e.g. https://secretserver.example.com
+pm_thycotic_username: ""           # TSS service account username
+pm_thycotic_password: ""           # must be set via vault_pm_thycotic_password
+pm_thycotic_domain: ""             # Active Directory domain (leave empty for local auth)
+
+# --- Secret organisation ---
+pm_thycotic_folder_id: ""          # Folder ID to create secrets in (required for create)
+pm_thycotic_template_id: ""        # Secret template ID (required for create)
+pm_thycotic_secret_id: ""          # Existing secret ID (required for delete/audit/rotate)
+
+# --- Audit report ---
+pm_audit_report_path: /tmp/pm_audit_report.txt
+pm_audit_report_format: text       # text | json
+
+# --- ISM policy (used for locally generated passwords passed to TSS) ---
+pm_length: 20
+pm_min_uppercase: 1
+pm_min_lowercase: 1
+pm_min_digits: 1
+pm_min_special: 1
+pm_special_chars: "!@#$%^&*()-_=+[]{}|;:,.<>?"
+pm_expiry_days: 90
+pm_history_count: 5
+
+# --- Python interpreter for local password generation ---
+pm_thycotic_python: python3
+
+# --- Testing / dry-run toggle ---
+# Set true in molecule scenarios and dry-run checks. Skips all TSS API calls so
+# local generation and validation logic can be tested without a real Secret Server.
+pm_thycotic_skip_api: false

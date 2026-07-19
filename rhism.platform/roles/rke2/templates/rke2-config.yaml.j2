@@ -1,0 +1,36 @@
+# {{ ansible_managed }}
+# RKE2 configuration file — rendered by the rhism.platform.rke2 role.
+# See https://docs.rke2.io/install/configuration for all options.
+{% if cp_node_role == 'worker' %}
+# ── Agent (worker) node ──────────────────────────────────────────────────────
+server: "{{ cp_server_url }}"
+token: "{{ cp_node_token }}"
+{% else %}
+# ── Server (control-plane) node ──────────────────────────────────────────────
+{% if cp_server_url | length > 0 %}
+# Join an existing HA server (embedded etcd) cluster.
+server: "{{ cp_server_url }}"
+{% endif %}
+{% if cp_node_token | length > 0 %}
+token: "{{ cp_node_token }}"
+{% endif %}
+write-kubeconfig-mode: "0600"
+{% if cp_cluster_cidr | default('') | length > 0 %}
+cluster-cidr: "{{ cp_cluster_cidr }}"
+{% endif %}
+{% if cp_service_cidr | default('') | length > 0 %}
+service-cidr: "{{ cp_service_cidr }}"
+{% endif %}
+{% if cp_tls_sans | default([]) | length > 0 %}
+tls-san:
+{% for san in cp_tls_sans %}
+  - "{{ san }}"
+{% endfor %}
+{% endif %}
+{% if cp_disable_components | default([]) | length > 0 %}
+disable:
+{% for component in cp_disable_components %}
+  - "{{ component }}"
+{% endfor %}
+{% endif %}
+{% endif %}

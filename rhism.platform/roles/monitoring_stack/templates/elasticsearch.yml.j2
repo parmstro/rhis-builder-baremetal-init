@@ -1,0 +1,19 @@
+cluster.name: {{ mon_elastic_cluster_name }}
+node.name: {{ mon_elastic_node_name }}
+path.data: {{ mon_elastic_data_path }}
+path.logs: {{ mon_elastic_log_path }}
+network.host: {{ mon_elastic_network_host }}
+http.port: {{ mon_elastic_http_port }}
+transport.port: {{ mon_elastic_transport_port }}
+discovery.type: single-node
+
+xpack.security.enabled: {{ mon_elastic_security_enabled | lower }}
+{% if mon_elastic_security_enabled %}
+xpack.security.http.ssl.enabled: true
+xpack.security.http.ssl.keystore.path: certs/http.p12
+xpack.security.transport.ssl.enabled: true
+xpack.security.transport.ssl.keystore.path: certs/transport.p12
+xpack.security.transport.ssl.verification_mode: certificate
+{% endif %}
+
+xpack.monitoring.collection.enabled: true

@@ -1,0 +1,53 @@
+---
+# mail_relay — secure action (TLS + SASL)
+
+- name: Secure Postfix relay (TLS + SASL)
+  become: true
+  when: mail_execute | bool
+  block:
+    - name: Deploy TLS certificate
+      ansible.builtin.copy:
+        src: "{{ mail_tls_cert_file }}"
+        dest: "{{ mail_tls_cert_file }}"
+        owner: root
+        group: root
+        mode: "0644"
+        remote_src: true
+      when: mail_tls_cert_file | length > 0
+
+    - name: Deploy TLS private key
+      ansible.builtin.copy:
+        src: "{{ mail_tls_key_file }}"
+        dest: "{{ mail_tls_key_file }}"
+        owner: root
+        group: postfix
+        mode: "0640"
+        remote_src: true
+      no_log: true
+      when: mail_tls_key_file | length > 0
+
+    - name: Deploy SASL password file
+      ansible.builtin.template:
+        src: sasl_passwd.j2
+        dest: /etc/postfix/sasl_passwd
+        owner: root
+        group: root
+        mode: "0600"
+      no_log: true
+      when: mail_relay_user | length > 0
+      notify: mail_relay - rebuild sasl db
+
+    - name: Build SASL password hash database
+      ansible.builtin.command:
+        cmd: postmap /etc/postfix/sasl_passwd
+      changed_when: true
+      no_log: true
+      when: mail_relay_user | length > 0
+
+    - name: Restrict SASL password file permissions
+      ansible.builtin.file:
+        path: /etc/postfix/sasl_passwd
+        owner: root
+        group: root
+        mode: "0600"
+      when: mail_relay_user | length > 0

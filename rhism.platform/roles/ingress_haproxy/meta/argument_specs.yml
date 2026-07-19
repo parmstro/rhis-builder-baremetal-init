@@ -1,0 +1,46 @@
+---
+argument_specs:
+  main:
+    short_description: Deploy the HAProxy ingress controller on Kubernetes.
+    description: >-
+      Standalone-first ingress backend for container_platform. Deploys the HAProxy Kubernetes
+      ingress controller via Helm and sets it as the default IngressClass (on OCP/OKD, where
+      HAProxy is the built-in router, it only reports status). Consumes the shared
+      ingress-backend interface (action, cp_* vars) so the container_platform dispatcher can
+      select any backend with identical code.
+    options:
+      action:
+        description: >-
+          Lifecycle action, shared across all ingress backends. 'ingress' (and its alias
+          'present') deploy HAProxy; 'absent' removes it.
+        type: str
+        default: ingress
+        choices:
+          - ingress
+          - present
+          - absent
+      cp_kubeconfig_path:
+        description: Path to the cluster kubeconfig. Shared ingress-interface var.
+        type: str
+        default: /etc/rancher/k3s/k3s.yaml
+      cp_type:
+        description: >-
+          Container platform type. On 'ocp'/'okd' HAProxy is the built-in router and only a
+          status report is produced; other platforms get a Helm deployment. Shared
+          ingress-interface var.
+        type: str
+        default: k3s
+      cp_ingress_domain:
+        description: Apps/ingress base domain, used in status reporting. Shared interface var.
+        type: str
+        default: ""
+      cp_ingress_replicas:
+        description: HAProxy controller replica count. Shared ingress-interface var.
+        type: int
+        default: 1
+      cp_ingress_execute:
+        description: >-
+          Dry-run gate honoured by every ingress backend. false validates action dispatch and
+          variable resolution without changing the node or cluster (used by molecule).
+        type: bool
+        default: true

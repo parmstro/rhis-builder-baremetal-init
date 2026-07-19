@@ -1,0 +1,21 @@
+---
+# action: enroll — obtain service keytab for this host
+
+- name: Enroll host and obtain service keytab
+  become: true
+  block:
+    - name: Install Red Hat IDM client packages for enroll
+      ansible.builtin.package:
+        name: "{{ _idm_client_packages }}"
+        state: present
+
+    - name: Obtain host keytab via ipa-getkeytab
+      ansible.builtin.command:
+        cmd: >-
+          ipa-getkeytab
+          -s {{ idm_server_hostname | default(idm_master_server) }}
+          -p host/{{ inventory_hostname }}@{{ idm_realm }}
+          -k /etc/krb5.keytab
+      register: _idm_getkeytab_result
+      changed_when: _idm_getkeytab_result.rc == 0
+      no_log: true

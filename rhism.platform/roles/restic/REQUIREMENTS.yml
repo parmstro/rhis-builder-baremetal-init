@@ -1,0 +1,22 @@
+---
+# Functional requirements — restic (requirements→test-case layer, owner rule
+# 2026-07-12).
+functional_requirements:
+  - req_id: RESTIC-FR-001
+    statement: >-
+      The role SHALL consume the shared backup_restic_* family interface and
+      run standalone or via the dispatcher.
+    tier: 1
+    verified_by:
+      - molecule: default
+      - molecule: backup_management/default
+
+  - req_id: RESTIC-FR-002
+    statement: >-
+      backup/verify/restore SHALL work against a real repository: verify
+      includes checksum verification (restic check --read-data-subset) and a
+      restore-test that restores a snapshot to scratch and asserts the data
+      returns (2026-07-11 backup-integrity work).
+    tier: 2
+    verified_by:
+      - molecule: functional

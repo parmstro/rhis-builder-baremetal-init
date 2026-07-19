@@ -1,0 +1,32 @@
+---
+- name: Verify standalone variable contract
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Load role defaults
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../../defaults/main.yml"
+      delegate_to: localhost
+
+    - name: Assert standalone interface defaults resolve
+      ansible.builtin.assert:
+        that:
+          - action == 'backup'
+          - backup_rear_output_format == 'ISO'
+          - backup_rear_output_url == ''
+          - backup_rear_backup_method == 'NETFS'
+          - backup_rear_backup_url | length > 0
+          - backup_rear_backup_prog == 'tar'
+          - backup_rear_config_dir == '/etc/rear'
+          - backup_rear_schedule_enabled | bool
+          - backup_rear_backup_mode == 'mkbackup'
+          - backup_rear_recover_execute | bool == false
+          - backup_rear_recover_confirm_irreversible | bool == false
+          - _rear_packages | length > 0
+        fail_msg: "rear defaults did not resolve to the expected standalone contract"
+      delegate_to: localhost
+
+    - name: Report verification passed
+      ansible.builtin.debug:
+        msg: "PASS — rear standalone contract verified"
+      delegate_to: localhost

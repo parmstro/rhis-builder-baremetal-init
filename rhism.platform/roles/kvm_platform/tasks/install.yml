@@ -1,0 +1,46 @@
+---
+# kvm_platform — install action.
+# Installs qemu-kvm/libvirt packages and enables+starts libvirtd. Does NOT touch storage
+# pools/networks (that's the configure action) or create any VM guest.
+
+- name: Install KVM/libvirt host platform
+  when: kvm_platform_execute | bool
+  block:
+    - name: Resolve package list
+      ansible.builtin.include_tasks: packages.yml
+
+    - name: Install KVM/libvirt packages
+      ansible.builtin.package:
+        name: "{{ _kvm_platform_resolved_packages }}"
+        state: present
+      become: true
+
+    - name: Create host bridge via NetworkManager (optional, opt-in)
+      community.general.nmcli:
+        type: bridge
+        conn_name: "{{ kvm_platform_bridge_name }}"
+        ifname: "{{ kvm_platform_bridge_name }}"
+        state: present
+      become: true
+      when: kvm_platform_manage_bridge | bool
+
+    - name: Enslave physical interface to the bridge (optional, opt-in)
+      community.general.nmcli:
+        type: ethernet
+        conn_name: "{{ kvm_platform_bridge_interface }}-slave"
+        ifname: "{{ kvm_platform_bridge_interface }}"
+        master: "{{ kvm_platform_bridge_name }}"
+        slave_type: bridge
+        state: present
+      become: true
+      when:
+        - kvm_platform_manage_bridge | bool
+        - kvm_platform_bridge_interface | length > 0
+
+    - name: Enable and start libvirtd
+      ansible.builtin.service:
+        name: "{{ kvm_platform_libvirt_service }}"
+        state: started
+        enabled: true
+      become: true
+      when: kvm_platform_manage_service | bool

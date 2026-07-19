@@ -1,0 +1,58 @@
+---
+# tasks/test.yml — Send test message, verify DKIM signing, test SpamAssassin.
+
+- name: Test full mail stack
+  block:
+    - name: Verify test recipient is set
+      ansible.builtin.assert:
+        that: mail_test_recipient is defined and mail_test_recipient | length > 0
+        fail_msg: "mail_test_recipient must be set to send a test message"
+
+    - name: Send test message via sendmail
+      ansible.builtin.command:
+        cmd: >-
+          /usr/sbin/sendmail -v {{ mail_test_recipient }}
+      args:
+        stdin: |
+          From: ansible-test@{{ mail_hostname }}
+          To: {{ mail_test_recipient }}
+          Subject: Ansible mail_full stack test
+
+          This is an automated test message from the mail_full Ansible role.
+          Sent at: {{ ansible_date_time.iso8601 | default('unknown') }}
+      changed_when: true
+      become: true
+      when: mail_execute | bool
+
+    - name: Check DKIM signing headers
+      ansible.builtin.command:
+        cmd: >-
+          opendkim-testkey -d {{ mail_domain }} -s {{ mail_dkim_selector }} -vvv
+      register: _mail_full_dkim_test
+      changed_when: false
+      failed_when: false
+      become: true
+      when:
+        - mail_execute | bool
+        - mail_dkim_enabled | bool
+
+    - name: Display DKIM test result
+      ansible.builtin.debug:
+        msg: "{{ _mail_full_dkim_test.stdout_lines | default([]) + _mail_full_dkim_test.stderr_lines | default([]) }}"
+      when: mail_dkim_enabled | bool
+
+    - name: Test SpamAssassin scoring
+      ansible.builtin.command:
+        cmd: spamassassin --test -D
+      register: _mail_full_sa_test
+      changed_when: false
+      failed_when: false
+      become: true
+      when:
+        - mail_execute | bool
+        - mail_spamassassin_enabled | bool
+
+    - name: Display SpamAssassin test output
+      ansible.builtin.debug:
+        msg: "{{ _mail_full_sa_test.stdout_lines | default([]) }}"
+      when: mail_spamassassin_enabled | bool

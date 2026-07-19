@@ -1,0 +1,30 @@
+---
+- name: Apply security package baseline
+  ansible.builtin.include_role:
+    name: linux_packages
+  when: linux_security_apply_packages | bool
+
+- name: Apply OS hardening
+  ansible.builtin.include_role:
+    name: linux_hardening
+  when: linux_security_apply_hardening | bool
+
+- name: Apply firewall policy
+  ansible.builtin.include_role:
+    name: firewall
+  when: linux_security_apply_firewall | bool
+
+- name: Apply auditd configuration
+  ansible.builtin.include_role:
+    name: linux_auditing
+  when: linux_security_apply_auditing | bool
+
+- name: Apply user security policy
+  ansible.builtin.include_role:
+    name: linux_users
+  when: linux_security_apply_users | bool
+
+- name: Apply SELinux policy
+  ansible.builtin.include_role:
+    name: linux_selinux
+  when: linux_security_apply_selinux | bool

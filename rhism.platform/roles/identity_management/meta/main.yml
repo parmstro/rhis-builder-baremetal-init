@@ -1,0 +1,22 @@
+---
+galaxy_info:
+  role_name: identity_management
+  namespace: rhism
+  author: rhism
+  description: >-
+    Deploy and configure identity infrastructure: Red Hat IDM, FreeIPA, or
+    integrate Linux hosts with an existing Microsoft Active Directory domain.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: EL
+      versions:
+        - "9"
+  galaxy_tags:
+    - identity
+    - freeipa
+    - idm
+    - activedirectory
+    - ldap
+
+dependencies: []

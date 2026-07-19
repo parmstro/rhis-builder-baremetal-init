@@ -1,0 +1,72 @@
+# cobbler — EPEL-only PXE/DHCP/DNS/TFTP network-install server; substrate for
+# the rhism.platform.cobbler role (image-factory 2026-07-14; /new-image).
+#
+# DOCTRINE NOTE: THIN INSTALL-ONLY. All Cobbler configuration (settings.yaml,
+# distros/profiles/systems, `cobbler sync`) is the ROLE's job at converge — the
+# role's actions run LIVE against this running container (the faithful role
+# test); nothing cobbler-specific is baked here.
+#
+# PROVENANCE (reputable-sources rule) — DOCUMENTED EPEL EXCEPTION + ENTITLED
+# DEP CLOSURE. Cobbler itself ships only from EPEL (same precedent class as
+# nagios/EPEL and elastic/vendor-repo):
+#   - cobbler: EPEL 9 (Extra Packages for Enterprise Linux 9), repo
+#     baseurl https://dl.fedoraproject.org/pub/epel/9/Everything/$basearch/,
+#     gpgcheck=1 against the official Fedora EPEL 9 GPG key
+#       identity   "Fedora (epel9) <epel@fedoraproject.org>"
+#       fingerprint FF8AD1344597106ECE813B918A3872BF3228467C
+#       gpgkey      https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-9
+#     Tested NVR: cobbler-3.3.7-15.el9 (probed 2026-07-14).
+#   - SOURCING CORRECTION (found at build 2026-07-14): four of cobbler's
+#     mandatory deps — tftp-server, dosfstools, xorriso, createrepo_c — are
+#     RHEL-native and ABSENT from every UBI 9 repo (baseos/appstream/CRB) AND
+#     from EPEL. They are pulled from the ENTITLED rhel-9 repos (RH-first over
+#     a CentOS-Stream fallback) via a SINGLE-LAYER secret-mounted
+#     subscription-manager register -> install -> unregister -> clean, the same
+#     zero-residue pattern mail_full uses for dovecot. The activation key/org
+#     live ONLY in the untracked repo-root ./activation-key passed as build
+#     secret id=rhsm; no consumer identity or entitlement cert persists in any
+#     layer. httpd / mod_wsgi / python deps come from UBI 9 itself.
+#
+# PER-BASE RECORD (honest gap): cobbler is present in EPEL 9 ONLY — ABSENT from
+# EPEL 8 and EPEL 10 (probed 2026-07-14). This substrate therefore builds on
+# ubi9-secure ONLY; ubi8-secure and ubi10-secure are a recorded EPEL-absent gap
+# (the same 2-of-3 shape bareos ships), not a defect.
+#
+# BUILD (public EPEL + entitled deps — secret required):
+#   podman build --secret id=rhsm,src=<repo>/activation-key \
+#     --build-arg UBI_SECURE_BASE=localhost/ubi9-secure:latest -t cobbler_ubi9:candidate .
+ARG UBI_SECURE_BASE=localhost/ubi9-secure:latest
+FROM ${UBI_SECURE_BASE}
+ARG EL_VERSION=9
+
+# EPEL 9 repo — mirrored verbatim (baseurl form), GPG-verified against the
+# official Fedora EPEL 9 key (persistent for reproducibility).
+RUN printf '%s\n' \
+      '[epel]' \
+      'name=Extra Packages for Enterprise Linux $releasever - $basearch' \
+      'baseurl=https://dl.fedoraproject.org/pub/epel/9/Everything/$basearch/' \
+      'enabled=1' \
+      'gpgcheck=1' \
+      'countme=1' \
+      'gpgkey=https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-9' \
+      > /etc/yum.repos.d/epel.repo && \
+    rpm --import https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-9
+
+# cobbler (EPEL) + its RHEL-native dep closure (entitled rhel-9 repos), one
+# layer, zero residue. rc captured so a failed install still unregisters.
+RUN --mount=type=secret,id=rhsm,target=/tmp/.rhsm-secret \
+    command -v subscription-manager >/dev/null || dnf -y install subscription-manager; \
+    key=$(awk '$1 ~ /^(keuy:|key:)$/ {print $2}' /tmp/.rhsm-secret); \
+    org=$(awk '$1 == "org:" {print $2}' /tmp/.rhsm-secret); \
+    subscription-manager register --org "${org}" --activationkey "${key}" && \
+    dnf -y install cobbler-3.3.7-15.el9; rc=$?; \
+    subscription-manager unregister; subscription-manager clean; \
+    rm -rf /etc/pki/consumer /etc/pki/entitlement; \
+    dnf clean all; exit ${rc}
+
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod 0755 /usr/local/bin/entrypoint.sh
+
+# 80 = httpd (cobbler_api WSGI proxy + web UI); 69/udp = TFTP; 25151 = cobblerd XML-RPC.
+EXPOSE 80 69/udp 25151
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

@@ -1,0 +1,74 @@
+---
+# gitlab_ee — standalone-first defaults over the SHARED SCM product interface.
+#
+# Both GitLab product roles (gitlab_ce / gitlab_ee) consume the SAME variable names,
+# so the scm_deploy dispatcher selects either one with one identical call —
+# `include_role: name="{{ scm_type }}"` — and never needs per-edition code. Standalone
+# callers set these same vars directly; the defaults below make the role runnable on its
+# own. gitlab_ce and gitlab_ee stay SEPARATE roles because Community and Enterprise are
+# distinct install targets a user picks exactly one of — EE additionally registers with
+# RHSM and installs the licensed gitlab-ee package.
+
+# --- Role-internal edition constants (vars/, not meant to be overridden) --------------
+_scm_package_repo_script: https://packages.gitlab.com/install/repositories/gitlab/gitlab-ee/script.rpm.sh
+_scm_package_name: gitlab-ee
+_scm_edition: ee
+_scm_rhsm_required: false
+_scm_service_name: gitlab-runsvdir
+_scm_ctl_cmd: gitlab-ctl
+_scm_rake_cmd: gitlab-rake
+
+# --- Action dispatch map — routes action names to task files --------------------------
+# The set of valid actions is enforced by meta/argument_specs.yml (choices); this map only
+# routes a validated action to its file. Service state actions share service.yml.
+_gitlab_ee_action_map:
+  present: present.yml
+  absent: absent.yml
+  configure: configure.yml
+  reconfigure: reconfigure.yml
+  runners: runners.yml
+  backup: backup.yml
+  restore: restore.yml
+  upgrade: upgrade.yml
+  status: status.yml
+  started: service.yml
+  stopped: service.yml
+  restarted: service.yml
+
+# --- Shared SCM interface (consumed identically by gitlab_ce and gitlab_ee) ------------
+# Action passed by scm_deploy (install.yml sends `present`); default covers standalone use.
+action: present
+
+# Instance identity / access.
+scm_external_url: "http://localhost"
+
+# Configuration deployment — path to a gitlab.rb template; empty means reconfigure only.
+scm_config_template: ""
+
+# Runner registration — list of runner definitions (name/token/url/executor/tags/...).
+scm_runners: []
+
+# Backup / restore.
+scm_backup_path: /var/opt/gitlab/backups
+scm_backup_skip: ""
+scm_restore_backup_id: ""
+
+# Firewall exposure.
+scm_open_http: true
+scm_open_https: true
+scm_open_ssh: true
+
+# Teardown behaviour — purge /etc/gitlab on `absent`.
+scm_purge_config: false
+
+# Upgrade dry-run gate — the role's EXISTING execute gate. false (default) blocks a real
+# `dnf state=latest` so `upgrade` validates its guard without changing packages; set true
+# to actually upgrade. Reused by the molecule scenario as the dry-run gate.
+scm_upgrade_execute: false
+
+# --- EE-only: Red Hat Subscription Management (used by the present action) -------------
+# _scm_rhsm_required defaults false so the role runs standalone without a subscription;
+# set true (and supply org_id + activation key) on a real EE host that needs RHSM.
+scm_rhsm_skip_registration: false
+scm_rhsm_org_id: ""
+scm_rhsm_activation_key: ""

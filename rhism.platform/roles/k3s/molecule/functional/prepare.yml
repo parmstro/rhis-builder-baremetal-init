@@ -1,0 +1,12 @@
+---
+- name: Prepare
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Install sudo (for become), firewalld + python3-firewall (role opens k3s ports)
+      ansible.builtin.raw: dnf install -y sudo firewalld python3-firewall 2>/dev/null
+      changed_when: false
+
+    - name: Start firewalld so the role's firewalld tasks succeed
+      ansible.builtin.raw: systemctl start firewalld
+      changed_when: false

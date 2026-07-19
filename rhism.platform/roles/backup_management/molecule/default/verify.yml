@@ -1,0 +1,29 @@
+---
+# The original verify.yml asserted vars/restic.yml / vars/bareos.yml existed with
+# per-type metadata (_backup_has_server_component, _backup_encryption,
+# _backup_service_name) — that design was never implemented (backup_management
+# is a pure dispatcher: backup_type selects which product role to include_role,
+# no type-vars file mechanism exists). Verifying the dispatch contract that
+# actually exists instead: every declared backup_action has a task file.
+- name: Verify backup_management dispatch contract
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Verify a dispatch task file exists for every declared action
+      ansible.builtin.stat:
+        path: "{{ playbook_dir }}/../../tasks/{{ item }}.yml"
+      register: _backup_action_stat
+      failed_when: not _backup_action_stat.stat.exists
+      loop:
+        - server
+        - client
+        - schedule
+        - restore
+        - verify
+        - baseline
+      delegate_to: localhost
+
+    - name: Report verification passed
+      ansible.builtin.debug:
+        msg: "PASS — backup_management dispatch task files verified for all declared actions"
+      delegate_to: localhost

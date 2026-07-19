@@ -1,0 +1,24 @@
+---
+- name: Ensure backup directory exists
+  ansible.builtin.file:
+    path: "{{ scm_backup_path }}"
+    state: directory
+    owner: git
+    group: git
+    mode: "0700"
+  become: true
+
+- name: Create GitLab backup
+  ansible.builtin.command:
+    cmd: "{{ _scm_rake_cmd }} gitlab:backup:create RAILS_ENV=production"
+  become: true
+  changed_when: true
+
+- name: Set backup retention in gitlab.rb
+  ansible.builtin.lineinfile:
+    path: /etc/gitlab/gitlab.rb
+    regexp: "^gitlab_rails\\['backup_keep_time'\\]"
+    line: "gitlab_rails['backup_keep_time'] = {{ scm_backup_keep_time }}"
+  become: true
+  when: scm_backup_enabled
+  notify: scm_deploy - reconfigure gitlab

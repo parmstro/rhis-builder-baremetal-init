@@ -1,0 +1,48 @@
+---
+# =============================================================================
+# INSTALL PROFILE — AAP 2.7 (gateway line; newest supported target).
+#
+# Same gateway topology and install-method set as 2.5/2.6; incremental over 2.6.
+# This is the newest supported version. TODO: confirm the 2.7 operator channel
+# and any containerized required-var additions against the Red Hat AAP 2.7
+# install guides before a real run.
+# =============================================================================
+
+aap_version_profile:
+  version: "2.7"
+  gateway_era: true
+  install_methods:
+    - containerized
+    - openshift
+
+  controller_api_base: /api/controller/v2/
+  ping_path: /api/controller/v2/ping/
+
+  containerized:
+    available: true
+    tech_preview: false
+    installer_collection: ansible.containerized_installer
+    installer_install_playbook: ansible.containerized_installer.install
+    installer_backup_playbook: ansible.containerized_installer.backup
+    installer_restore_playbook: ansible.containerized_installer.restore
+    inventory_groups:
+      - automationgateway
+      - automationcontroller
+      - automationhub
+      - automationeda
+      - database
+    required_group_vars:
+      - postgresql_admin_username
+      - postgresql_admin_password
+      - gateway_admin_password
+      - controller_admin_password
+      - hub_admin_password
+      - registry_username
+      - registry_password
+
+  openshift:
+    available: true
+    cr_api_version: aap.ansible.com/v1alpha1
+    cr_kind: AnsibleAutomationPlatform
+    operator_channel: stable-2.7            # TODO: confirm
+    operator_package: ansible-automation-platform-operator

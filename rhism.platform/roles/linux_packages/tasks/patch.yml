@@ -1,0 +1,53 @@
+---
+- name: Derive CVE-affected package list from CMDB API
+  when: linux_packages_patch | length == 0
+  block:
+    - name: Query CMDB for host CVE exposures
+      ansible.builtin.uri:
+        url: "{{ linux_packages_cmdb_api_url }}/api/packages/host/{{ inventory_hostname }}/cve_packages"
+        method: GET
+        return_content: true
+        status_code: [200, 404]
+      delegate_to: localhost
+      register: _cmdb_cve_packages
+
+    - name: Set patch list from CMDB response
+      ansible.builtin.set_fact:
+        linux_packages_patch: "{{ (_cmdb_cve_packages.json.packages | default([])) |
+          selectattr('max_cvss_severity', 'in',
+            (['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] |
+             select('in', _severity_tiers[linux_packages_patch_min_severity] | default([])) | list)) |
+          map(attribute='name') | unique | list }}"
+      vars:
+        _severity_tiers:
+          CRITICAL: ['CRITICAL']
+          HIGH: ['CRITICAL', 'HIGH']
+          MEDIUM: ['CRITICAL', 'HIGH', 'MEDIUM']
+          LOW: ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']
+      when: _cmdb_cve_packages.status == 200
+
+- name: Assert patch list is not empty
+  ansible.builtin.assert:
+    that: linux_packages_patch | length > 0
+    fail_msg: >-
+      linux_packages_patch is empty — either pass it explicitly via
+      -e 'linux_packages_patch=[libxml2,glibc]' or ensure the CMDB API
+      is reachable at {{ linux_packages_cmdb_api_url }}.
+
+- name: Show packages to be patched
+  ansible.builtin.debug:
+    msg: "Patching {{ linux_packages_patch | length }} package(s): {{ linux_packages_patch | join(', ') }}"
+
+- name: Upgrade CVE-affected packages to latest available version
+  ansible.builtin.package:
+    name: "{{ linux_packages_patch }}"
+    state: latest
+  become: true
+  register: _patch_result
+
+- name: Report patch outcome
+  ansible.builtin.debug:
+    msg: >-
+      {{ 'Packages updated — reboot may be required for glibc/kernel changes.'
+         if _patch_result.changed else
+         'All packages already at latest version — no changes needed.' }}

@@ -1,0 +1,104 @@
+---
+# Functional requirements — gitlab_ce (requirements->test-case layer + Tier-3
+# elevation, owner rules 2026-07-12). Product role: GitLab Community Edition
+# omnibus on EL9. Capability fact-checked against the official GitLab docs
+# (docs.gitlab.com/omnibus install + configuration, docs.gitlab.com/ee/
+# administration/backup_restore, docs.gitlab.com/runner/register) and curated
+# against README + meta/argument_specs.yml action set + tasks/. gitlab_ce and
+# gitlab_ee are SEPARATE editions of one product over the shared scm_*
+# interface; this FR set is near-identical to gitlab_ee's BY DESIGN — only the
+# licensed-package wording (FR-002) and the EE-only RHSM step (gitlab_ee FR-012,
+# absent here) differ. Family lab: playbooks/scm_deploy.yml.
+functional_requirements:
+  - req_id: GITLAB_CE-FR-001
+    statement: >-
+      The role SHALL consume the shared SCM product interface (bare action +
+      scm_* vars) and pass its contract scenario — argument-spec action
+      validation, the standalone default (action=present), the negative
+      bad-action path, and the scm_upgrade_execute dry-run gate — without
+      installing a real GitLab.
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: GITLAB_CE-FR-002
+    statement: >-
+      The role SHALL install the gitlab-ce omnibus package on 'present' via the
+      official packages.gitlab.com repository script, with prerequisite packages
+      and EXTERNAL_URL set to scm_external_url.
+    tier: 3
+    verified_by:
+      - lab: playbooks/scm_deploy.yml#install
+
+  - req_id: GITLAB_CE-FR-003
+    statement: >-
+      The role SHALL apply configuration on 'configure'/'reconfigure' —
+      templating /etc/gitlab/gitlab.rb when scm_config_template is set, then
+      running gitlab-ctl reconfigure.
+    tier: 3
+    verified_by:
+      - lab: playbooks/scm_deploy.yml#configure
+
+  - req_id: GITLAB_CE-FR-004
+    statement: >-
+      The role SHALL install gitlab-runner and register each scm_runners entry
+      against the instance on 'runners'.
+    tier: 3
+    verified_by:
+      - lab: playbooks/scm_deploy.yml#runners
+
+  - req_id: GITLAB_CE-FR-005
+    statement: >-
+      The role SHALL create an application backup on 'backup' via gitlab-rake
+      gitlab:backup:create, honouring the scm_backup_skip components.
+    tier: 3
+    verified_by:
+      - lab: playbooks/scm_deploy.yml#backup
+
+  - req_id: GITLAB_CE-FR-006
+    statement: >-
+      The role SHALL restore from the backup identified by scm_restore_backup_id
+      on 'restore' — stopping services, restoring, reconfiguring, and restarting.
+    tier: 3
+    verified_by:
+      - lab: playbooks/scm_deploy.yml#restore
+
+  - req_id: GITLAB_CE-FR-007
+    statement: >-
+      The role SHALL upgrade the gitlab-ce package in place on 'upgrade',
+      fail-closed behind scm_upgrade_execute (the closed gate itself is asserted
+      by the contract scenario in FR-001).
+    tier: 3
+    verified_by:
+      - lab: playbooks/scm_deploy.yml#upgrade
+
+  - req_id: GITLAB_CE-FR-008
+    statement: >-
+      The role SHALL open the http/https/ssh firewalld services on 'present'
+      (each toggled by scm_open_*) and close them on 'absent'.
+    tier: 3
+    verified_by:
+      - lab: playbooks/scm_deploy.yml#install
+
+  - req_id: GITLAB_CE-FR-009
+    statement: >-
+      The role SHALL manage the GitLab service (gitlab-runsvdir) lifecycle on
+      'started'/'stopped'/'restarted'.
+    tier: 3
+    verified_by:
+      - lab: playbooks/scm_deploy.yml#install
+
+  - req_id: GITLAB_CE-FR-010
+    statement: >-
+      The role SHALL report instance state via gitlab-ctl status on 'status'.
+    tier: 3
+    verified_by:
+      - lab: playbooks/scm_deploy.yml#status
+
+  - req_id: GITLAB_CE-FR-011
+    statement: >-
+      The role SHALL remove the gitlab-ce package on 'absent' and, when
+      scm_purge_config is set, purge /etc/gitlab — a teardown the deploy lab
+      does not exercise.
+    tier: 3
+    verified_by: []

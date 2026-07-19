@@ -1,0 +1,44 @@
+---
+# --------------------------------------------------------------------------- #
+# Shared — firewall port opening for satellite install                        #
+#                                                                             #
+# Used by: install.yml                                                        #
+# Extracted because this block is a self-contained concern and could be       #
+# reused if other actions need firewall changes.                              #
+# --------------------------------------------------------------------------- #
+- name: Apply satellite/smart-proxy firewall rules (privilege-escalated)
+  become: true
+  block:
+    - name: Open firewall for satellite HTTP/HTTPS
+      ansible.posix.firewalld:
+        service: "{{ item }}"
+        state: enabled
+        permanent: true
+        immediate: true
+      loop:
+        - http
+        - https
+
+    - name: Open firewall for DNS (smart proxy)
+      ansible.posix.firewalld:
+        service: dns
+        state: enabled
+        permanent: true
+        immediate: true
+      when: content_proxy_dns | bool
+
+    - name: Open firewall for DHCP (smart proxy)
+      ansible.posix.firewalld:
+        service: dhcp
+        state: enabled
+        permanent: true
+        immediate: true
+      when: content_proxy_dhcp | bool
+
+    - name: Open firewall for TFTP (smart proxy)
+      ansible.posix.firewalld:
+        service: tftp
+        state: enabled
+        permanent: true
+        immediate: true
+      when: content_proxy_tftp | bool

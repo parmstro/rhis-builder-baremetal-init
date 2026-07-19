@@ -1,0 +1,53 @@
+---
+- name: Converge — RHSM registration
+  hosts: all
+  gather_facts: true
+  become: true
+  tasks:
+    - name: Register with Red Hat Subscription Manager
+      community.general.redhat_subscription:
+        state: present
+        org_id: "{{ rhsm_org_id }}"
+        activationkey: "{{ rhsm_activation_key }}"
+      register: _rhsm_reg
+
+    - name: Enable required RHSM repositories
+      community.general.rhsm_repository:
+        name:
+          - rhel-9-for-x86_64-baseos-rpms
+          - rhel-9-for-x86_64-appstream-rpms
+        state: enabled
+
+- name: Converge — Deploy RH IDM via platform_builder (identity layer only)
+  hosts: all
+  gather_facts: true
+  vars:
+    pb_action: deploy
+    pb_manifest_path: "{{ playbook_dir }}/files/supported-manifest.yml"
+    pb_deploy_execute: true
+    pb_enable_security: false
+    pb_enable_identity: true
+    pb_enable_provisioning: false
+    pb_enable_content: false
+    pb_enable_mail: false
+    pb_enable_scm: false
+    pb_enable_backup: false
+    pb_enable_container_platform: false
+    pb_enable_monitoring: false
+    pb_identity_type: rh_idm
+    pb_idm_apply_server: true
+    pb_idm_apply_dns: true
+    pb_idm_apply_client: false
+    pb_idm_apply_trust: false
+    idm_domain: "{{ idm_domain }}"
+    idm_realm: "{{ idm_realm }}"
+    idm_admin_password: "{{ idm_admin_password }}"
+    idm_ds_password: "{{ idm_ds_password }}"
+    idm_server_install: "{{ idm_server_install | bool }}"
+    idm_setup_dns: "{{ idm_setup_dns | bool }}"
+    idm_forwarders: "{{ idm_forwarders }}"
+    idm_mkhomedir: "{{ idm_mkhomedir | bool }}"
+    idm_idstart: "{{ idm_idstart }}"
+    idm_idmax: "{{ idm_idmax }}"
+  roles:
+    - role: rhism.platform.builder

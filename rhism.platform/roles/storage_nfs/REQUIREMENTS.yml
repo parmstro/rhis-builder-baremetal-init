@@ -1,0 +1,66 @@
+---
+# Functional requirements — storage_nfs (requirements->test-case layer + Tier-3
+# elevation, owner rules 2026-07-12). Product role in the container_platform
+# storage family (a user picks exactly one of storage_local_path/storage_nfs/
+# storage_longhorn/storage_ocs). Product capability fact-checked against the
+# official Kubernetes NFS subdir external provisioner docs
+# (github.com/kubernetes-sigs/nfs-subdir-external-provisioner — Helm deploy,
+# nfs.server/nfs.path, StorageClass name/reclaimPolicy/archiveOnDelete,
+# per-PVC subdirectory provisioning, ReadWriteMany). Curated against README +
+# meta/argument_specs.yml action set + tasks/main.yml. Family lab:
+# playbooks/container_platform.yml (cp_storage_type: nfs).
+functional_requirements:
+  - req_id: STORAGE_NFS-FR-001
+    statement: >-
+      The role SHALL consume the shared container_platform storage interface
+      (bare action + cp_storage_* + cp_kubeconfig_path) and pass its contract
+      scenario — argument-spec validation, standalone default (action=storage),
+      dispatch for storage/present/absent, negative bad-action rejection, and the
+      cp_storage_execute dry-run gate — without a cluster or NFS server.
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: STORAGE_NFS-FR-002
+    statement: >-
+      Before a real deploy the role SHALL fail closed unless both
+      cp_storage_nfs_server and cp_storage_nfs_path are set (non-empty).
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#storage-nfs
+
+  - req_id: STORAGE_NFS-FR-003
+    statement: >-
+      On deploy the role SHALL install nfs-utils on every cluster node so they can
+      mount the shared export.
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#storage-nfs
+
+  - req_id: STORAGE_NFS-FR-004
+    statement: >-
+      The role SHALL add the kubernetes-sigs nfs-subdir-external-provisioner Helm
+      repository and deploy the provisioner into the nfs-provisioner namespace,
+      bound to the existing NFS export (cp_storage_nfs_server + cp_storage_nfs_path).
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#storage-nfs
+
+  - req_id: STORAGE_NFS-FR-005
+    statement: >-
+      The role SHALL create the StorageClass (cp_storage_class_name, default
+      nfs-client) that provisions each PVC as a subdirectory of the export, with a
+      configurable reclaim policy (cp_storage_nfs_reclaim_policy) and
+      archive-on-delete (cp_storage_nfs_archive_on_delete), optionally set as the
+      cluster default.
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#storage-nfs
+
+  - req_id: STORAGE_NFS-FR-006
+    statement: >-
+      On action absent the role SHALL remove the Helm release, delete the
+      nfs-provisioner namespace, and remove nfs-utils.
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#storage-nfs

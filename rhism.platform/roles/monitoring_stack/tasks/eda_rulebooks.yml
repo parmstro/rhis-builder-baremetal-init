@@ -1,0 +1,43 @@
+---
+- name: Create EDA rulebook directory
+  ansible.builtin.file:
+    path: "{{ mon_eda_rulebook_dir }}"
+    state: directory
+    mode: "0755"
+  become: true
+
+- name: Deploy security events rulebook
+  ansible.builtin.template:
+    src: eda_security_events.yml.j2
+    dest: "{{ mon_eda_rulebook_dir }}/security_events.yml"
+    mode: "0644"
+  become: true
+
+- name: Deploy infrastructure events rulebook
+  ansible.builtin.template:
+    src: eda_infrastructure_events.yml.j2
+    dest: "{{ mon_eda_rulebook_dir }}/infrastructure_events.yml"
+    mode: "0644"
+  become: true
+
+- name: Deploy service health rulebook
+  ansible.builtin.template:
+    src: eda_service_health.yml.j2
+    dest: "{{ mon_eda_rulebook_dir }}/service_health.yml"
+    mode: "0644"
+  become: true
+
+- name: Deploy bug detections rulebook
+  ansible.builtin.template:
+    src: eda_bug_detections.yml.j2
+    dest: "{{ mon_eda_rulebook_dir }}/bug_detections.yml"
+    mode: "0644"
+  become: true
+
+- name: Report deployed rulebooks
+  ansible.builtin.debug:
+    msg: >-
+      EDA rulebooks deployed to {{ mon_eda_rulebook_dir }}:
+      security_events.yml, infrastructure_events.yml, service_health.yml,
+      bug_detections.yml (port {{ mon_eda_webhook_port + 3 }}).
+      Register these in the EDA controller to activate event-driven automation.

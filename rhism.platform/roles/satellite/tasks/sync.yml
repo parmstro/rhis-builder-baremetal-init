@@ -1,0 +1,34 @@
+---
+# --------------------------------------------------------------------------- #
+# sync — sync plans and immediate repository sync                             #
+# --------------------------------------------------------------------------- #
+- name: Manage sync plans
+  theforeman.foreman.sync_plan:
+    server_url: "{{ content_server_url }}"
+    username: "{{ content_username }}"
+    password: "{{ content_password }}"
+    validate_certs: "{{ content_validate_certs }}"
+    organization: "{{ content_organization }}"
+    name: "{{ item.name }}"
+    interval: "{{ item.interval | default('daily') }}"
+    sync_date: "{{ item.sync_date | default(omit) }}"
+    enabled: "{{ item.enabled | default(true) }}"
+    products: "{{ item.products | default(omit) }}"
+    state: present
+  loop: "{{ content_sync_plans }}"
+  no_log: "{{ content_no_log }}"
+  when: content_sync_plans | length > 0
+
+- name: Trigger immediate repository sync
+  theforeman.foreman.repository_sync:
+    server_url: "{{ content_server_url }}"
+    username: "{{ content_username }}"
+    password: "{{ content_password }}"
+    validate_certs: "{{ content_validate_certs }}"
+    organization: "{{ content_organization }}"
+    product: "{{ item }}"
+  loop: "{{ content_sync_products }}"
+  no_log: "{{ content_no_log }}"
+  when:
+    - content_sync_now | bool
+    - content_sync_products | length > 0

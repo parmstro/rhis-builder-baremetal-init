@@ -1,0 +1,63 @@
+---
+# Cobbler 3.3 ships a large, strictly schema-validated /etc/cobbler/settings.yaml
+# (~588 keys); cobblerd refuses to start if it is replaced with a sparse file or
+# if a value has the wrong type. So the role UPDATES only the keys it manages, in
+# place, preserving the shipped file and its owner/group (root:apache) that the
+# mod_wsgi cobbler_api needs to read.
+
+- name: Confirm cobbler settings.yaml is present
+  ansible.builtin.stat:
+    path: "{{ _prov_config_file }}"
+  become: true
+  register: _cobbler_settings_stat
+
+- name: Assert cobbler is installed before configuring
+  ansible.builtin.assert:
+    that:
+      - _cobbler_settings_stat.stat.exists
+    fail_msg: >-
+      {{ _prov_config_file }} not found — install cobbler first (action=present).
+
+- name: Compose the managed cobbler settings keys
+  ansible.builtin.set_fact:
+    _cobbler_managed_settings: >-
+      {{
+        [
+          {'key': 'server', 'value': prov_cobbler_server},
+          {'key': 'manage_dhcp', 'value': (prov_cobbler_manage_dhcp | bool) | ternary('true', 'false')},
+          {'key': 'manage_dns', 'value': (prov_cobbler_manage_dns | bool) | ternary('true', 'false')},
+          {'key': 'manage_tftpd', 'value': (prov_cobbler_manage_tftp | bool) | ternary('true', 'false')},
+          {'key': 'client_use_localhost', 'value': (prov_cobbler_client_use_localhost | bool) | ternary('true', 'false')}
+        ]
+        + (
+          [{'key': 'next_server_v4', 'value': prov_cobbler_next_server}]
+          if (prov_cobbler_next_server | length > 0) else []
+        )
+      }}
+
+- name: Apply cobbler settings in place (preserve the schema-validated file)
+  ansible.builtin.lineinfile:
+    path: "{{ _prov_config_file }}"
+    regexp: "^{{ item.key }}:"
+    line: "{{ item.key }}: {{ item.value }}"
+    owner: root
+    group: "{{ prov_cobbler_settings_group }}"
+    mode: "0640"
+  become: true
+  loop: "{{ _cobbler_managed_settings }}"
+  loop_control:
+    label: "{{ item.key }}"
+  notify: cobbler - restart cobbler
+
+- name: Ensure the tftpboot directory exists
+  ansible.builtin.file:
+    path: "{{ prov_cobbler_tftpboot_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+  when: prov_cobbler_manage_tftp | bool
+
+- name: Sync cobbler after configuration
+  ansible.builtin.include_tasks: sync.yml

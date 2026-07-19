@@ -1,0 +1,67 @@
+---
+# deploy — pull the official, digest-pinned Tang image and run it, with a
+# persistent key volume, SELinux port label, and firewalld opening. Reuses
+# roles/podman for all container mechanics (CLAUDE.md "Reuse existing
+# roles") rather than reimplementing podman_image/podman_container calls.
+#
+# Dry-run gated by tang_deploy_execute (default false): deploy needs a
+# target with a REAL podman binary (roles/podman's containers.podman
+# modules shell out to it — they do not talk to a forwarded-socket API the
+# way community.docker does), so an ungated run in a socket-only scope (the
+# EE itself) would fail, not merely no-op. The gate keeps a Tier-1 contract
+# run genuinely side-effect-free; real functional deployment is a Tier-3
+# lab concern (see docs/tang.md).
+
+- name: Report dry-run status
+  ansible.builtin.debug:
+    msg: >-
+      {{ 'DEPLOYING for real' if (tang_deploy_execute | bool)
+         else 'DRY-RUN (tang_deploy_execute=false): validating only, no changes made' }}
+
+- name: Deploy for real
+  when: tang_deploy_execute | bool
+  block:
+    - name: Pull the official Tang image (by tag)
+      ansible.builtin.include_role:
+        name: podman
+      vars:
+        podman_action: pull
+        podman_image_name: "{{ tang_image_repository }}"
+        podman_image_tag: "{{ tang_image_tag }}"
+
+    - name: Open the Tang port in firewalld
+      ansible.posix.firewalld:
+        port: "{{ tang_port }}/tcp"
+        zone: public
+        permanent: true
+        immediate: true
+        state: enabled
+      become: true
+      when: tang_manage_firewall | bool
+
+    - name: Apply the tangd_port_t SELinux port label
+      community.general.seport:
+        ports: "{{ tang_port }}"
+        proto: tcp
+        setype: tangd_port_t
+        state: present
+      become: true
+      when: tang_manage_selinux | bool
+
+    - name: Run the Tang container (digest-pinned, regardless of the pull tag)
+      ansible.builtin.include_role:
+        name: podman
+      vars:
+        podman_action: container
+        podman_container_name: "{{ tang_container_name }}"
+        podman_container_image: "{{ tang_image_repository }}@{{ tang_image_digest }}"
+        podman_container_state: started
+        podman_restart_policy: always
+        podman_volumes:
+          - "{{ tang_volume_name }}:/var/db/tang:Z"
+        podman_ports:
+          - "0.0.0.0:{{ tang_port }}:8080"
+
+    - name: Back up the escrow key material to the control node (real-world resilience)
+      ansible.builtin.include_tasks: backup_keys.yml
+      when: tang_backup_keys | bool

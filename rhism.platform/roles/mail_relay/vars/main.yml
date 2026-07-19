@@ -1,0 +1,17 @@
+---
+# Role-internal action routing — not overridable by inventory.
+# The action choices are enforced by meta/argument_specs.yml; this map only routes
+# each valid action to its task file.
+
+_mail_relay_action_map:
+  present: package.yml
+  absent: package.yml
+  configure: configure.yml
+  secure: secure.yml
+  test: test.yml
+  status: status.yml
+  started: service.yml
+  stopped: service.yml
+  restarted: service.yml
+  queue_flush: queue_flush.yml
+  queue_purge: queue_purge.yml

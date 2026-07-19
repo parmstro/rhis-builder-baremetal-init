@@ -1,0 +1,39 @@
+---
+- name: Converge — sysctl hardening
+  hosts: all
+  gather_facts: true
+  vars:
+    linux_hardening_action: sysctl
+    linux_hardening_sysctl_apply: false
+  roles:
+    - role: rhism.platform.linux_hardening
+
+- name: Converge — SSH hardening
+  hosts: all
+  gather_facts: true
+  vars:
+    linux_hardening_action: ssh
+    linux_hardening_ssh_port: 22
+    linux_hardening_ssh_permit_root_login: "no"
+    linux_hardening_ssh_password_auth: "no"
+    linux_hardening_ssh_manage_sftp: false
+  roles:
+    - role: rhism.platform.linux_hardening
+
+- name: Converge — PAM configuration
+  hosts: all
+  gather_facts: true
+  vars:
+    linux_hardening_action: pam
+  roles:
+    - role: rhism.platform.linux_hardening
+
+- name: Converge — kernel module blacklisting
+  hosts: all
+  gather_facts: true
+  vars:
+    linux_hardening_action: kernel_modules
+    # Avoid modprobe errors in containers — no host kernel modules to unload
+    linux_hardening_blacklisted_modules: []
+  roles:
+    - role: rhism.platform.linux_hardening

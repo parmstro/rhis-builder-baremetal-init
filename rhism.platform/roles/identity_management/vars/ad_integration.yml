@@ -1,0 +1,26 @@
+---
+# Active Directory integration — integrates Linux hosts with an existing AD domain
+# using realmd + sssd. No server is deployed; hosts are enrolled as AD members.
+# Loaded dynamically when idm_type=ad_integration via include_vars in tasks/main.yml.
+
+_idm_join_packages:
+  - realmd
+  - sssd
+  - sssd-tools
+  - sssd-ad
+  - oddjob
+  - oddjob-mkhomedir
+  - adcli
+  - samba-common-tools
+  - krb5-workstation
+
+_idm_join_method: realm
+_idm_sssd_provider: ad
+_idm_service_name: sssd
+_idm_rhsm_required: false
+
+# server, replica, client, trust, dns actions are not applicable for ad_integration.
+# Only enroll and baseline (with idm_apply_server: false) are valid.
+_idm_server_applicable: false
+_idm_server_packages: []
+_idm_client_packages: []

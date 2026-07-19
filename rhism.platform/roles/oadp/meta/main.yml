@@ -1,0 +1,27 @@
+---
+galaxy_info:
+  namespace: rhism
+  role_name: oadp
+  author: rhism
+  description: >-
+    Install and operate OpenShift API for Data Protection (OADP) — the Red Hat-supported,
+    Velero-based backup/restore operator for OpenShift/Kubernetes. Installs the operator via
+    OLM, configures the whole Velero stack through the DataProtectionApplication CR, and drives
+    the backup lifecycle (server, client, backup, schedule, restore, verify, baseline).
+    Standalone-first product role, also selectable by the backup_management dispatcher
+    (backup_type: oadp).
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: EL
+      versions:
+        - "9"
+  galaxy_tags:
+    - backup
+    - oadp
+    - velero
+    - openshift
+    - kubernetes
+    - restore
+    - disasterrecovery
+dependencies: []

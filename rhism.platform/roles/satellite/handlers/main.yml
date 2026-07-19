@@ -1,0 +1,12 @@
+---
+- name: satellite - restart foreman
+  ansible.builtin.service:
+    name: foreman
+    state: restarted
+  become: true
+
+- name: satellite - restart apache
+  ansible.builtin.service:
+    name: httpd
+    state: restarted
+  become: true

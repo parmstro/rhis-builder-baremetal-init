@@ -1,0 +1,45 @@
+---
+# Test manifest for molecule — minimal selection, all components dry-run safe
+profile: oss
+components:
+  identity:
+    enabled: true
+    type: freeipa
+    ad_trust:
+      enabled: false
+      domain: ""
+      admin: Administrator
+      range_type: ipa-ad-trust
+  provisioning:
+    enabled: false
+    type: dnsmasq
+    hosts: []
+  secrets:
+    enabled: true
+    type: ansible
+    target: test-secret
+  content:
+    enabled: true
+    type: foreman
+  mail:
+    enabled: true
+    type: relay
+  scm:
+    enabled: false
+    type: gitlab_ce
+  backup:
+    enabled: true
+    type: restic
+  container_platform:
+    enabled: true
+    type: k3s
+  security:
+    enabled: false
+    type: default
+  monitoring:
+    enabled: false
+    type: default
+network: {}
+sizing: {}
+credentials: {}
+licensing: {}

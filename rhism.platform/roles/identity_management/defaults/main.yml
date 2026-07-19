@@ -1,0 +1,146 @@
+---
+# Which identity action to run:
+#   server | replica | client | enroll | trust | dns |
+#   otp | smart_card | radius_proxy | baseline
+idm_action: baseline
+
+# ===========================================================================
+# Identity type — drives which vars file and task variants are loaded
+# ===========================================================================
+# rh_idm        — Red Hat IDM (subscription required; same packages as FreeIPA)
+# freeipa       — FreeIPA (open source, no subscription)
+# ad_integration — integrate Linux hosts with an existing AD domain (no server deploy)
+idm_type: freeipa
+
+# ===========================================================================
+# Domain and realm
+# ===========================================================================
+idm_domain: ""                         # e.g. corp.example.com
+idm_realm: ""                          # derived as uppercase domain if empty
+idm_hostname: ""                       # FQDN for server (default: inventory_hostname)
+
+# ===========================================================================
+# Server install settings (idm_action: server)
+# ===========================================================================
+idm_admin_password: ""                 # vault — admin Kerberos principal password
+idm_ds_password: ""                    # vault — Directory Server (LDAP) password
+idm_setup_dns: true                    # configure integrated BIND DNS
+idm_auto_forwarders: false             # auto-detect forwarders from /etc/resolv.conf
+idm_forwarders: []                     # explicit DNS forwarders, e.g. [8.8.8.8]
+idm_no_forwarders: false               # use root DNS hints only
+idm_ip_addresses: []                   # IP addresses to register (default: autodetect)
+idm_idstart: 50000                     # starting UID/GID for IPA-managed users
+idm_idmax: 199999                      # ending UID/GID range
+idm_mkhomedir: true                    # auto-create home directories on login
+
+# Gate — set true to execute the actual server install (default dry-run).
+# Molecule always leaves this false; set true in real deployments.
+idm_server_install: false
+
+# ===========================================================================
+# Red Hat IDM / RHSM settings (idm_type: rh_idm)
+# ===========================================================================
+idm_rhsm_org_id: ""                    # vault — RHSM organization ID
+idm_rhsm_activation_key: ""           # vault — RHSM activation key
+idm_rhsm_skip_registration: false     # true if host is already registered
+
+# ===========================================================================
+# Replica settings (idm_action: replica)
+# ===========================================================================
+idm_master_server: ""                  # FQDN of existing server to replicate from
+idm_replica_setup_dns: true
+idm_replica_setup_ca: true
+
+# ===========================================================================
+# Client settings (idm_action: client)
+# ===========================================================================
+idm_server_hostname: ""                # FQDN of IDM/IPA server to enroll with
+idm_client_install: false              # gate, same as idm_server_install
+
+# ===========================================================================
+# AD integration settings (idm_action: enroll, idm_type: ad_integration)
+# ===========================================================================
+idm_ad_admin_user: Administrator       # AD user with join permission
+idm_ad_admin_password: ""             # vault
+idm_ad_computer_ou: ""                # OU for computer account, e.g. OU=Linux,DC=corp,DC=example,DC=com
+idm_ad_permit_all_users: false        # add permit-all realm access rule after join
+idm_ad_enroll_execute: false          # gate for actual realm join
+
+# ===========================================================================
+# AD trust settings (idm_action: trust)
+# ===========================================================================
+idm_ad_trust_domain: ""               # AD domain to establish trust with
+idm_ad_trust_admin: Administrator     # AD admin user
+idm_ad_trust_password: ""            # vault
+idm_ad_trust_range_type: ipa-ad-trust # ipa-ad-trust | ipa-ad-trust-posix
+
+# ===========================================================================
+# DNS zone settings (idm_action: dns)
+# ===========================================================================
+idm_dns_zones: []                      # list of zone dicts: {name, forwarders, forward_policy}
+idm_dns_records: []                    # list of record dicts: {zone, name, type, value}
+
+# ===========================================================================
+# OTP token settings (idm_action: otp)
+# ===========================================================================
+# List of token definitions, e.g.:
+# idm_otp_tokens:
+#   - owner: jsmith
+#     type: totp               # totp | hotp
+#     description: "Phone authenticator"
+#   - owner: mjones
+#     type: hotp
+#     name: mjones-yubikey-hotp-01
+idm_otp_tokens: []
+
+# ===========================================================================
+# Smart card / PIV settings (idm_action: smart_card)
+# ===========================================================================
+idm_smart_card_ca_cert: ""             # PEM string of the CA that issued smart cards
+idm_smart_card_ca_cert_file: ""        # or path to a CA cert file
+idm_smart_card_server_configure: true  # run ipa-advise config-server-for-smart-card-auth
+idm_smart_card_configure_clients: false # run ipa-advise config-client-for-smart-card-auth
+idm_smart_card_password_fallback: true # allow password as fallback (false = card required)
+idm_smart_card_required_users: []      # users who must use smart card login
+idm_smart_card_cert_map_rules: []      # cert mapping rules for user matching
+# Example mapping rule:
+# idm_smart_card_cert_map_rules:
+#   - name: yubikey-piv-map
+#     description: "Map YubiKey PIV cert Subject to IPA user"
+#     maprule: "(uid={subject_dn.uid})"
+#     matchrule: "<ISSUER>CN=YubiKey PIV CA.*"
+
+# ===========================================================================
+# RADIUS proxy settings (idm_action: radius_proxy)
+# ===========================================================================
+# List of RADIUS server definitions:
+# idm_radius_servers:
+#   - name: rsa-securid
+#     description: "RSA SecurID Authentication Manager"
+#     server: 192.168.1.50        # RADIUS server IP or FQDN
+#     secret: "VaultedSecret"     # vault — RADIUS shared secret
+#     port: 1812
+#     type: rsa                   # rsa | safenet | yubikey | generic (informational)
+#   - name: yubikey-cloud
+#     server: radius.yubico.com
+#     secret: "VaultedSecret"
+#     type: yubikey
+idm_radius_servers: []
+
+# Map IPA users to a RADIUS proxy:
+# idm_radius_user_mappings:
+#   - user: jsmith
+#     proxy_name: rsa-securid
+#     radius_username: jsmith@corp.example.com  # optional, defaults to IPA username
+idm_radius_user_mappings: []
+
+# ===========================================================================
+# Baseline orchestrator toggles (idm_action: baseline)
+# ===========================================================================
+idm_apply_server: true
+idm_apply_client: false                # false — client enrollment is per-host, not in baseline
+idm_apply_dns: true
+idm_apply_trust: false                 # only when AD trust is needed
+idm_apply_otp: false                   # enable when idm_otp_tokens is populated
+idm_apply_smart_card: false            # enable when smart card CA cert is provided
+idm_apply_radius_proxy: false          # enable when idm_radius_servers is populated

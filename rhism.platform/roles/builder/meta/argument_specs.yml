@@ -1,0 +1,242 @@
+---
+argument_specs:
+  main:
+    short_description: >-
+      rhism estate builder — reads an rhism.platform.wizard deployment
+      manifest and drives every component role in dependency order.
+    description: >-
+      Orchestrator role. plan renders a human-readable deployment order from
+      the manifest without touching anything. deploy dispatches, in order:
+      linux security baseline, Tang/NBDE key escrow, KVM hypervisor platform
+      (install + configure), identity management, provisioning services (+ a
+      bare-host provisioning fork to cobbler or Satellite), secrets management,
+      content management, mail server, SCM, backup management, container
+      platform, monitoring stack, Ansible Automation Platform (install +
+      config-as-code) — each gated by the manifest's own components.<name>.enabled
+      (or a pb_enable_<name> override). verify runs post-deploy health checks.
+      teardown stops services in reverse dependency order. Real changes are gated
+      behind pb_deploy_execute (default false) throughout.
+    options:
+      pb_action:
+        description: Which task to run.
+        type: str
+        default: plan
+        choices:
+          - plan
+          - deploy
+          - verify
+          - teardown
+      pb_manifest_path:
+        description: >-
+          Path to the deployment manifest written by
+          rhism.platform.wizard. A deliberately distinct default
+          path/filename so two manifests never silently overwrite one
+          another on a shared control host.
+        type: str
+        default: /opt/rhism/manifests/rhism-deployment-manifest.yml
+      pb_deploy_execute:
+        description: >-
+          Dry-run gate passed to every child role. false (the default)
+          renders/validates without making real changes anywhere.
+        type: bool
+        default: false
+      pb_enable_security:
+        description: Override components.security.enabled from the manifest.
+        type: str
+        default: ""
+      pb_enable_hypervisor:
+        description: >-
+          Override components.hypervisor.enabled from the manifest (the KVM/libvirt
+          compute substrate; the estate profile enables it).
+        type: str
+        default: ""
+      pb_enable_identity:
+        description: Override components.identity.enabled from the manifest.
+        type: str
+        default: ""
+      pb_enable_provisioning:
+        description: Override components.provisioning.enabled from the manifest.
+        type: str
+        default: ""
+      pb_enable_secrets:
+        description: Override components.secrets.enabled from the manifest.
+        type: str
+        default: ""
+      pb_enable_content:
+        description: Override components.content.enabled from the manifest.
+        type: str
+        default: ""
+      pb_enable_mail:
+        description: Override components.mail.enabled from the manifest.
+        type: str
+        default: ""
+      pb_enable_scm:
+        description: Override components.scm.enabled from the manifest.
+        type: str
+        default: ""
+      pb_enable_backup:
+        description: Override components.backup.enabled from the manifest.
+        type: str
+        default: ""
+      pb_enable_container_platform:
+        description: Override components.container_platform.enabled from the manifest.
+        type: str
+        default: ""
+      pb_enable_monitoring:
+        description: Override components.monitoring.enabled from the manifest.
+        type: str
+        default: ""
+      pb_enable_automation:
+        description: >-
+          Override components.automation.enabled from the manifest (Ansible
+          Automation Platform; the estate profile enables it).
+        type: str
+        default: ""
+      pb_hypervisor_type:
+        description: >-
+          Override components.hypervisor.type from the manifest. Only kvm is
+          wired in the builder today (kvm_platform vendored); vmware/proxmox
+          would need their product role vendored and a branch added.
+        type: str
+        default: ""
+      pb_identity_type:
+        description: Override components.identity.type from the manifest.
+        type: str
+        default: ""
+      pb_provisioning_type:
+        description: Override components.provisioning.type from the manifest.
+        type: str
+        default: ""
+      pb_pm_type:
+        description: Secrets backend override — ansible | vault | thycotic.
+        type: str
+        default: ""
+      pb_content_type:
+        description: Override components.content.type from the manifest.
+        type: str
+        default: ""
+      pb_mail_type:
+        description: Override components.mail.type from the manifest.
+        type: str
+        default: ""
+      pb_scm_type:
+        description: Override components.scm.type from the manifest.
+        type: str
+        default: ""
+      pb_backup_type:
+        description: Override components.backup.type from the manifest.
+        type: str
+        default: ""
+      pb_cp_type:
+        description: Override components.container_platform.type from the manifest.
+        type: str
+        default: ""
+      pb_automation_type:
+        description: >-
+          Override components.automation.type from the manifest. Only aap is
+          wired in the builder today (aap role vendored).
+        type: str
+        default: ""
+      pb_aap_controller_host:
+        description: >-
+          Controller URL for AAP's config-as-code (Step 10 configure). Empty
+          (default) skips the configure step; a real URL enables it, and only
+          when pb_deploy_execute is true (a controller must already be up).
+        type: str
+        default: ""
+      pb_pm_action:
+        description: Action passed to password_management's Step 3.5 dispatch.
+        type: str
+        default: create
+      pb_idm_apply_server:
+        description: Apply the identity server baseline step.
+        type: bool
+        default: true
+      pb_idm_apply_dns:
+        description: Apply the identity DNS baseline step.
+        type: bool
+        default: true
+      pb_idm_apply_client:
+        description: Apply the identity client-enrollment baseline step.
+        type: bool
+        default: false
+      pb_idm_apply_trust:
+        description: >-
+          Override components.identity.ad_trust.enabled from the manifest.
+          Establishes a REAL cross-realm Kerberos trust when true — only
+          applicable when identity.type is rh_idm.
+        type: str
+        default: ""
+      pb_idm_ad_trust_password:
+        description: >-
+          AD trust admin password. Never sourced from the manifest (no
+          secret material there) — set via -e/vault at deploy time.
+        type: str
+        default: ""
+        no_log: true
+      pb_content_apply_install:
+        description: Apply the content server install step.
+        type: bool
+        default: true
+      pb_content_apply_configure:
+        description: Apply the content server configure step.
+        type: bool
+        default: true
+      pb_content_apply_repos:
+        description: Apply the content repos step.
+        type: bool
+        default: true
+      pb_content_apply_sync:
+        description: Apply the content sync step (slow — off by default).
+        type: bool
+        default: false
+      pb_scm_apply_install:
+        description: Apply the SCM install step.
+        type: bool
+        default: true
+      pb_scm_apply_configure:
+        description: Apply the SCM configure step.
+        type: bool
+        default: true
+      pb_scm_apply_runners:
+        description: Apply the SCM runners step.
+        type: bool
+        default: false
+      pb_backup_apply_server:
+        description: Apply the backup server step.
+        type: bool
+        default: true
+      pb_backup_apply_client:
+        description: Apply the backup client step.
+        type: bool
+        default: true
+      pb_cp_apply_install:
+        description: Apply the container platform install step.
+        type: bool
+        default: true
+      pb_cp_apply_configure:
+        description: Apply the container platform configure step.
+        type: bool
+        default: true
+      pb_cp_apply_storage:
+        description: Apply the container platform storage step.
+        type: bool
+        default: true
+      pb_cp_apply_registry:
+        description: Apply the container platform registry step.
+        type: bool
+        default: false
+      pb_cp_apply_ingress:
+        description: Apply the container platform ingress step.
+        type: bool
+        default: true
+      pb_sizing:
+        description: >-
+          Capacity-planning tier for the ORCHESTRATOR ITSELF (docs/
+          capacity-planning.md) — trivial and effectively invariant, since
+          this role is pure control-node logic with no persistent service.
+          Named pb_sizing (not builder_sizing) to stay consistent with
+          every other variable in this role's own pb_ prefix.
+        type: str
+        default: s
+        choices: [s]

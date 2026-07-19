@@ -1,0 +1,25 @@
+---
+# config_execution_environments — register custom execution environments (aap's
+# own config-as-code engine; awx.awx is the API client, not a role dependency).
+# A job template references an EE by name (config_templates.yml
+# execution_environment), so the EE object must be registered first — this runs
+# before config_templates in the baseline (see configure.yml).
+
+- name: Register execution environments
+  awx.awx.execution_environment:
+    name: "{{ item.name }}"
+    image: "{{ item.image }}"
+    description: "{{ item.description | default(omit) }}"
+    pull: "{{ item.pull | default(omit) }}"
+    organization: "{{ item.organization | default(omit) }}"
+    credential: "{{ item.credential | default(omit) }}"
+    state: present
+    controller_host: "{{ aap_controller_host }}"
+    controller_username: "{{ aap_admin_user }}"
+    controller_password: "{{ aap_admin_password }}"
+    validate_certs: "{{ aap_validate_certs }}"
+    request_timeout: "{{ aap_api_timeout }}"
+  loop: "{{ aap_execution_environments }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: aap_execution_environments | length > 0

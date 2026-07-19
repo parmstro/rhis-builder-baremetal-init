@@ -1,0 +1,12 @@
+---
+- name: rke2 - restart server
+  ansible.builtin.service:
+    name: "{{ _cp_service_name }}"
+    state: restarted
+  become: true
+
+- name: rke2 - restart agent
+  ansible.builtin.service:
+    name: "{{ _cp_service_name_agent }}"
+    state: restarted
+  become: true

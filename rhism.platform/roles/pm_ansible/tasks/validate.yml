@@ -1,0 +1,33 @@
+---
+# Shared — validate that _pm_password meets ISM complexity requirements.
+# Input: _pm_password (string). Reports each failing control.
+
+- name: Validate ISM-0406 — minimum length ({{ pm_length }} chars)
+  ansible.builtin.assert:
+    that:
+      - _pm_password | length >= pm_length
+    fail_msg: "ISM-0406: password length {{ _pm_password | length }} is below minimum {{ pm_length }}"
+
+- name: Validate ISM-0407 — uppercase characters (min {{ pm_min_uppercase }})
+  ansible.builtin.assert:
+    that:
+      - _pm_password | regex_findall('[A-Z]') | length >= pm_min_uppercase
+    fail_msg: "ISM-0407: password must contain at least {{ pm_min_uppercase }} uppercase character(s)"
+
+- name: Validate ISM-0407 — lowercase characters (min {{ pm_min_lowercase }})
+  ansible.builtin.assert:
+    that:
+      - _pm_password | regex_findall('[a-z]') | length >= pm_min_lowercase
+    fail_msg: "ISM-0407: password must contain at least {{ pm_min_lowercase }} lowercase character(s)"
+
+- name: Validate ISM-0407 — digit characters (min {{ pm_min_digits }})
+  ansible.builtin.assert:
+    that:
+      - _pm_password | regex_findall('[0-9]') | length >= pm_min_digits
+    fail_msg: "ISM-0407: password must contain at least {{ pm_min_digits }} digit(s)"
+
+- name: Validate ISM-0407 — special characters (min {{ pm_min_special }})
+  ansible.builtin.assert:
+    that:
+      - _pm_password | regex_findall('[^A-Za-z0-9]') | length >= pm_min_special
+    fail_msg: "ISM-0407: password must contain at least {{ pm_min_special }} special character(s)"

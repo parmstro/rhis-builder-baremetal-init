@@ -1,0 +1,143 @@
+---
+# Lifecycle action (bare shared var). Standalone default installs the full director+storage+fd
+# server; the backup_management dispatcher overrides this via include_role vars. Full choice
+# list and typed defaults are declared and validated in meta/argument_specs.yml.
+action: server
+
+# Standalone-first defaults over the SHARED backup family interface (backup_bareos_*).
+# These are the SAME variable names the backup_management dispatcher exposes, so the
+# dispatcher selects this product with one call passing only `action`, and every backup_bareos_*
+# value flows straight through. Standalone callers set these same names directly.
+
+# Bareos director
+backup_bareos_director_host: "{{ ansible_fqdn | default('localhost') }}"
+backup_bareos_director_port: 9101
+backup_bareos_director_password: ""    # vault-backed
+
+# Bareos storage
+backup_bareos_storage_host: "{{ ansible_fqdn | default('localhost') }}"
+backup_bareos_storage_port: 9103
+backup_bareos_storage_password: ""     # vault-backed
+backup_bareos_storage_device: /var/lib/bareos/storage
+
+# Bareos file daemon (dispatcher spells this file_daemon, not fd)
+backup_bareos_file_daemon_port: 9102
+backup_bareos_file_daemon_password: ""     # vault-backed
+
+# Monitor (dispatcher-exposed; reserved for monitor console)
+backup_bareos_monitor_password: ""     # vault-backed
+
+# Director tuning
+backup_bareos_max_concurrent_jobs: 20
+
+# Retention (dispatcher-exposed)
+backup_bareos_message_retention: "180 days"
+backup_bareos_job_retention: "12 months"
+backup_bareos_volume_retention: "365 days"
+
+# Client registration (add_client action)
+backup_bareos_client_name: "{{ ansible_hostname | default('localhost') }}-fd"
+backup_bareos_client_address: "{{ ansible_default_ipv4.address | default('127.0.0.1') }}"
+backup_bareos_client_password: ""      # vault-backed
+backup_bareos_client_fd_port: 9102
+
+# Job definition (add_job action) — role-only names (not exposed by the dispatcher)
+backup_bareos_job_name: ""
+backup_bareos_job_client: ""
+backup_bareos_job_fileset_include: []
+backup_bareos_job_exclude:
+  - /proc
+  - /sys
+  - /dev
+  - /run
+backup_bareos_job_schedule_name: WeeklyCycle
+backup_bareos_job_pool: Default
+
+# On-demand job run (run_job action) — role-only
+backup_bareos_run_job_name: ""
+
+# Restore (restore action) — role-only
+backup_bareos_restore_client: "{{ ansible_hostname | default('localhost') }}-fd"
+backup_bareos_restore_where: /var/restore
+backup_bareos_restore_job_name: RestoreFiles   # BUG-120: default Restore job now exists
+
+# Verify (verify action) — role-only.
+# VolumeToCatalog reads the backed-up volume and compares file attributes +
+# CHECKSUMS against the catalog — a real integrity check (detects bit-rot /
+# tampering / media failure). Changed 2026-07-11 from InitCatalog, which only
+# baselines the catalog and verifies NOTHING — a no-op default for an action
+# named "verify". Other levels: DiskToCatalog, Data (fullest), Catalog.
+backup_bareos_verify_level: VolumeToCatalog
+backup_bareos_verify_job_name: SelfVerify   # BUG-120: default Verify job now exists
+
+# Volume management (prune / purge actions) — role-only
+backup_bareos_purge_volume: ""
+
+# Pools, filesets, schedules, jobs (used by bareos-dir.conf.j2).
+# Defaults form a minimal SELF-BACKUP set (BUG-118: empty lists rendered a
+# director that cannot start — "No Job records defined" is a hard fatal —
+# and no Client resource existed for any job to reference). Standalone-first:
+# a bare `action: server` run now yields a startable, useful director that
+# backs up its own /etc; inventories override the lists wholesale.
+backup_bareos_self_client_address: localhost
+backup_bareos_pools:
+  - name: Default
+backup_bareos_filesets:
+  - name: SelfTest
+    include:
+      - /etc
+backup_bareos_schedules:
+  - name: WeeklyCycle
+    run:
+      - Full 1st sat at 21:00
+      - Incremental mon-fri at 23:00
+backup_bareos_jobs:
+  - name: SelfBackup
+    client: "{{ backup_bareos_client_name }}"
+    fileset: SelfTest
+  # BUG-120: restore/verify bconsole actions REQUIRE a Restore-/Verify-type
+  # job resource to exist — the role never defined either, so both actions
+  # were unusable on a role-built director.
+  - name: RestoreFiles
+    type: Restore
+    fileset: SelfTest
+  - name: SelfVerify
+    type: Verify
+    verify_job: SelfBackup
+    fileset: SelfTest
+
+# Internal package lists — prefixed with _ so they are not overridden casually
+_bareos_director_packages:
+  - bareos
+  - bareos-director
+  - bareos-storage
+  - bareos-bconsole
+  - bareos-database-postgresql
+_bareos_fd_packages:
+  - bareos-filedaemon
+
+# Console connection target for bconsole.conf (BUG-119). localhost serves
+# the on-director console; point elsewhere for a remote admin host.
+backup_bareos_console_address: localhost
+
+# Runtime-environment toggles (added 2026-07-13, image-factory pilot —
+# BUG-117): containers/minimal targets have no firewalld or systemd; both
+# stay true for normal hosts, scenarios/labs set them false.
+backup_bareos_manage_firewall: true
+backup_bareos_manage_service: true
+
+# Catalog connection (added 2026-07-13 — BUG-116: previously hard-coded
+# literals in bareos-dir.conf.j2 and no schema initialization at all).
+# Empty address = local UNIX socket (the pre-existing implicit behaviour).
+backup_bareos_catalog_db_name: bareos
+backup_bareos_catalog_db_user: bareos
+backup_bareos_catalog_db_password: ""     # vault-backed
+backup_bareos_catalog_db_address: ""
+backup_bareos_catalog_db_port: 5432
+
+# Catalog schema initialization (server action): creates db/user/tables via
+# the Bareos-shipped scripts when the schema is absent. Admin credentials are
+# only needed for a REMOTE catalog (local socket init runs as postgres peer).
+backup_bareos_initialize_catalog: true
+backup_bareos_catalog_admin_user: postgres
+backup_bareos_catalog_admin_password: ""  # vault-backed

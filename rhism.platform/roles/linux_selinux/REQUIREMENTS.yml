@@ -1,0 +1,54 @@
+---
+# Functional requirements — linux_selinux (requirements->test-case layer +
+# Tier-3 elevation, wave-3+ standard). Standalone linux_* domain role (chained
+# by the linux_security orchestrator). Capability fact-checked against the RHEL
+# SELinux documentation (enforcing/permissive/disabled modes, targeted policy,
+# semanage booleans, semanage fcontext + restorecon, and the reboot requirement
+# for a disabled->enforcing transition). Curated from README +
+# meta/argument_specs.yml + tasks/. Molecule default runs on EL8/9/10 containers
+# where SELinux is disabled: it proves the graceful-skip contract only — real
+# policy enforcement needs an EL VM with selinux-policy installed.
+# Family lab: playbooks/linux_security.yml.
+functional_requirements:
+  - req_id: LINUX_SELINUX-FR-001
+    statement: >-
+      The role SHALL gather the ansible_selinux fact and, when SELinux is
+      disabled (ansible_selinux.status == 'disabled'), log a message and skip all
+      enforce/booleans/fcontexts tasks cleanly without error.
+    tier: 2
+    verified_by:
+      - molecule: default
+
+  - req_id: LINUX_SELINUX-FR-002
+    statement: >-
+      all SHALL run enforce, booleans, and fcontexts in sequence (each gated by
+      the graceful-skip guard).
+    tier: 2
+    verified_by:
+      - molecule: default
+
+  - req_id: LINUX_SELINUX-FR-003
+    statement: >-
+      enforce SHALL set the SELinux state (linux_selinux_state:
+      enforcing/permissive/disabled) and policy type (linux_selinux_policy,
+      default targeted); a disabled->enforcing change is applied but requires a
+      reboot the role does not perform.
+    tier: 3
+    verified_by:
+      - lab: playbooks/linux_security.yml#selinux
+
+  - req_id: LINUX_SELINUX-FR-004
+    statement: >-
+      booleans SHALL set each linux_selinux_booleans entry ({name, state,
+      persistent}) via community.general.seboolean.
+    tier: 3
+    verified_by:
+      - lab: playbooks/linux_security.yml#selinux
+
+  - req_id: LINUX_SELINUX-FR-005
+    statement: >-
+      fcontexts SHALL apply each linux_selinux_fcontexts entry ({target, setype})
+      via community.general.sefcontext and run restorecon -Rv on the target.
+    tier: 3
+    verified_by:
+      - lab: playbooks/linux_security.yml#selinux

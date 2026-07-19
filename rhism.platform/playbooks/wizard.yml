@@ -1,0 +1,17 @@
+---
+- name: rhism Wizard — interactive deployment manifest builder
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  pre_tasks:
+    - name: Ensure manifest output directory exists
+      ansible.builtin.file:
+        path: "{{ wizard_output_dir | default('/opt/rhism/manifests') }}"
+        state: directory
+        mode: "0750"
+
+  roles:
+    - role: rhism.platform.wizard
+      vars:
+        wizard_action: "{{ wizard_action | default('interactive') }}"

@@ -1,0 +1,69 @@
+---
+# Role control
+prov_action: baseline
+prov_type: dnsmasq
+
+# Install gate — dry-run by default
+prov_install_execute: false
+
+# Domain and DNS
+prov_domain: "{{ ansible_domain | default('example.local') }}"
+prov_dns_upstream:
+  - 8.8.8.8
+  - 8.8.4.4
+prov_dns_authoritative: false
+prov_network: ""           # e.g. 192.168.1.0/24 (required when prov_dns_authoritative true)
+
+# DHCP
+prov_dhcp_enabled: true
+prov_dhcp_range_start: ""  # e.g. 192.168.1.100
+prov_dhcp_range_end: ""    # e.g. 192.168.1.200
+prov_dhcp_netmask: 255.255.255.0
+prov_dhcp_lease_time: 12h
+prov_dhcp_gateway: ""      # e.g. 192.168.1.1
+prov_dhcp_static_hosts: []
+# - mac: "aa:bb:cc:dd:ee:ff"
+#   ip: 192.168.1.50
+#   name: server01
+
+# TFTP / PXE
+prov_tftp_enabled: true
+prov_tftp_root: /var/lib/tftpboot
+prov_pxe_kernel: vmlinuz
+prov_pxe_initrd: initrd.img
+prov_pxe_kernel_args: "inst.repo=http://{{ ansible_default_ipv4.address | default('0.0.0.0') }}/ks quiet"
+
+# Cobbler (cobbler type)
+prov_cobbler_server: "{{ ansible_fqdn | default('localhost') }}"
+prov_cobbler_next_server: "{{ ansible_default_ipv4.address | default('127.0.0.1') }}"
+prov_cobbler_manage_dhcp: true
+prov_cobbler_manage_dns: true
+prov_cobbler_manage_tftp: true
+prov_cobbler_distros: []
+# - name: rhel9
+#   breed: redhat
+#   os_version: rhel9
+#   kernel: /boot/vmlinuz
+#   initrd: /boot/initrd.img
+#   arch: x86_64
+prov_cobbler_profiles: []
+# - name: rhel9-basic
+#   distro: rhel9
+#   kickstart: /var/lib/cobbler/templates/rhel9.ks
+
+# Smart proxy registration (satellite_proxy / foreman_proxy types)
+prov_smartproxy_url: "https://{{ ansible_fqdn | default('localhost') }}:8443"
+prov_content_server_url: ""   # Foreman/Satellite URL
+prov_content_username: admin
+prov_content_password: ""     # vault-backed
+prov_content_validate_certs: true
+prov_content_organization: "Default Organization"
+prov_content_location: "Default Location"
+prov_smartproxy_dns: true
+prov_smartproxy_dhcp: true
+prov_smartproxy_tftp: true
+prov_smartproxy_realm: false
+
+# Baseline toggles
+prov_apply_install: false
+prov_apply_configure: false

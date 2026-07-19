@@ -1,0 +1,11 @@
+---
+# GitLab CI for the rhism.platform collection.
+# Uses the shared lint + secrets + molecule + release template — see ci/role-pipeline.yml
+# in the platform orchestration repo (ansible_galaxy) for what each stage runs.
+# The include resolves via the hosting org's own namespace, so no org name is
+# hard-coded here.
+
+include:
+  - project: $CI_PROJECT_ROOT_NAMESPACE/ansible_galaxy
+    ref: main
+    file: ci/role-pipeline.yml

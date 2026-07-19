@@ -1,0 +1,12 @@
+---
+# ── Shared: firewall port management ─────────────────────────────────────────
+# Included by present.yml and absent.yml with _firewall_state: enabled|disabled
+
+- name: Manage firewall ports for rke2
+  ansible.posix.firewalld:
+    port: "{{ item }}"
+    state: "{{ _firewall_state }}"
+    permanent: true
+    immediate: true
+  become: true
+  loop: "{{ _cp_firewall_ports }}"

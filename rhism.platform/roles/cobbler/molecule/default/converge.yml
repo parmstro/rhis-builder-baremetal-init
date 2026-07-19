@@ -1,0 +1,82 @@
+---
+- name: Converge — configure dry-run (dispatch + shared var contract, no host changes)
+  hosts: all
+  gather_facts: false
+  vars:
+    action: configure
+    prov_execute: false
+  roles:
+    - role: rhism.platform.cobbler
+
+- name: Converge — present dry-run
+  hosts: all
+  gather_facts: false
+  vars:
+    action: present
+    prov_execute: false
+  roles:
+    - role: rhism.platform.cobbler
+
+- name: Converge — add_distro dry-run
+  hosts: all
+  gather_facts: false
+  vars:
+    action: add_distro
+    prov_execute: false
+  roles:
+    - role: rhism.platform.cobbler
+
+- name: Converge — sync dry-run
+  hosts: all
+  gather_facts: false
+  vars:
+    action: sync
+    prov_execute: false
+  roles:
+    - role: rhism.platform.cobbler
+
+- name: Converge — add_systems dry-run (rhism Phase C item 2, bulk registration)
+  hosts: all
+  gather_facts: false
+  vars:
+    action: add_systems
+    prov_execute: false
+    prov_cobbler_systems:
+      - {name: test-host-1, profile: rhel9-x86_64, mac: "52:54:00:aa:bb:01", ip: "192.168.100.10", hostname: test-host-1.example.com}
+      - {name: test-host-2, profile: rhel9-x86_64, mac: "52:54:00:aa:bb:02", ip: "192.168.100.11", hostname: test-host-2.example.com}
+  roles:
+    - role: cobbler
+
+- name: Converge — restarted (service) dry-run
+  hosts: all
+  gather_facts: false
+  vars:
+    action: restarted
+    prov_execute: false
+  roles:
+    - role: rhism.platform.cobbler
+
+- name: Converge — default action (standalone, no vars set) dry-run
+  hosts: all
+  gather_facts: false
+  vars:
+    prov_execute: false
+  roles:
+    - role: rhism.platform.cobbler
+
+- name: Converge — negative test (bogus action must fail)
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Attempt bogus action
+      block:
+        - name: Call role with invalid action
+          ansible.builtin.include_role:
+            name: rhism.platform.cobbler
+          vars:
+            action: bogus_action
+            prov_execute: false
+      rescue:
+        - name: Confirm expected failure was caught
+          ansible.builtin.debug:
+            msg: "PASS — bogus action correctly rejected"

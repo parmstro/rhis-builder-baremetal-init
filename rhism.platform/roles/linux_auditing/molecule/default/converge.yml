@@ -1,0 +1,38 @@
+---
+- name: Converge — configure auditd
+  hosts: all
+  gather_facts: true
+  vars:
+    linux_auditing_action: configure
+    linux_auditing_rules_extra:
+      - "-w /etc/cron.d -p wa -k cron"
+    linux_auditing_start_service: false
+  roles:
+    - role: rhism.platform.linux_auditing
+
+- name: Converge — verify rules (file-based; service skipped in containers)
+  hosts: all
+  gather_facts: true
+  vars:
+    linux_auditing_action: verify
+    linux_auditing_start_service: false
+  roles:
+    - role: rhism.platform.linux_auditing
+
+- name: Converge — report (container mode — skips aureport, records placeholder)
+  hosts: all
+  gather_facts: false
+  vars:
+    linux_auditing_action: report
+    linux_auditing_start_service: false
+  roles:
+    - role: rhism.platform.linux_auditing
+
+- name: Converge — baseline (configure + verify + report in sequence)
+  hosts: all
+  gather_facts: true
+  vars:
+    linux_auditing_action: baseline
+    linux_auditing_start_service: false
+  roles:
+    - role: rhism.platform.linux_auditing

@@ -1,0 +1,62 @@
+---
+# Permissive baseline. Start green, then raise `profile` toward `production`
+# as the repo's older tasks are modernised (FQCN, loop vs with_items, etc.).
+# Run locally with: ansible-lint
+profile: basic
+
+# Never install requirements.yml (git-SSH URLs) or refresh schemas during lint —
+# every role/collection resolves locally (ANSIBLE_ROLES_PATH/COLLECTIONS_PATH),
+# and EE runs default offline per the container-security posture. Without this,
+# lint git-clones inside the EE and dies on host-key verification whenever the
+# .ansible/roles cache is absent (surfaced after the 2026-07-11 VM prune).
+offline: true
+
+exclude_paths:
+  - collections/
+  - library/            # custom modules/plugins are linted on their own terms
+  - .molecule/
+  # BUG-112 class: the case-insensitive macOS FS (through virtiofs) serves each
+  # role's REQUIREMENTS.yml (test-traceability layer) when ansible-lint probes
+  # for requirements.yml, then fails schema validation. No independent role
+  # tracks a real lowercase requirements.yml.
+  - roles/*/REQUIREMENTS.yml
+  - roles/*/requirements.yml
+  # Role-relative variants of the same BUG-112 exclusion — this copy of the config
+  # is consumed from the role's own root (independent repo / `cd roles/aap`).
+  - REQUIREMENTS.yml
+  - requirements.yml
+
+mock_modules:
+  # awx.awx lives in the platform_ee layer, not the base EE this lint runs in.
+  # The configure action is aap's OWN config-as-code engine (tasks/config_*.yml
+  # — internalised 2026-07-15, owner decision: self-contained, no awx_config
+  # dependency); awx.awx is the API client only. Mock every module the engine
+  # calls so the task graph resolves at lint/syntax-check time.
+  - awx.awx.organization
+  - awx.awx.team
+  - awx.awx.credential_type
+  - awx.awx.credential
+  - awx.awx.project
+  - awx.awx.project_update
+  - awx.awx.inventory
+  - awx.awx.inventory_source
+  - awx.awx.job_template
+  - awx.awx.workflow_job_template
+  - awx.awx.workflow_job_template_node
+  - awx.awx.schedule
+
+# Conventions documented in CLAUDE.md that older code still uses. Remove entries
+# here as the corresponding code is migrated to the "going forward" conventions.
+skip_list:
+  - fqcn[action-core]   # existing tasks use short module names (copy, yum, ...)
+  - fqcn[action]
+  - name[casing]        # don't fail on task-name capitalisation
+  - var-naming[no-role-prefix]
+  - var-naming[no-reserved]  # dispatcher pattern passes `action` to product roles
+  - name[template]           # task names include mid-string vars for clarity
+
+# Treat these as warnings rather than hard failures during the initial rollout.
+warn_list:
+  - yaml               # defer to .yamllint for YAML style
+  - no-changed-when
+  - risky-shell-pipe

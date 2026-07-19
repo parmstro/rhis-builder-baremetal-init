@@ -1,0 +1,37 @@
+---
+# Permissive baseline so existing YAML passes; tighten over time.
+# Run locally with: yamllint .
+extends: default
+
+rules:
+  # Long template lines / URLs are common in this repo (baseurls, queries).
+  line-length:
+    max: 160
+    level: warning
+  # The repo mixes "yes/no" and "true/false"; don't fail on either.
+  truthy:
+    allowed-values: ["true", "false", "yes", "no"]
+    check-keys: false
+  # Document start "---" is conventional but not worth failing a build over.
+  document-start:
+    present: true
+    level: warning
+  braces:
+    max-spaces-inside: 1
+  octal-values:
+    forbid-implicit-octal: true
+    forbid-explicit-octal: true
+  comments:
+    min-spaces-from-content: 1
+  comments-indentation: disable
+  # Flow-style YAML mappings in this repo use alignment spacing after commas.
+  commas:
+    max-spaces-after: -1
+  # Ansible files frequently omit a trailing newline edge cases; warn only.
+  new-line-at-end-of-file:
+    level: warning
+
+ignore: |
+  .molecule/
+  *.tar.gz
+  roles/*/files/

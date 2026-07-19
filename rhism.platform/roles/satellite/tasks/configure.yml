@@ -1,0 +1,37 @@
+---
+# --------------------------------------------------------------------------- #
+# configure — organization, location, global settings via Foreman API         #
+# --------------------------------------------------------------------------- #
+- name: Ensure organization exists
+  theforeman.foreman.organization:
+    server_url: "{{ content_server_url }}"
+    username: "{{ content_username }}"
+    password: "{{ content_password }}"
+    validate_certs: "{{ content_validate_certs }}"
+    name: "{{ content_organization }}"
+    state: present
+  no_log: "{{ content_no_log }}"
+
+- name: Ensure location exists
+  theforeman.foreman.location:
+    server_url: "{{ content_server_url }}"
+    username: "{{ content_username }}"
+    password: "{{ content_password }}"
+    validate_certs: "{{ content_validate_certs }}"
+    name: "{{ content_location }}"
+    organizations:
+      - "{{ content_organization }}"
+    state: present
+  no_log: "{{ content_no_log }}"
+
+- name: Apply global settings
+  theforeman.foreman.setting:
+    server_url: "{{ content_server_url }}"
+    username: "{{ content_username }}"
+    password: "{{ content_password }}"
+    validate_certs: "{{ content_validate_certs }}"
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+  loop: "{{ content_settings }}"
+  no_log: "{{ content_no_log }}"
+  when: content_settings | length > 0

@@ -1,0 +1,7 @@
+{# Managed by Ansible — role mail_full. Do not edit by hand. #}
+# Postfix virtual mailbox domains — managed by Ansible (mail_full role)
+# Do not edit manually; changes will be overwritten.
+# One domain per line; presence marks the domain as locally hosted.
+{% for domain in mail_virtual_domains | default([]) %}
+{{ domain.name | default(domain) }}    OK
+{% endfor %}

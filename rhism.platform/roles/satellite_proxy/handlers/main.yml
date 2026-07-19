@@ -1,0 +1,7 @@
+---
+- name: satellite_proxy - restart foreman-proxy
+  ansible.builtin.service:
+    name: foreman-proxy
+    state: restarted
+  become: true
+  listen: satellite_proxy - restart foreman-proxy

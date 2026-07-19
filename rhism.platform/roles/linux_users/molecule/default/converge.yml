@@ -1,0 +1,20 @@
+---
+- name: Converge — faillock configuration
+  hosts: all
+  gather_facts: true
+  vars:
+    linux_users_action: faillock
+    linux_users_faillock_deny: 5
+    linux_users_faillock_unlock_time: 900
+  roles:
+    - role: rhism.platform.linux_users
+
+- name: Converge — sudo policy (no-op — no groups/users defined in test)
+  hosts: all
+  gather_facts: true
+  vars:
+    linux_users_action: sudo
+    linux_users_sudo_nopasswd_groups: []
+    linux_users_sudo_nopasswd_users: []
+  roles:
+    - role: rhism.platform.linux_users

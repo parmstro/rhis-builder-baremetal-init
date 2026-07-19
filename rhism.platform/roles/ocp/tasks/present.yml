@@ -1,0 +1,85 @@
+---
+# Action: present — install OCP binaries, RHSM registration, and prerequisites
+# Action: absent — remove OCP binaries
+# Consolidated: differ only by state-like conditionals within a single block
+
+- name: Register with RHSM
+  community.general.redhat_subscription:
+    state: present
+    org_id: "{{ cp_rhsm_org_id }}"
+    activationkey: "{{ cp_rhsm_activation_key }}"
+  no_log: true
+  become: true
+  when:
+    - action == 'present'
+    - cp_install_execute | bool
+    - not (cp_rhsm_skip_registration | bool)
+
+- name: Ensure install directory
+  ansible.builtin.include_tasks: install_dir.yml
+  when:
+    - action == 'present'
+    - cp_install_execute | bool
+
+- name: Manage OCP binaries and prerequisites
+  become: true
+  block:
+    - name: Download openshift-install binary
+      ansible.builtin.get_url:
+        url: "{{ _cp_ocp_mirror_url }}/{{ cp_ocp_version }}/openshift-install-linux.tar.gz"
+        dest: /tmp/openshift-install-linux.tar.gz
+        mode: "0644"
+      when:
+        - action == 'present'
+        - cp_install_execute | bool
+
+    - name: Extract openshift-install binary
+      ansible.builtin.unarchive:
+        src: /tmp/openshift-install-linux.tar.gz
+        dest: /usr/local/bin
+        remote_src: true
+        include:
+          - openshift-install
+      when:
+        - action == 'present'
+        - cp_install_execute | bool
+
+    - name: Download oc CLI binary
+      ansible.builtin.get_url:
+        url: "{{ _cp_ocp_mirror_url }}/{{ cp_ocp_version }}/openshift-client-linux.tar.gz"
+        dest: /tmp/openshift-client-linux.tar.gz
+        mode: "0644"
+      when:
+        - action == 'present'
+        - cp_install_execute | bool
+
+    - name: Extract oc CLI binary
+      ansible.builtin.unarchive:
+        src: /tmp/openshift-client-linux.tar.gz
+        dest: /usr/local/bin
+        remote_src: true
+        include:
+          - oc
+          - kubectl
+      when:
+        - action == 'present'
+        - cp_install_execute | bool
+
+    - name: Remove openshift binaries
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /usr/local/bin/openshift-install
+        - /usr/local/bin/oc
+        - /usr/local/bin/kubectl
+      when: action == 'absent'
+
+    - name: Manage firewall ports for OCP
+      ansible.posix.firewalld:
+        port: "{{ item }}"
+        state: "{{ 'enabled' if action == 'present' else 'disabled' }}"
+        permanent: true
+        immediate: true
+      loop: "{{ _cp_firewall_ports }}"
+      when: ansible_facts.services['firewalld.service'] is defined

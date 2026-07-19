@@ -1,0 +1,38 @@
+---
+- name: Service health event response
+  hosts: all
+  sources:
+    - ansible.eda.webhook:
+        host: 0.0.0.0
+        port: {{ mon_eda_webhook_port + 2 }}
+  rules:
+    - name: Service down detected
+      condition: >-
+        event.payload.source is defined and
+        event.payload.source == "nagios" and
+        event.payload.state == "CRITICAL" and
+        event.payload.service is defined and
+        event.payload.service not in ["SSH", "Load", "Disk", "Memory"]
+      action:
+        run_playbook:
+          name: {{ mon_eda_response_playbooks.service_down.playbook }}
+          extra_vars:
+            event_action: {{ mon_eda_response_playbooks.service_down.extra_vars.event_action }}
+            event_source: "{% raw %}{{ event.payload.source }}{% endraw %}"
+            event_host: "{% raw %}{{ event.payload.host | default('unknown') }}{% endraw %}"
+            event_service: "{% raw %}{{ event.payload.service | default('unknown') }}{% endraw %}"
+            event_detail: "{% raw %}{{ event.payload | to_json }}{% endraw %}"
+
+    - name: Host unreachable
+      condition: >-
+        event.payload.source is defined and
+        event.payload.source == "nagios" and
+        event.payload.state == "DOWN"
+      action:
+        run_playbook:
+          name: {{ mon_eda_response_playbooks.host_unreachable.playbook }}
+          extra_vars:
+            event_action: {{ mon_eda_response_playbooks.host_unreachable.extra_vars.event_action }}
+            event_source: "{% raw %}{{ event.payload.source }}{% endraw %}"
+            event_host: "{% raw %}{{ event.payload.host | default('unknown') }}{% endraw %}"
+            event_detail: "{% raw %}{{ event.payload | to_json }}{% endraw %}"

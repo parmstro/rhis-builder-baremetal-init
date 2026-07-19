@@ -1,0 +1,37 @@
+---
+# client — Bareos file daemon only.
+# Chains: install fd package → configure fd → start fd service.
+
+- name: Install Bareos file daemon package
+  ansible.builtin.package:
+    name: "{{ _bareos_fd_packages }}"
+    state: present
+  become: true
+
+- name: Deploy bareos-fd.conf
+  ansible.builtin.template:
+    src: bareos-fd.conf.j2
+    dest: /etc/bareos/bareos-fd.conf
+    owner: bareos
+    group: bareos
+    mode: "0640"
+  no_log: true
+  become: true
+  notify: bareos - restart fd
+
+- name: Open firewall for bareos file daemon ({{ backup_bareos_file_daemon_port }}/tcp)
+  ansible.posix.firewalld:
+    port: "{{ backup_bareos_file_daemon_port }}/tcp"
+    state: enabled
+    permanent: true
+    immediate: true
+  become: true
+  when: backup_bareos_manage_firewall | bool
+
+- name: Start Bareos file daemon service
+  ansible.builtin.service:
+    name: bareos-fd
+    state: started
+    enabled: true
+  become: true
+  when: backup_bareos_manage_service | bool

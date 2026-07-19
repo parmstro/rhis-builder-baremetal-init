@@ -1,0 +1,111 @@
+---
+# server — install the OADP operator via OLM and configure the full Velero stack
+# through the DataProtectionApplication (DPA) CR.
+#
+# Sequence (Red Hat OpenShift OADP install flow):
+#   1. Namespace openshift-adp
+#   2. OperatorGroup targeting that namespace
+#   3. Subscription (package redhat-oadp-operator, channel/source)
+#   4. wait for the CSV .status.phase == Succeeded (operator installed by OLM)
+#   5. cloud-credentials Secret (object-store credentials)
+#   6. DataProtectionApplication CR (installs+configures Velero + node-agent + plugins)
+#   7. wait for the BackupStorageLocation .status.phase == Available
+#
+# All CRs target backup_oadp_namespace. This action needs a real OpenShift cluster
+# with OLM and reachable object storage — a Tier-3 lab concern, never run in CI.
+
+- name: Create the OADP operator namespace
+  kubernetes.core.k8s:
+    kubeconfig: "{{ backup_oadp_kubeconfig | default(omit) }}"
+    state: present
+    apply: true
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: "{{ backup_oadp_namespace }}"
+
+- name: Create the OADP OperatorGroup
+  kubernetes.core.k8s:
+    kubeconfig: "{{ backup_oadp_kubeconfig | default(omit) }}"
+    state: present
+    apply: true
+    definition:
+      apiVersion: operators.coreos.com/v1
+      kind: OperatorGroup
+      metadata:
+        name: "{{ backup_oadp_operator_group_name }}"
+        namespace: "{{ backup_oadp_namespace }}"
+      spec:
+        targetNamespaces:
+          - "{{ backup_oadp_namespace }}"
+
+- name: Subscribe to the OADP operator
+  kubernetes.core.k8s:
+    kubeconfig: "{{ backup_oadp_kubeconfig | default(omit) }}"
+    state: present
+    apply: true
+    definition:
+      apiVersion: operators.coreos.com/v1alpha1
+      kind: Subscription
+      metadata:
+        name: "{{ backup_oadp_operator_package }}"
+        namespace: "{{ backup_oadp_namespace }}"
+      spec:
+        channel: "{{ backup_oadp_operator_channel }}"
+        installPlanApproval: Automatic
+        name: "{{ backup_oadp_operator_package }}"
+        source: "{{ backup_oadp_operator_source }}"
+        sourceNamespace: "{{ backup_oadp_operator_source_namespace }}"
+
+- name: Wait for the OADP ClusterServiceVersion to reach Succeeded
+  kubernetes.core.k8s_info:
+    kubeconfig: "{{ backup_oadp_kubeconfig | default(omit) }}"
+    api_version: operators.coreos.com/v1alpha1
+    kind: ClusterServiceVersion
+    namespace: "{{ backup_oadp_namespace }}"
+  register: _oadp_csv
+  retries: "{{ (backup_oadp_wait_timeout | int / 10) | int }}"
+  delay: 10
+  until: >-
+    _oadp_csv['resources'] | default([])
+    | selectattr('status.phase', 'defined')
+    | selectattr('status.phase', 'equalto', 'Succeeded')
+    | list | length > 0
+  when: backup_oadp_wait | bool
+
+- name: Create the object-store credentials secret
+  kubernetes.core.k8s:
+    kubeconfig: "{{ backup_oadp_kubeconfig | default(omit) }}"
+    state: present
+    apply: true
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: "{{ backup_oadp_credential_secret }}"
+        namespace: "{{ backup_oadp_namespace }}"
+      type: Opaque
+      stringData:
+        "{{ backup_oadp_credential_key }}": "{{ backup_oadp_cloud_credentials }}"
+  no_log: true
+  when: backup_oadp_cloud_credentials | length > 0
+
+- name: Deploy the DataProtectionApplication (installs and configures Velero)
+  ansible.builtin.include_tasks: dpa.yml
+
+- name: Wait for the BackupStorageLocation to become Available
+  kubernetes.core.k8s_info:
+    kubeconfig: "{{ backup_oadp_kubeconfig | default(omit) }}"
+    api_version: velero.io/v1
+    kind: BackupStorageLocation
+    namespace: "{{ backup_oadp_namespace }}"
+  register: _oadp_bsl
+  retries: "{{ (backup_oadp_wait_timeout | int / 10) | int }}"
+  delay: 10
+  until: >-
+    _oadp_bsl['resources'] | default([])
+    | selectattr('status.phase', 'defined')
+    | selectattr('status.phase', 'equalto', 'Available')
+    | list | length > 0
+  when: backup_oadp_wait | bool

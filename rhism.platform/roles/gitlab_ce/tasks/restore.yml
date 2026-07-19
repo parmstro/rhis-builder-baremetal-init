@@ -1,0 +1,38 @@
+---
+# ---------------------------------------------------------------------------
+# gitlab_ce — restore: run gitlab-backup restore from a named backup
+# ---------------------------------------------------------------------------
+
+- name: Restore GitLab CE backup
+  become: true
+  block:
+    - name: Validate restore backup ID is set
+      ansible.builtin.assert:
+        that:
+          - scm_restore_backup_id is defined
+          - scm_restore_backup_id | length > 0
+        fail_msg: "scm_restore_backup_id must be set for restore action"
+
+    - name: Run backup preflight checks
+      ansible.builtin.include_tasks: backup_preflight.yml
+
+    - name: Stop GitLab services before restore
+      ansible.builtin.command:
+        cmd: "{{ _scm_ctl_cmd }} stop puma sidekiq"
+      changed_when: true
+
+    - name: Restore GitLab backup
+      ansible.builtin.command:
+        cmd: >-
+          {{ _scm_rake_cmd }} gitlab:backup:restore
+          BACKUP={{ scm_restore_backup_id }}
+          force=yes
+      changed_when: true
+
+    - name: Reconfigure GitLab after restore
+      ansible.builtin.include_tasks: reconfigure.yml
+
+    - name: Restart GitLab after restore
+      ansible.builtin.command:
+        cmd: "{{ _scm_ctl_cmd }} restart"
+      changed_when: true

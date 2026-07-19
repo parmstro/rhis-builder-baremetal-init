@@ -1,0 +1,71 @@
+---
+# ---------------------------------------------------------------------------
+# add_job.yml — Define fileset, schedule, and job resources via bconsole
+# ---------------------------------------------------------------------------
+
+- name: Validate add_job requirements
+  ansible.builtin.assert:
+    that:
+      - backup_bareos_job_name | length > 0
+      - backup_bareos_job_client | length > 0
+      - backup_bareos_job_fileset_include | length > 0
+    fail_msg: "backup_bareos_job_name, backup_bareos_job_client, and backup_bareos_job_fileset_include are required for add_job"
+
+# --- fileset ---
+
+- name: Define fileset via bconsole
+  ansible.builtin.include_tasks: bconsole.yml
+  vars:
+    _bconsole_name: Define fileset via bconsole
+    _bconsole_commands:
+      - >-
+        configure add fileset name={{ backup_bareos_job_name }}-FileSet
+        include={{ backup_bareos_job_fileset_include | join(',') }}
+        exclude={{ backup_bareos_job_exclude | join(',') }}
+
+- name: Fail if fileset definition failed
+  ansible.builtin.fail:
+    msg: "Failed to define fileset '{{ backup_bareos_job_name }}-FileSet'"
+  when:
+    - _bconsole_result.rc is defined
+    - _bconsole_result.rc != 0
+    - "'successfully' not in _bconsole_result.stdout | lower"
+
+# --- schedule ---
+
+- name: Define schedule via bconsole
+  ansible.builtin.include_tasks: bconsole.yml
+  vars:
+    _bconsole_name: Define schedule via bconsole
+    _bconsole_commands:
+      - "configure add schedule name={{ backup_bareos_job_schedule_name }} run=\"Full 1st sat at 21:00\" run=\"Incremental mon-fri at 21:00\""
+
+- name: Fail if schedule definition failed
+  ansible.builtin.fail:
+    msg: "Failed to define schedule '{{ backup_bareos_job_schedule_name }}'"
+  when:
+    - _bconsole_result.rc is defined
+    - _bconsole_result.rc != 0
+    - "'successfully' not in _bconsole_result.stdout | lower"
+
+# --- job ---
+
+- name: Define job via bconsole
+  ansible.builtin.include_tasks: bconsole.yml
+  vars:
+    _bconsole_name: Define job via bconsole
+    _bconsole_commands:
+      - >-
+        configure add job name={{ backup_bareos_job_name }}
+        client={{ backup_bareos_job_client }}
+        fileset={{ backup_bareos_job_name }}-FileSet
+        schedule={{ backup_bareos_job_schedule_name }}
+        pool={{ backup_bareos_job_pool }}
+
+- name: Fail if job definition failed
+  ansible.builtin.fail:
+    msg: "Failed to define job '{{ backup_bareos_job_name }}'"
+  when:
+    - _bconsole_result.rc is defined
+    - _bconsole_result.rc != 0
+    - "'successfully' not in _bconsole_result.stdout | lower"

@@ -1,0 +1,258 @@
+---
+argument_specs:
+  main:
+    short_description: Deploy a full Postfix + Dovecot + DKIM + antispam mail stack.
+    description: >-
+      Standalone-first mail product role. Installs and configures a complete mail stack —
+      Postfix (MTA), Dovecot (IMAP/POP3), OpenDKIM signing, SpamAssassin and ClamAV
+      antispam — with virtual domains and mailbox users. Consumes the shared mail-server
+      interface (action, mail_* vars) so the mail_server dispatcher can select either mail
+      product (relay | full) with identical code.
+    options:
+      action:
+        description: >-
+          Lifecycle action, shared across both mail products. 'present'/'absent' manage
+          packages + firewall; 'configure' writes Postfix/Dovecot config; 'secure' applies
+          TLS/DKIM/SASL; 'antispam' configures SpamAssassin/ClamAV/amavisd; 'add_domain'/
+          'add_user' manage virtual mail; 'started'/'stopped'/'restarted' manage services;
+          'status'/'test' inspect.
+        type: str
+        default: present
+        choices:
+          - present
+          - absent
+          - configure
+          - secure
+          - antispam
+          - add_domain
+          - add_user
+          - test
+          - status
+          - started
+          - stopped
+          - restarted
+      mail_execute:
+        description: >-
+          Dry-run gate honoured by both mail products. false validates action dispatch and
+          variable resolution without changing the node (used by molecule).
+        type: bool
+        default: true
+      mail_domain:
+        description: Mail domain (mydomain / myorigin). Shared interface var.
+        type: str
+        default: "{{ ansible_domain | default('example.local') }}"
+      mail_hostname:
+        description: Fully-qualified mail hostname (myhostname). Shared interface var.
+        type: str
+        default: "{{ ansible_fqdn | default('mail.example.local') }}"
+      mail_relay_host:
+        description: Optional upstream SMTP smarthost to relay outbound mail through.
+        type: str
+        default: ""
+      mail_relay_port:
+        description: Upstream smarthost port.
+        type: int
+        default: 587
+      mail_relay_user:
+        description: SASL username for the upstream smarthost.
+        type: str
+        default: ""
+      mail_relay_password:
+        description: SASL password for the upstream smarthost (vault-backed, no_log).
+        type: str
+        default: ""
+      mail_tls_enabled:
+        description: Enable TLS for inbound/outbound SMTP. Shared interface var.
+        type: bool
+        default: true
+      mail_tls_cert_file:
+        description: PEM certificate path.
+        type: str
+        default: ""
+      mail_tls_key_file:
+        description: PEM private-key path.
+        type: str
+        default: ""
+      mail_tls_security_level:
+        description: Postfix TLS security level.
+        type: str
+        default: may
+        choices: [may, encrypt, dane, dane-only, verify]
+      mail_inet_interfaces:
+        description: Postfix inet_interfaces value.
+        type: str
+        default: all
+      mail_inet_protocols:
+        description: Postfix inet_protocols value.
+        type: str
+        default: ipv4
+      mail_message_size_limit:
+        description: Postfix message_size_limit (bytes).
+        type: int
+        default: 10485760
+      mail_mailbox_size_limit:
+        description: Postfix mailbox_size_limit (bytes; 0 = unlimited).
+        type: int
+        default: 0
+      mail_open_smtp:
+        description: Open the SMTP firewall port (25). Shared interface var.
+        type: bool
+        default: true
+      mail_open_submission:
+        description: Open the submission firewall port (587). Shared interface var.
+        type: bool
+        default: true
+      mail_open_smtps:
+        description: Open the SMTPS firewall port (465). Shared interface var.
+        type: bool
+        default: false
+      mail_dovecot_protocols:
+        description: Dovecot protocols to enable (drives IMAP/IMAPS firewall ports).
+        type: list
+        elements: str
+        default: [imap, imaps]
+      mail_dovecot_mail_location:
+        description: Dovecot mail_location.
+        type: str
+        default: "maildir:~/Maildir"
+      mail_dovecot_ssl:
+        description: Dovecot ssl setting (e.g. required).
+        type: str
+        default: required
+      mail_dovecot_listen:
+        description: >-
+          Dovecot listen addresses. Containers/labs without IPv6 set "*" —
+          dovecot exits fatally when it cannot bind "::".
+        type: str
+        default: "*, ::"
+      mail_dovecot_passwd_file:
+        description: Dovecot passwd-file backing the virtual users (add_user appends here).
+        type: str
+        default: /etc/dovecot/passwd.db
+      mail_imap_port:
+        description: Dovecot IMAP (STARTTLS) listener port.
+        type: int
+        default: 143
+      mail_imaps_port:
+        description: Dovecot IMAPS (implicit TLS) listener port.
+        type: int
+        default: 993
+      mail_pop3_port:
+        description: Dovecot POP3 (STARTTLS) listener port.
+        type: int
+        default: 110
+      mail_pop3s_port:
+        description: Dovecot POP3S (implicit TLS) listener port.
+        type: int
+        default: 995
+      mail_virtual_domains:
+        description: Virtual mail domains to provision.
+        type: list
+        elements: raw
+        default: []
+      mail_virtual_users:
+        description: Virtual mailbox users to provision.
+        type: list
+        elements: raw
+        default: []
+      mail_virtual_mailbox_base:
+        description: Virtual mailbox tree root (postfix virtual_mailbox_base + dovecot userdb home base).
+        type: str
+        default: /var/mail/vhosts
+      mail_vmail_user:
+        description: System account owning the virtual mailbox tree.
+        type: str
+        default: vmail
+      mail_vmail_uid:
+        description: UID of the vmail account (postfix virtual_uid_maps + dovecot first_valid_uid).
+        type: int
+        default: 5000
+      mail_vmail_gid:
+        description: GID of the vmail group.
+        type: int
+        default: 5000
+      mail_dkim_enabled:
+        description: >-
+          Enable OpenDKIM signing. Default false — opendkim is EPEL-only on EL
+          (antispam-chain sourcing deferred, owner decision 2026-07-14).
+        type: bool
+        default: false
+      mail_dkim_selector:
+        description: DKIM selector.
+        type: str
+        default: mail
+      mail_dkim_key_size:
+        description: DKIM RSA key size (bits).
+        type: int
+        default: 2048
+      mail_spamassassin_enabled:
+        description: >-
+          Enable SpamAssassin. Default false — removed from RHEL 10 (EPEL-only)
+          and unproven in the UBI repo subset (deferred sourcing decision).
+        type: bool
+        default: false
+      mail_spamassassin_required_score:
+        description: SpamAssassin required_score threshold.
+        type: float
+        default: 5.0
+      mail_spamassassin_rewrite_subject:
+        description: Rewrite the subject of flagged messages.
+        type: bool
+        default: false
+      mail_clamav_enabled:
+        description: >-
+          Enable ClamAV. Default false — clamav/clamav-update/amavisd-new are
+          EPEL-only on all three EL bases (deferred sourcing decision).
+        type: bool
+        default: false
+      mail_test_recipient:
+        description: Recipient address for the 'test' action.
+        type: str
+        default: "admin@localhost"
+      mail_new_domain:
+        description: Domain to add (required for the 'add_domain' action).
+        type: str
+        default: ""
+      mail_new_user:
+        description: User address to add (required for the 'add_user' action).
+        type: str
+        default: ""
+      mail_new_user_password_hash:
+        description: Dovecot password hash for the new user (required for 'add_user').
+        type: str
+        default: ""
+      mail_manage_service:
+        description: >-
+          Manage/restart the mail services (BUG-117 class — false on containers,
+          where the entrypoint owns daemon lifecycle; guards services.yml, the
+          status action's systemctl leg and the restart/reload handlers).
+          Shared mail-family var (same name as mail_relay).
+        type: bool
+        default: true
+      mail_manage_firewall:
+        description: >-
+          Manage firewalld ports (BUG-117 class — false on containers, which
+          have no firewalld; guards every firewalld task in present.yml).
+        type: bool
+        default: true
+      mail_manage_packages:
+        description: >-
+          Manage packages via dnf. false skips package tasks entirely —
+          image-factory substrates pre-bake the packages, and EL8's ansible
+          interpreter (python3.11) has no dnf bindings (BUG-018 class).
+        type: bool
+        default: true
+      mail_db_type:
+        description: >-
+          Postfix lookup-table type (BUG-122 — EL10/postfix 3.8 unbundles hash:
+          into the deprecated postfix-hash subpackage). EL-aware default: lmdb
+          on EL10+, hash below. Shared mail-family var (same name as mail_relay).
+        type: str
+      mail_mynetworks:
+        description: >-
+          Networks permitted to relay (BUG-124 — drives mynetworks and
+          smtpd_relay_restrictions). Shared mail-family var (same name as
+          mail_relay).
+        type: list
+        elements: str
+        default: ["127.0.0.0/8"]

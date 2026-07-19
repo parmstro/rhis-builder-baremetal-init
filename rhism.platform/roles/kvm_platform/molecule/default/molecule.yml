@@ -1,0 +1,33 @@
+---
+# Default scenario — validates standalone dispatch + the full variable contract with
+# kvm_platform_execute: false throughout. qemu-kvm/libvirtd genuinely can't run
+# meaningfully inside a nested container (see docs/kvm_platform.md), so no real package
+# install, service start, or libvirt object is ever exercised here. A real functional
+# scenario needs a bare-metal-ish test host with /dev/kvm exposed.
+driver:
+  name: docker
+
+platforms:
+  - name: kvm-platform-test
+    image: registry.access.redhat.com/ubi9/ubi-init:latest
+    pre_build_image: true
+    override_command: false
+    privileged: true
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    cgroupns_mode: host
+    command: /sbin/init
+
+provisioner:
+  name: ansible
+
+scenario:
+  test_sequence:
+    - dependency
+    - destroy
+    - syntax
+    - create
+    - converge
+    - converge
+    - verify
+    - destroy

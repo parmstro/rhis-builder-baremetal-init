@@ -1,0 +1,45 @@
+---
+- name: Converge — enable dry-run (dispatch + shared var contract, no cluster)
+  hosts: all
+  gather_facts: false
+  vars:
+    action: registry
+    cp_type: ocp
+    cp_registry_execute: false
+  roles:
+    - role: rhism.platform.registry_internal
+
+- name: Converge — absent dry-run
+  hosts: all
+  gather_facts: false
+  vars:
+    action: absent
+    cp_type: ocp
+    cp_registry_execute: false
+  roles:
+    - role: rhism.platform.registry_internal
+
+- name: Converge — default action (standalone, no vars set) dry-run
+  hosts: all
+  gather_facts: false
+  vars:
+    cp_registry_execute: false
+  roles:
+    - role: rhism.platform.registry_internal
+
+- name: Converge — negative test (bogus action must fail)
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Attempt bogus action
+      block:
+        - name: Call role with invalid action
+          ansible.builtin.include_role:
+            name: registry_internal
+          vars:
+            action: bogus_action
+            cp_registry_execute: false
+      rescue:
+        - name: Confirm expected failure was caught
+          ansible.builtin.debug:
+            msg: "PASS — bogus action correctly rejected"

@@ -1,0 +1,28 @@
+---
+# ---------------------------------------------------------------------------
+# service.yml — Service management for started/stopped/restarted
+#
+# Consolidates three actions: all use state: "{{ action }}" on
+# ansible.builtin.service, so a single file handles all three states.
+# ---------------------------------------------------------------------------
+
+- name: Manage bareos-dir service
+  ansible.builtin.service:
+    name: bareos-dir
+    state: "{{ action }}"
+    enabled: "{{ action == 'started' }}"
+  become: true
+
+- name: Manage bareos-sd service
+  ansible.builtin.service:
+    name: bareos-sd
+    state: "{{ action }}"
+    enabled: "{{ action == 'started' }}"
+  become: true
+
+- name: Manage bareos-fd service
+  ansible.builtin.service:
+    name: bareos-fd
+    state: "{{ action }}"
+    enabled: "{{ action == 'started' }}"
+  become: true

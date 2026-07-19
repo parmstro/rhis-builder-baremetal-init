@@ -1,0 +1,184 @@
+---
+# Goal-outcome verification — asserts the REAL artifacts converge produced:
+# the aggregated SOE chain (with cross-bundle dedup and the deprecated entry
+# absent), the /22-correct network derivations (explicitly NOT the classful
+# /24 octet-split answer), the vault skeleton, and the published catalogue.
+- name: Verify rhism_inventory goal outcomes
+  hosts: localhost
+  gather_facts: false
+  vars:
+    work_dir: /tmp/rhism_inventory_molecule
+    expected_reverse_zones:
+      - 0.20.10.in-addr.arpa
+      - 1.20.10.in-addr.arpa
+      - 2.20.10.in-addr.arpa
+      - 3.20.10.in-addr.arpa
+  tasks:
+    # ----------------------------------------------------------------- #
+    # aggregate output                                                   #
+    # ----------------------------------------------------------------- #
+    - name: Load the aggregated SOE chain
+      ansible.builtin.set_fact:
+        agg: "{{ lookup('ansible.builtin.file', work_dir ~ '/output/aggregated_soe.yml') | from_yaml }}"
+
+    - name: Assert the satellite bundle pass-through list is complete
+      ansible.builtin.assert:
+        that:
+          # 3 activation keys per shipped entry + 1 in the extra fixture = 7.
+          - agg.content_soe_bundles | length == 7
+          - agg.content_soe_bundles | map(attribute='name') | list | sort ==
+            ['SOE10_dev', 'SOE10_prod', 'SOE10_qa', 'SOE9_dev', 'SOE9_extra_dev', 'SOE9_prod', 'SOE9_qa']
+        fail_msg: "content_soe_bundles is not the expected one-bundle-per-activation-key list"
+
+    - name: Assert the promotion-path prior derivation
+      ansible.builtin.assert:
+        that:
+          - (agg.content_soe_bundles | selectattr('name', 'equalto', 'SOE9_prod') | first).lifecycle_environment_prior == 'Qualification'
+          - (agg.content_soe_bundles | selectattr('name', 'equalto', 'SOE9_dev') | first).lifecycle_environment_prior == 'Library'
+        fail_msg: "lifecycle_environment_prior was not derived from the entry's promotion path"
+
+    - name: Assert the duplicated content view was deduplicated to exactly one
+      ansible.builtin.assert:
+        that:
+          # SOE9 is declared by BOTH rhel9_soe and rhel9_soe_extra.
+          - agg.content_views | map(attribute='name') | select('equalto', 'SOE9') | list | length == 1
+          - agg.content_views | map(attribute='name') | list | sort == ['SOE10', 'SOE9']
+          # The shared RHEL 9 BaseOS repository set is also declared twice.
+          - agg.content_cdn_repository_sets | map(attribute='name')
+            | select('equalto', 'Red Hat Enterprise Linux 9 for x86_64 - BaseOS (RPMs)') | list | length == 1
+        fail_msg: "aggregate did not deduplicate shared objects by name"
+
+    - name: Assert the pre-sync list carries every bundle's content sections
+      ansible.builtin.assert:
+        that:
+          # 6 unique repository sets + 1 custom product + 2 content views.
+          - agg.content_presync_sources | length == 9
+          - "'Internal Middleware Repo' in (agg.content_presync_sources | map(attribute='name') | list)"
+          - "'SOE9' in (agg.content_presync_sources | map(attribute='name') | list)"
+          - "'SOE10' in (agg.content_presync_sources | map(attribute='name') | list)"
+          - "'Red Hat Enterprise Linux 10 for x86_64 - BaseOS (RPMs)' in
+             (agg.content_presync_sources | map(attribute='name') | list)"
+        fail_msg: "the sync-gate pre-sync list is incomplete"
+
+    - name: Assert the deprecated entry is absent from every aggregate shape
+      ansible.builtin.assert:
+        that:
+          - "'SOE8' not in (agg.content_views | map(attribute='name') | list)"
+          - "'SOE8_dev' not in (agg.content_activation_keys | map(attribute='name') | list)"
+          - "'SOE8' not in (agg.content_presync_sources | map(attribute='name') | list)"
+        fail_msg: "the deprecated rhel8_soe entry leaked into the aggregate output"
+
+    - name: Assert the flat satellite shapes are all present
+      ansible.builtin.assert:
+        that:
+          - agg.content_lifecycle_environments | map(attribute='name') | list | sort ==
+            ['Development', 'Production', 'Qualification']
+          - agg.content_activation_keys | length == 7
+          - agg.content_hostgroups | map(attribute='name') | list | sort ==
+            ['hg_x86_64_rhel10_metal', 'hg_x86_64_rhel9_metal', 'hg_x86_64_rhel9_middleware']
+          - agg.content_products | map(attribute='name') | list == ['Internal Middleware Repo']
+        fail_msg: "a flat satellite list shape is missing or wrong"
+
+    # ----------------------------------------------------------------- #
+    # generate output                                                    #
+    # ----------------------------------------------------------------- #
+    - name: Load the generated derivations
+      ansible.builtin.set_fact:
+        derived: "{{ lookup('ansible.builtin.file', work_dir ~ '/output/deployment/group_vars/all/derived.yml') | from_yaml }}"
+
+    - name: Assert the /22 derivations are computed on the full CIDR
+      ansible.builtin.assert:
+        that:
+          - derived.rhism_domain == 'soe.example.com'
+          - derived.rhism_realm == 'SOE.EXAMPLE.COM'
+          - derived.rhism_network_cidr == '10.20.0.0/22'
+          # nthhost(10) of 10.20.0.0/22 — upstream parity next_nth_usable(10).
+          - derived.rhism_dns_server_ip == '10.20.0.10'
+          - derived.rhism_gateway_ip == '10.20.0.1'
+          - derived.rhism_time_servers | length == 2
+        fail_msg: "generate derivations wrong for the /22 network"
+
+    - name: Assert the reverse zone set is /22-correct, not the octet-split answer
+      ansible.builtin.assert:
+        that:
+          - derived.rhism_reverse_dns_zones == expected_reverse_zones
+          # Explicitly NOT the naive classful answer, which stops at the
+          # first /24 and silently loses the other three zones.
+          - derived.rhism_reverse_dns_zones != ['0.20.10.in-addr.arpa']
+          - "'3.20.10.in-addr.arpa' in derived.rhism_reverse_dns_zones"
+        fail_msg: >-
+          reverse DNS zones are not the complete /22 set
+          (got {{ derived.rhism_reverse_dns_zones }})
+
+    - name: Stat the vault skeleton
+      ansible.builtin.stat:
+        path: "{{ work_dir }}/output/deployment/vault"
+      register: vault_dir
+
+    - name: Stat the vault README
+      ansible.builtin.stat:
+        path: "{{ work_dir }}/output/deployment/vault/README.md"
+      register: vault_readme
+
+    - name: Assert the vault skeleton is restrictive and secret-free
+      ansible.builtin.assert:
+        that:
+          - vault_dir.stat.exists
+          - vault_dir.stat.isdir
+          - vault_dir.stat.mode == '0700'
+          - vault_readme.stat.exists
+        fail_msg: "vault skeleton missing or not mode 0700"
+
+    - name: Load the deployment tree's aggregated SOE chain
+      ansible.builtin.set_fact:
+        deploy_agg: "{{ lookup('ansible.builtin.file', work_dir ~ '/output/deployment/group_vars/all/aggregated_soe.yml') | from_yaml }}"
+
+    - name: Assert generate reused the aggregate implementation
+      ansible.builtin.assert:
+        that:
+          - deploy_agg.content_soe_bundles | length == 7
+          - deploy_agg.content_views | map(attribute='name') | list | sort == ['SOE10', 'SOE9']
+        fail_msg: "the deployment tree's aggregated SOE chain is missing or wrong"
+
+    # ----------------------------------------------------------------- #
+    # publish output                                                     #
+    # ----------------------------------------------------------------- #
+    - name: Stat the expected published entries
+      ansible.builtin.stat:
+        path: "{{ work_dir }}/publish/{{ item }}.yml"
+      register: published
+      loop:
+        - rhel9_soe
+        - rhel10_soe
+        - rhel9_soe_extra
+
+    - name: Assert every selected entry was published
+      ansible.builtin.assert:
+        that:
+          - published.results | map(attribute='stat.exists') | list == [true, true, true]
+        fail_msg: "a selected catalogue entry is missing from the publish directory"
+
+    - name: Assert each published file parses back to its entry
+      ansible.builtin.assert:
+        that:
+          - (lookup('ansible.builtin.file', work_dir ~ '/publish/' ~ item ~ '.yml') | from_yaml).name == item
+        fail_msg: "published file {{ item }}.yml does not parse to the expected entry"
+      loop:
+        - rhel9_soe
+        - rhel10_soe
+        - rhel9_soe_extra
+
+    - name: Stat the deprecated entry in the publish directory
+      ansible.builtin.stat:
+        path: "{{ work_dir }}/publish/rhel8_soe.yml"
+      register: published_deprecated
+
+    - name: Assert the deprecated entry was not published
+      ansible.builtin.assert:
+        that:
+          - not published_deprecated.stat.exists
+        fail_msg: "the deprecated rhel8_soe entry leaked into the publish directory"
+
+    - name: Report verification passed
+      ansible.builtin.debug:
+        msg: "PASS — aggregate/generate/publish goal outcomes all verified"

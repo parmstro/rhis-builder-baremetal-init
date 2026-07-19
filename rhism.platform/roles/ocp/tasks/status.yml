@@ -1,0 +1,26 @@
+---
+# Action: status — report OCP cluster health
+
+- name: Get node list
+  ansible.builtin.command:
+    cmd: oc get nodes -o wide
+  register: _ocp_nodes
+  changed_when: false
+  environment:
+    KUBECONFIG: "{{ _cp_kubeconfig_path }}"
+
+- name: Get cluster operator status
+  ansible.builtin.command:
+    cmd: oc get co
+  register: _ocp_operators
+  changed_when: false
+  environment:
+    KUBECONFIG: "{{ _cp_kubeconfig_path }}"
+
+- name: Display cluster health
+  ansible.builtin.debug:
+    msg:
+      - "=== OCP nodes ==="
+      - "{{ _ocp_nodes.stdout_lines }}"
+      - "=== Cluster operators ==="
+      - "{{ _ocp_operators.stdout_lines }}"

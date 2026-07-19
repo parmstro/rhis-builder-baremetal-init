@@ -1,0 +1,28 @@
+---
+# client — per-application enablement. OADP is agentless server-side (the node-agent
+# runs on the cluster, not on the app), so this action is thin: it labels/annotates the
+# application namespace so its workloads opt into filesystem backup and any backup hooks.
+#
+# Filesystem (Kopia/Restic) backup of volumes is opt-in per app; the recommended pattern
+# annotates the namespace/pods so subsequent Backups include their volumes. The Backup CR's
+# own defaultVolumesToFsBackup toggle (backup_oadp_default_volumes_to_fs_backup) is set at
+# backup time; here we record the app's intent on its namespace.
+
+- name: Validate client requirements
+  ansible.builtin.assert:
+    that:
+      - backup_oadp_client_namespace | length > 0
+    fail_msg: "backup_oadp_client_namespace is required for the client action"
+
+- name: Label and annotate the application namespace for OADP backup
+  kubernetes.core.k8s:
+    kubeconfig: "{{ backup_oadp_kubeconfig | default(omit) }}"
+    state: present
+    apply: true
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: "{{ backup_oadp_client_namespace }}"
+        labels: "{{ backup_oadp_client_labels }}"
+        annotations: "{{ backup_oadp_client_annotations }}"

@@ -1,0 +1,35 @@
+---
+- name: Blacklist unnecessary kernel modules
+  community.general.modprobe:
+    name: "{{ item }}"
+    state: absent
+    persistent: present
+  loop: "{{ linux_hardening_blacklisted_modules }}"
+  when: linux_hardening_modules_apply | bool
+
+# Config-only mode (BUG-104 class): community.general.modprobe requires the
+# `modprobe` binary (kmod) — absent on minimal images (UBI base, containers),
+# where there is also no live module to unload. Write the CIS-style blacklist
+# config directly; it takes effect when a real host boots from the image.
+- name: Ensure /etc/modprobe.d exists (config only)
+  ansible.builtin.file:
+    path: /etc/modprobe.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when:
+    - not (linux_hardening_modules_apply | bool)
+    - linux_hardening_blacklisted_modules | length > 0
+
+- name: Blacklist unnecessary kernel modules (config only)
+  ansible.builtin.copy:
+    dest: "/etc/modprobe.d/{{ item }}.conf"
+    content: |
+      install {{ item }} /bin/false
+      blacklist {{ item }}
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ linux_hardening_blacklisted_modules }}"
+  when: not (linux_hardening_modules_apply | bool)

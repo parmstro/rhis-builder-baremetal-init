@@ -1,0 +1,85 @@
+---
+# ---------------------------------------------------------------------------
+# configure.yml — Deploy configs, create storage dir, open firewall
+# ---------------------------------------------------------------------------
+
+- name: Create bareos storage directory
+  ansible.builtin.file:
+    path: "{{ backup_bareos_storage_device }}"
+    state: directory
+    owner: bareos
+    group: bareos
+    mode: "0750"
+  become: true
+
+- name: Deploy bareos-dir.conf
+  ansible.builtin.template:
+    src: bareos-dir.conf.j2
+    dest: /etc/bareos/bareos-dir.conf
+    owner: bareos
+    group: bareos
+    mode: "0640"
+  no_log: true
+  become: true
+  notify: bareos - restart director
+
+- name: Deploy bareos-sd.conf
+  ansible.builtin.template:
+    src: bareos-sd.conf.j2
+    dest: /etc/bareos/bareos-sd.conf
+    owner: bareos
+    group: bareos
+    mode: "0640"
+  no_log: true
+  become: true
+  notify: bareos - restart storage
+
+- name: Deploy bareos-fd.conf
+  ansible.builtin.template:
+    src: bareos-fd.conf.j2
+    dest: /etc/bareos/bareos-fd.conf
+    owner: bareos
+    group: bareos
+    mode: "0640"
+  no_log: true
+  become: true
+  notify: bareos - restart fd
+
+- name: Deploy bconsole.conf (BUG-119 — console must match the managed director)
+  ansible.builtin.template:
+    src: bconsole.conf.j2
+    dest: /etc/bareos/bconsole.conf
+    owner: bareos
+    group: bareos
+    mode: "0640"
+  no_log: true
+  become: true
+
+# Firewall tasks gated (BUG-117): containers/minimal targets have no
+# firewalld; scenarios/labs set backup_bareos_manage_firewall: false.
+- name: Open firewall for bareos director (9101/tcp)
+  ansible.posix.firewalld:
+    port: "{{ backup_bareos_director_port }}/tcp"
+    state: enabled
+    permanent: true
+    immediate: true
+  become: true
+  when: backup_bareos_manage_firewall | bool
+
+- name: Open firewall for bareos storage (9103/tcp)
+  ansible.posix.firewalld:
+    port: "{{ backup_bareos_storage_port }}/tcp"
+    state: enabled
+    permanent: true
+    immediate: true
+  become: true
+  when: backup_bareos_manage_firewall | bool
+
+- name: Open firewall for bareos file daemon (9102/tcp)
+  ansible.posix.firewalld:
+    port: "{{ backup_bareos_file_daemon_port }}/tcp"
+    state: enabled
+    permanent: true
+    immediate: true
+  become: true
+  when: backup_bareos_manage_firewall | bool

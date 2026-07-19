@@ -1,0 +1,31 @@
+---
+# ---------------------------------------------------------------------------
+# publish — copy the selected + filtered catalogue entries into the directory
+# the rhism_ui backend serves: a FLAT directory of individually-parseable
+# <name>.yml files (its loadCatalog contract: readdir *.yml, each file is one
+# entry; GET /api/catalog/<id> reads <id>.yml).
+# ---------------------------------------------------------------------------
+
+- name: Ensure the publish directory exists
+  ansible.builtin.file:
+    path: "{{ rhism_inventory_publish_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Publish each selected catalogue entry as an individual file
+  ansible.builtin.copy:
+    dest: "{{ rhism_inventory_publish_dir }}/{{ item.entry.name | default(item.file | regex_replace('\\.yml$', '')) }}.yml"
+    mode: "0644"
+    content: |
+      ---
+      {{ item.entry | to_nice_yaml(indent=2) }}
+  loop: "{{ _rhism_inventory_selected_files }}"
+  loop_control:
+    label: "{{ item.entry.name | default(item.file) }}"
+
+- name: Report the publish summary
+  ansible.builtin.debug:
+    msg: >-
+      published {{ _rhism_inventory_selected_files | length }} catalogue
+      entries to {{ rhism_inventory_publish_dir }}
+      ({{ _rhism_inventory_dropped_deprecated | length }} deprecated entries dropped)

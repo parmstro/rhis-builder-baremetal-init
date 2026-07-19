@@ -1,0 +1,103 @@
+---
+argument_specs:
+  main:
+    short_description: Install and manage a Red Hat OpenShift (OCP) cluster.
+    description: >-
+      Standalone-first Kubernetes-distro product role for container_platform. Manages the OCP
+      lifecycle via openshift-install and oc — RHSM registration, download binaries, render
+      install-config, run cluster install/destroy (gated), scale nodes, etcd backup/restore,
+      and upgrade. Consumes the shared container-platform interface (bare action + cp_* vars)
+      so the container_platform dispatcher can select any distro (k3s/rke2/okd/ocp) with
+      identical code.
+    options:
+      action:
+        description: >-
+          Lifecycle action, shared across all container-platform distros. 'present'/'absent'
+          register RHSM + install or remove the OCP binaries + firewall; 'configure' renders
+          install-config; 'install'/'destroy' create or tear down the cluster (gated by
+          cp_install_execute / cp_destroy_confirm); 'add_node'/'remove_node' scale a MachineSet;
+          'backup'/'restore' handle etcd; 'upgrade' runs oc adm upgrade; 'status' reports state.
+        type: str
+        default: present
+        choices:
+          - present
+          - absent
+          - configure
+          - install
+          - destroy
+          - add_node
+          - remove_node
+          - backup
+          - restore
+          - upgrade
+          - status
+      cp_ocp_version:
+        description: OCP release version used in the Red Hat mirror installer/client URLs.
+        type: str
+        default: ""
+      cp_cluster_name:
+        description: Cluster name — used in console/API URLs and the install-config.
+        type: str
+        default: ocp
+      cp_base_domain:
+        description: Cluster base DNS domain — used in console/API URLs and the install-config.
+        type: str
+        default: example.com
+      cp_pull_secret:
+        description: Registry pull secret consumed by the install-config template.
+        type: str
+        default: ""
+      cp_ssh_pub_key:
+        description: SSH public key injected into cluster nodes via the install-config template.
+        type: str
+        default: ""
+      cp_install_dir:
+        description: >-
+          Installer working directory holding install-config.yaml, auth/kubeconfig, and state.
+        type: str
+        default: /opt/openshift-install
+      cp_backup_dir:
+        description: Directory for etcd backups (backup action).
+        type: str
+        default: /var/backup/etcd
+      cp_restore_dir:
+        description: Directory to restore etcd from (restore action).
+        type: str
+        default: /var/backup/etcd
+      cp_node_machineset:
+        description: MachineSet name to scale for add_node / remove_node.
+        type: str
+        default: ""
+      cp_node_replicas:
+        description: Replica count applied when scaling a MachineSet in add_node.
+        type: int
+        default: 1
+      cp_upgrade_version:
+        description: Target version for the upgrade action; empty runs oc adm upgrade --to-latest.
+        type: str
+        default: ""
+      cp_rhsm_skip_registration:
+        description: >-
+          Skip RHSM registration in the 'present' action (host already entitled / disconnected).
+        type: bool
+        default: false
+      cp_rhsm_org_id:
+        description: RHSM organization ID for redhat_subscription registration.
+        type: str
+        default: ""
+      cp_rhsm_activation_key:
+        description: RHSM activation key for redhat_subscription registration.
+        type: str
+        default: ""
+      cp_install_execute:
+        description: >-
+          Gate for the 'install' action — must be true to run 'openshift-install create
+          cluster'. Defaults to false so install is a fail-closed dry-run.
+        type: bool
+        default: false
+      cp_destroy_confirm:
+        description: >-
+          Gate for the 'destroy' action — must be true to run 'openshift-install destroy
+          cluster'. Defaults to false so destroy is a fail-closed dry-run.
+        type: bool
+        default: false

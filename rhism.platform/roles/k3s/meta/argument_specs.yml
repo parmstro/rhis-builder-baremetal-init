@@ -1,0 +1,75 @@
+---
+argument_specs:
+  main:
+    short_description: Install and manage a K3s lightweight Kubernetes cluster.
+    description: >-
+      Standalone-first Kubernetes-distro product role for container_platform. Installs K3s
+      (server or agent), manages its config/service, node join/eviction, in-place upgrades,
+      etcd snapshot backup/restore, and teardown. Consumes the shared container-platform
+      interface (bare action + cp_* vars) so the container_platform dispatcher can select any
+      distro (k3s/rke2/okd/ocp) with identical code.
+    options:
+      action:
+        description: >-
+          Lifecycle action, shared across all container-platform distros. 'present'/'absent'
+          install or remove K3s; 'configure' deploys config + kubeconfig; 'started'/'stopped'/
+          'restarted' manage the service; 'add_node'/'remove_node' join or evict a worker;
+          'upgrade' upgrades in place; 'backup'/'restore' handle etcd snapshots; 'reset' is a
+          confirmed teardown; 'status' reports cluster state.
+        type: str
+        default: present
+        choices:
+          - present
+          - absent
+          - configure
+          - started
+          - stopped
+          - restarted
+          - add_node
+          - remove_node
+          - upgrade
+          - backup
+          - restore
+          - reset
+          - status
+      cp_node_role:
+        description: >-
+          Node role. 'control_plane' installs a K3s server; 'worker' installs a K3s agent.
+          Shared container-platform interface var.
+        type: str
+        default: control_plane
+        choices:
+          - control_plane
+          - worker
+      cp_install_version:
+        description: >-
+          K3s version to pin (INSTALL_K3S_VERSION). Empty selects the stable channel.
+        type: str
+        default: ""
+      cp_server_url:
+        description: Server join URL (K3S_URL) used when installing a worker / add_node.
+        type: str
+        default: ""
+      cp_node_token:
+        description: Cluster join token (K3S_TOKEN) used when installing a worker / add_node.
+        type: str
+        default: ""
+      cp_kubeconfig_path:
+        description: >-
+          Standard-path kubeconfig symlink target. A symlink is created only when this is set
+          and differs from the on-node kubeconfig. Shared container-platform interface var.
+        type: str
+        default: /etc/rancher/k3s/k3s.yaml
+      cp_backup_snapshot_name:
+        description: Name for the etcd snapshot created by the 'backup' action.
+        type: str
+        default: "{{ inventory_hostname }}-k3s"
+      cp_restore_snapshot_name:
+        description: Name of the etcd snapshot to restore in the 'restore' action.
+        type: str
+        default: ""
+      cp_reset_confirm:
+        description: >-
+          Safety confirmation required before the destructive 'reset' (full teardown) action.
+        type: bool
+        default: false

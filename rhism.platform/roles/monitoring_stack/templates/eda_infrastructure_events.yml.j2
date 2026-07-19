@@ -1,0 +1,45 @@
+---
+- name: Infrastructure event response
+  hosts: all
+  sources:
+    - ansible.eda.webhook:
+        host: 0.0.0.0
+        port: {{ mon_eda_webhook_port + 1 }}
+  rules:
+    - name: High CPU usage detected
+      condition: >-
+        event.payload.source is defined and
+        (
+          (event.payload.source == "splunk" and
+           event.payload.search_name == "High CPU Usage") or
+          (event.payload.source == "nagios" and
+           event.payload.service == "Load" and
+           event.payload.state in ["WARNING", "CRITICAL"])
+        )
+      action:
+        run_playbook:
+          name: {{ mon_eda_response_playbooks.high_cpu.playbook }}
+          extra_vars:
+            event_action: {{ mon_eda_response_playbooks.high_cpu.extra_vars.event_action }}
+            event_source: "{% raw %}{{ event.payload.source }}{% endraw %}"
+            event_host: "{% raw %}{{ event.payload.host | default('unknown') }}{% endraw %}"
+            event_detail: "{% raw %}{{ event.payload | to_json }}{% endraw %}"
+
+    - name: Disk space critical
+      condition: >-
+        event.payload.source is defined and
+        (
+          (event.payload.source == "splunk" and
+           event.payload.search_name == "Disk Space Critical") or
+          (event.payload.source == "nagios" and
+           event.payload.service == "Disk" and
+           event.payload.state == "CRITICAL")
+        )
+      action:
+        run_playbook:
+          name: {{ mon_eda_response_playbooks.disk_critical.playbook }}
+          extra_vars:
+            event_action: {{ mon_eda_response_playbooks.disk_critical.extra_vars.event_action }}
+            event_source: "{% raw %}{{ event.payload.source }}{% endraw %}"
+            event_host: "{% raw %}{{ event.payload.host | default('unknown') }}{% endraw %}"
+            event_detail: "{% raw %}{{ event.payload | to_json }}{% endraw %}"

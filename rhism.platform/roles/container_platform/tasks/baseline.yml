@@ -1,0 +1,20 @@
+---
+- name: Install container platform
+  ansible.builtin.include_tasks: install.yml
+  when: cp_apply_install | bool
+
+- name: Configure container platform
+  ansible.builtin.include_tasks: configure.yml
+  when: cp_apply_configure | bool
+
+- name: Configure storage
+  ansible.builtin.include_tasks: storage.yml
+  when: cp_apply_storage | bool
+
+- name: Configure registry
+  ansible.builtin.include_tasks: registry.yml
+  when: cp_apply_registry | bool
+
+- name: Configure ingress
+  ansible.builtin.include_tasks: ingress.yml
+  when: cp_apply_ingress | bool

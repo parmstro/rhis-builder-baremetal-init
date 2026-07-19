@@ -1,0 +1,30 @@
+---
+# storage_nfs — standalone-first defaults over the SHARED storage-backend interface.
+#
+# Every storage backend (storage_local_path / storage_nfs / storage_longhorn / storage_ocs)
+# consumes the SAME variable names, so the container_platform orchestrator selects any of
+# them with one identical call — `include_role: name="storage_{{ cp_storage_type }}"` — and
+# never needs per-backend code. Standalone callers set these same vars directly; the defaults
+# below make the role runnable on its own.
+
+# Shared action (all backends): storage (deploy) | present (alias) | absent (remove).
+# The orchestrator passes `action` via include_role vars; this default covers standalone use.
+action: storage
+
+# Shared cluster access + storage policy (consumed by every backend, set once by the caller).
+cp_kubeconfig_path: /etc/rancher/k3s/k3s.yaml
+cp_storage_make_default: false
+
+# Shared dry-run gate honoured by every backend — false validates dispatch + variable
+# resolution without touching the node or cluster (used by the molecule scenario).
+cp_storage_execute: true
+
+# NFS-specific tunables (only this backend reads them; still cp_storage_-namespaced).
+# cp_storage_nfs_server / cp_storage_nfs_path are REQUIRED for a real deploy — the role
+# asserts they are non-empty before deploying. They default empty so the role loads
+# standalone; set them to your NFS export before running with cp_storage_execute: true.
+cp_storage_nfs_server: ""
+cp_storage_nfs_path: ""
+cp_storage_class_name: nfs-client
+cp_storage_nfs_reclaim_policy: Delete
+cp_storage_nfs_archive_on_delete: false

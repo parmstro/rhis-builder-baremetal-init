@@ -1,0 +1,40 @@
+---
+# config_inventories — inventories + inventory sources (aap's own
+# config-as-code engine; awx.awx is the API client, not a role dependency).
+
+- name: Create inventories
+  awx.awx.inventory:
+    name: "{{ item.name }}"
+    description: "{{ item.description | default(omit) }}"
+    organization: "{{ aap_organization }}"
+    variables: "{{ item.variables | default(omit) }}"
+    state: present
+    controller_host: "{{ aap_controller_host }}"
+    controller_username: "{{ aap_admin_user }}"
+    controller_password: "{{ aap_admin_password }}"
+    validate_certs: "{{ aap_validate_certs }}"
+    request_timeout: "{{ aap_api_timeout }}"
+  loop: "{{ aap_inventories }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Create inventory sources
+  awx.awx.inventory_source:
+    name: "{{ item.name }}"
+    inventory: "{{ item.inventory }}"
+    organization: "{{ aap_organization }}"
+    source: "{{ item.source }}"
+    source_project: "{{ item.source_project | default(omit) }}"
+    source_path: "{{ item.source_path | default(omit) }}"
+    overwrite: "{{ item.overwrite | default(true) }}"
+    update_on_launch: "{{ item.update_on_launch | default(true) }}"
+    state: present
+    controller_host: "{{ aap_controller_host }}"
+    controller_username: "{{ aap_admin_user }}"
+    controller_password: "{{ aap_admin_password }}"
+    validate_certs: "{{ aap_validate_certs }}"
+    request_timeout: "{{ aap_api_timeout }}"
+  loop: "{{ aap_inventory_sources }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: aap_inventory_sources | length > 0

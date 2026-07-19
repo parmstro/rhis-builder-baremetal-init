@@ -1,0 +1,18 @@
+---
+- name: Validate wizard_action
+  ansible.builtin.assert:
+    that:
+      - wizard_action is defined
+      - wizard_action in _wizard_valid_actions
+    fail_msg: >-
+      wizard_action must be one of: interactive, validate, show_plan,
+      generate_inventory.
+      Got '{{ wizard_action | default("undefined") }}'.
+  tags:
+    - infra_wizard
+
+- name: "Execute task file for: {{ wizard_action }}"
+  ansible.builtin.include_tasks: "{{ wizard_action }}.yml"
+  tags:
+    - infra_wizard
+    - "infra_wizard-{{ wizard_action }}"

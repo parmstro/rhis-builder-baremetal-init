@@ -1,0 +1,38 @@
+---
+# ── Configure rke2 ───────────────────────────────────────────────────────────
+
+- name: Ensure rke2 config directory exists
+  ansible.builtin.file:
+    path: "{{ _cp_config_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+
+- name: Deploy rke2 config.yaml
+  ansible.builtin.template:
+    src: rke2-config.yaml.j2
+    dest: "{{ _cp_config_file }}"
+    owner: root
+    group: root
+    mode: "0600"
+  become: true
+  notify: rke2 - restart server
+
+- name: Symlink rke2 kubectl to standard path
+  ansible.builtin.file:
+    src: "{{ _cp_kubectl_cmd }}"
+    dest: /usr/local/bin/kubectl
+    state: link
+    force: true
+  become: true
+
+- name: Set up kubeconfig symlink for current user
+  ansible.builtin.file:
+    src: "{{ _cp_kubeconfig_path }}"
+    dest: "{{ cp_kubeconfig_path }}"
+    state: link
+    force: true
+  become: true
+  when: cp_kubeconfig_path | length > 0 and cp_kubeconfig_path != _cp_kubeconfig_path

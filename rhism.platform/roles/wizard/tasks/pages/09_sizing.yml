@@ -1,0 +1,61 @@
+---
+- name: Select VM sizing tier
+  ansible.builtin.command:
+    cmd: >-
+      {{ wizard_tui_backend }} --title "{{ wizard_tui_title }}"
+      --radiolist "Select VM sizing tier (can be overridden per-service later):"
+      {{ wizard_tui_height }} {{ wizard_tui_width }} 3
+      "small"  "Small   — lab/dev (4 vCPU, 8 GB RAM per service)"    OFF
+      "medium" "Medium  — SME production (8 vCPU, 16 GB RAM)"        ON
+      "large"  "Large   — enterprise (16 vCPU, 32 GB RAM)"            OFF
+      3>&1 1>&2 2>&3
+  register: _wizard_sizing_result
+  changed_when: false
+  failed_when: _wizard_sizing_result.rc not in [0, 1]
+  tags: infra_wizard
+
+- name: Handle sizing cancel
+  ansible.builtin.fail:
+    msg: "Wizard cancelled by user at sizing selection."
+  when: _wizard_sizing_result.rc == 1
+  tags: infra_wizard
+
+- name: Apply sizing defaults for tier
+  ansible.builtin.set_fact:
+    wizard_sizing: >-
+      {{
+        {
+          'tier': _wizard_sizing_result.stdout | trim,
+          'identity_server':       {'cores': 4,  'memory_mb': 8192,  'disk_gb': 100}
+            if (_wizard_sizing_result.stdout | trim) == 'small'
+            else ({'cores': 8, 'memory_mb': 16384, 'disk_gb': 100}
+            if (_wizard_sizing_result.stdout | trim) == 'medium'
+            else {'cores': 8, 'memory_mb': 16384, 'disk_gb': 100}),
+          'content_server':        {'cores': 4,  'memory_mb': 8192,  'disk_gb': 500}
+            if (_wizard_sizing_result.stdout | trim) == 'small'
+            else ({'cores': 8, 'memory_mb': 16384, 'disk_gb': 500}
+            if (_wizard_sizing_result.stdout | trim) == 'medium'
+            else {'cores': 16, 'memory_mb': 32768, 'disk_gb': 1000}),
+          'scm_server':            {'cores': 4,  'memory_mb': 8192,  'disk_gb': 200}
+            if (_wizard_sizing_result.stdout | trim) == 'small'
+            else ({'cores': 8, 'memory_mb': 16384, 'disk_gb': 200}
+            if (_wizard_sizing_result.stdout | trim) == 'medium'
+            else {'cores': 16, 'memory_mb': 32768, 'disk_gb': 500}),
+          'backup_server':         {'cores': 2,  'memory_mb': 4096,  'disk_gb': 1000}
+            if (_wizard_sizing_result.stdout | trim) == 'small'
+            else ({'cores': 4, 'memory_mb': 8192, 'disk_gb': 2000}
+            if (_wizard_sizing_result.stdout | trim) == 'medium'
+            else {'cores': 8, 'memory_mb': 16384, 'disk_gb': 5000}),
+          'cp_control_plane':      {'cores': 4,  'memory_mb': 8192,  'disk_gb': 120, 'count': 1}
+            if (_wizard_sizing_result.stdout | trim) == 'small'
+            else ({'cores': 8, 'memory_mb': 16384, 'disk_gb': 120, 'count': 3}
+            if (_wizard_sizing_result.stdout | trim) == 'medium'
+            else {'cores': 16, 'memory_mb': 32768, 'disk_gb': 200, 'count': 3}),
+          'cp_worker':             {'cores': 4,  'memory_mb': 8192,  'disk_gb': 200, 'count': 2}
+            if (_wizard_sizing_result.stdout | trim) == 'small'
+            else ({'cores': 16, 'memory_mb': 32768, 'disk_gb': 200, 'count': 3}
+            if (_wizard_sizing_result.stdout | trim) == 'medium'
+            else {'cores': 32, 'memory_mb': 65536, 'disk_gb': 500, 'count': 5})
+        }
+      }}
+  tags: infra_wizard

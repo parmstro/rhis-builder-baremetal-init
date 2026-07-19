@@ -1,0 +1,35 @@
+---
+# restore: restore a snapshot to target directory
+
+- name: Include restic environment
+  ansible.builtin.include_tasks: env.yml
+
+- name: Validate restore requirements
+  ansible.builtin.assert:
+    that:
+      - backup_restic_restore_path | length > 0
+    fail_msg: "backup_restic_restore_path is required for restore"
+
+- name: Create restore target directory
+  ansible.builtin.file:
+    path: "{{ backup_restic_restore_path }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+  become: true
+
+- name: Restore snapshot
+  ansible.builtin.command:
+    cmd: >-
+      restic restore {{ backup_restic_restore_snapshot }}
+      --target "{{ backup_restic_restore_path }}"
+  environment: "{{ _restic_env }}"
+  become: true
+  no_log: true
+  register: _restic_restore
+  changed_when: true
+
+- name: Report restore result
+  ansible.builtin.debug:
+    msg: "{{ _restic_restore.stdout_lines | default([]) }}"

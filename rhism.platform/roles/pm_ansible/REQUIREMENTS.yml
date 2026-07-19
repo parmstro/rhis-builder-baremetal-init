@@ -1,0 +1,29 @@
+---
+# Functional requirements — pm_ansible (requirements→test-case layer +
+# Tier-3 elevation, owner rules 2026-07-12).
+functional_requirements:
+  - req_id: PMANS-FR-001
+    statement: >-
+      create/rotate SHALL generate ISM-compliant passwords (length + all four
+      character classes, retry-until-compliant) honouring pm_special_chars
+      via environment passing (never Jinja-interpolated into the generator —
+      the quoting-safety fix), storing vault-encrypted.
+    tier: 2
+    verified_by:
+      - molecule: default
+
+  - req_id: PMANS-FR-002
+    statement: >-
+      read/delete/audit SHALL round-trip stored secrets with an append-only
+      audit trail (each create invocation appends — by design, not
+      idempotent).
+    tier: 2
+    verified_by:
+      - molecule: default
+
+  - req_id: PMANS-FR-003
+    statement: >-
+      The full lifecycle SHALL run via the dispatcher against lab hosts.
+    tier: 3
+    verified_by:
+      - lab: playbooks/password_management.yml#pm_hosts

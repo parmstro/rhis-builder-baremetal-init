@@ -1,0 +1,57 @@
+---
+# OTP token management — TOTP, HOTP, and YubiKey OTP mode.
+# FreeIPA stores token seeds and validates TOTP/HOTP natively.
+# YubiKey OTP (Yubico proprietary) uses the RADIUS proxy path instead;
+# set idm_token_type: yubikey_otp to route those users through radius_proxy.
+
+- name: Validate otp action applies to this idm_type
+  ansible.builtin.assert:
+    that:
+      - idm_type in ['freeipa', 'rh_idm']
+    fail_msg: >-
+      idm_action: otp requires a FreeIPA/IDM server (idm_type: freeipa or rh_idm).
+
+- name: Validate OTP token list
+  ansible.builtin.assert:
+    that:
+      - idm_otp_tokens | length > 0
+    fail_msg: >-
+      idm_otp_tokens must contain at least one token definition.
+      Each entry: {owner: user, type: totp|hotp, description: "..."}
+
+- name: Create OTP tokens for users
+  freeipa.ansible_freeipa.ipaotptoken:
+    ipaadmin_password: "{{ idm_admin_password }}"
+    name: "{{ item.name | default(item.owner + '-' + item.type + '-01') }}"
+    owner: "{{ item.owner }}"
+    type: "{{ item.type | upper }}"
+    description: "{{ item.description | default(item.type + ' token for ' + item.owner) }}"
+    # TOTP clock offset tolerance in seconds (default: 300)
+    clockoffset: "{{ item.clock_offset | default(300) }}"
+    # HOTP counter sync window (default: 10)
+    syncwindow: "{{ item.sync_window | default(10) }}"
+    state: "{{ item.state | default('present') }}"
+  loop: "{{ idm_otp_tokens }}"
+  when: item.type | upper in ['TOTP', 'HOTP']
+  no_log: true
+
+- name: Enable two-factor authentication for OTP users
+  freeipa.ansible_freeipa.ipauser:
+    ipaadmin_password: "{{ idm_admin_password }}"
+    name: "{{ item.owner }}"
+    userauthtype:
+      - password
+      - otp
+    state: present
+  loop: "{{ idm_otp_tokens }}"
+  when: item.type | upper in ['TOTP', 'HOTP']
+  loop_control:
+    label: "{{ item.owner }}"
+
+- name: Report token creation summary
+  ansible.builtin.debug:
+    msg: >-
+      Created {{ idm_otp_tokens | selectattr('type', 'in', ['totp', 'hotp', 'TOTP', 'HOTP']) | list | length }}
+      OTP token(s). Users should scan the QR code from the IPA web UI
+      (https://{{ idm_hostname | default(inventory_hostname) }}/ipa/ui/) or
+      use ipa otptoken-show --all to get token details.

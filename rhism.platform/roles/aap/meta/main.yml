@@ -1,0 +1,27 @@
+---
+galaxy_info:
+  role_name: aap
+  namespace: rhism
+  author: rhism
+  description: >-
+    Red Hat Ansible Automation Platform full-lifecycle role (install → configure
+    → day-2), version-aware across AAP 2.4/2.5/2.6/2.7, via Red Hat's own
+    containerized installer or the OpenShift operator. Fully self-contained:
+    carries its own configuration-as-code engine (over the awx.awx API client);
+    reuses rhel_subscription for entitlement.
+  company: rhism
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: EL
+      versions:
+        - "9"
+  galaxy_tags:
+    - aap
+    - ansible
+    - automation
+    - redhat
+    - controller
+    - installer
+
+dependencies: []

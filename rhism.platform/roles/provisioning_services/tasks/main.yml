@@ -1,0 +1,25 @@
+---
+- name: Validate prov_action
+  ansible.builtin.assert:
+    that:
+      - prov_action is defined
+      - prov_action in _prov_valid_actions
+    fail_msg: >-
+      prov_action must be one of: {{ _prov_valid_actions | join(', ') }}.
+      Got '{{ prov_action | default('undefined') }}'.
+
+- name: Validate prov_type
+  ansible.builtin.assert:
+    that:
+      - prov_type is defined
+      - prov_type in _prov_valid_types
+    fail_msg: >-
+      prov_type must be one of: {{ _prov_valid_types | join(', ') }}.
+      Got '{{ prov_type | default('undefined') }}'.
+
+- name: Load {{ prov_type }} type vars
+  ansible.builtin.include_vars:
+    file: "{{ prov_type }}.yml"
+
+- name: "Execute task file for: {{ prov_action }}"
+  ansible.builtin.include_tasks: "{{ prov_action }}.yml"

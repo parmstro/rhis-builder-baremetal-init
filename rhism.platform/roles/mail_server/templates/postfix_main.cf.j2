@@ -1,0 +1,51 @@
+# Managed by Ansible — rhism mail_server ({{ mail_type }})
+myhostname = {{ mail_hostname }}
+mydomain = {{ mail_domain }}
+myorigin = $mydomain
+inet_interfaces = {{ mail_inet_interfaces }}
+inet_protocols = {{ mail_inet_protocols }}
+message_size_limit = {{ mail_message_size_limit }}
+mailbox_size_limit = {{ mail_mailbox_size_limit }}
+
+{% if mail_type == 'relay' %}
+mydestination = $myhostname, localhost.$mydomain, localhost
+relayhost = [{{ mail_relay_host }}]:{{ mail_relay_port }}
+
+{% if mail_relay_user | length > 0 %}
+smtp_sasl_auth_enable = yes
+smtp_sasl_password_maps = hash:/etc/postfix/sasl_passwd
+smtp_sasl_security_options = noanonymous
+{% endif %}
+{% else %}
+mydestination = $myhostname, localhost.$mydomain, localhost, $mydomain
+virtual_transport = lmtp:unix:private/dovecot-lmtp
+virtual_mailbox_domains = {{ mail_virtual_domains | map(attribute='name') | join(' ') }}
+
+{% if mail_spamassassin_enabled %}
+smtpd_milters = unix:/var/run/spamassassin/spamassassin-milter.sock
+non_smtpd_milters = $smtpd_milters
+milter_default_action = accept
+{% endif %}
+{% if mail_clamav_enabled %}
+content_filter = scan:127.0.0.1:10025
+{% endif %}
+{% if mail_dkim_enabled %}
+smtpd_milters = inet:127.0.0.1:8891
+non_smtpd_milters = inet:127.0.0.1:8891
+{% endif %}
+{% endif %}
+
+# TLS
+{% if mail_tls_enabled %}
+smtpd_tls_cert_file = /etc/pki/tls/certs/mail.crt
+smtpd_tls_key_file = /etc/pki/tls/private/mail.key
+smtpd_tls_security_level = {{ mail_tls_security_level }}
+smtpd_tls_loglevel = 1
+smtp_tls_security_level = {{ mail_tls_security_level }}
+smtp_tls_CAfile = /etc/pki/tls/certs/ca-bundle.crt
+{% endif %}
+
+smtpd_relay_restrictions =
+  permit_mynetworks,
+  permit_sasl_authenticated,
+  reject_unauth_destination

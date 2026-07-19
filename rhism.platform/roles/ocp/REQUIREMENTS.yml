@@ -1,0 +1,106 @@
+---
+# Functional requirements — ocp (requirements->test-case layer + Tier-3
+# elevation, owner rules 2026-07-12). Kubernetes-distro product role; mirrors
+# the rke2/okd family shape, adding RHSM entitlement. Product capability
+# fact-checked against the official Red Hat OpenShift Container Platform docs
+# (docs.redhat.com: installing with install-config.yaml, MachineSet scaling,
+# etcd backup/restore via cluster-backup.sh, oc adm upgrade). Curated against
+# README + meta/argument_specs.yml action set + tasks/. Family lab:
+# playbooks/container_platform.yml (cp_type=ocp).
+functional_requirements:
+  - req_id: OCP-FR-001
+    statement: >-
+      The role SHALL consume the shared container_platform family interface
+      (bare action + cp_* vars) with an absolute oc/openshift-install path
+      surviving sudo secure_path (BUG-041), and pass its contract scenario —
+      argument-spec validation, standalone default (action=present), and a
+      dispatch task file for every declared action — without registering RHSM,
+      downloading binaries, or creating a cluster.
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: OCP-FR-002
+    statement: >-
+      The 'present' action SHALL register the installer host with RHSM (unless
+      cp_rhsm_skip_registration) using cp_rhsm_org_id/cp_rhsm_activation_key,
+      download openshift-install and oc from the Red Hat mirror (cp_ocp_version),
+      and open the required firewall ports.
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#ocp
+
+  - req_id: OCP-FR-003
+    statement: >-
+      The role SHALL render install-config.yaml from the cp_* inputs
+      (cp_cluster_name, cp_base_domain, cp_pull_secret, cp_ssh_pub_key) into
+      cp_install_dir on 'configure'.
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#ocp
+
+  - req_id: OCP-FR-004
+    statement: >-
+      The 'install' action SHALL be fail-closed behind cp_install_execute
+      (openshift-install create cluster is never invoked until explicitly
+      enabled).
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: OCP-FR-005
+    statement: >-
+      The 'destroy' action SHALL be fail-closed behind cp_destroy_confirm
+      (openshift-install destroy cluster is never invoked until explicitly
+      confirmed).
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: OCP-FR-006
+    statement: >-
+      A real OCP cluster SHALL be created by the installer consuming a valid
+      Red Hat pull secret from console.redhat.com — genuinely uncoverable by CI
+      (needs a multi-node infrastructure, an entitled subscription, and a pull
+      secret).
+    tier: 3
+    verified_by: []
+
+  - req_id: OCP-FR-007
+    statement: >-
+      The role SHALL scale a worker MachineSet up (add_node, cp_node_replicas)
+      and down (remove_node) via oc scale machineset.
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#ocp
+
+  - req_id: OCP-FR-008
+    statement: >-
+      The role SHALL take an etcd backup (cluster-backup.sh — etcd snapshot +
+      static kubernetes resources) to cp_backup_dir on 'backup'.
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#ocp
+
+  - req_id: OCP-FR-009
+    statement: >-
+      The role SHALL restore cluster state from an etcd backup in cp_restore_dir
+      on 'restore'.
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#ocp
+
+  - req_id: OCP-FR-010
+    statement: >-
+      The role SHALL upgrade the cluster via oc adm upgrade to cp_upgrade_version
+      (or --to-latest when empty) on 'upgrade'.
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#ocp
+
+  - req_id: OCP-FR-011
+    statement: >-
+      The role SHALL report cluster/node state on 'status'.
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#ocp

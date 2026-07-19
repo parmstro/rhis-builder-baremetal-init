@@ -1,0 +1,40 @@
+---
+# registry_generic — standalone-first defaults over the SHARED registry-backend interface.
+#
+# Every registry backend (registry_internal / registry_generic) consumes the SAME variable
+# names, so the container_platform orchestrator selects either of them with one identical call
+# — `include_role: name="registry_{{ cp_registry_type }}"` — and never needs per-backend code.
+# Standalone callers set these same vars directly; the defaults below make the role runnable
+# on its own.
+
+# Shared action (all backends): registry (configure) | present (alias) | absent (remove).
+# The orchestrator passes `action` via include_role vars; this default covers standalone use.
+action: registry
+
+# Shared platform selector — the mechanism differs per platform: ocp/okd trust the registry
+# via the cluster Image config; k3s/rke2 write a containerd registries.yaml mirror.
+cp_type: k3s
+
+# Shared cluster access (consumed by every backend, set once by the caller).
+cp_kubeconfig_path: /etc/rancher/k3s/k3s.yaml
+
+# Shared dry-run gate honoured by every registry backend — false validates dispatch + variable
+# resolution without touching the node or cluster (used by the molecule scenario).
+cp_registry_execute: true
+
+# External registry endpoint this backend configures. Required (length > 0) when actually
+# executing a configure action; the empty default keeps the role loadable standalone.
+cp_registry_url: ""
+
+# External registry authentication (optional — many registries are anonymous-pull).
+cp_registry_username: ""
+cp_registry_password: ""
+
+# Name of the Kubernetes pull secret created in the default namespace (ocp/okd + k3s/rke2).
+cp_registry_secret_name: registry-pull-secret
+
+# Directory holding the containerd registries.yaml on k3s/rke2 nodes.
+cp_registry_config_dir: /etc/rancher/k3s
+
+# On OCP/OKD, also add the registry to the cluster Image config allowedRegistries.
+cp_registry_trust_cluster: false

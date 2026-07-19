@@ -1,0 +1,20 @@
+---
+# TSS API call for rotate — only included when pm_thycotic_skip_api is false.
+- name: Update secret password in Thycotic Secret Server
+  delinea.tss.secret:
+    server_url: "{{ pm_thycotic_server_url }}"
+    username: "{{ pm_thycotic_username }}"
+    password: "{{ pm_thycotic_password }}"
+    domain: "{{ pm_thycotic_domain | default(omit) }}"
+    state: present
+    id: "{{ pm_thycotic_secret_id }}"
+    fields:
+      - slug: password
+        value: "{{ _pm_password }}"
+      - slug: notes
+        value: >-
+          ISM-compliant rotation: ISM-0406,ISM-0407,ISM-0408,ISM-0410,ISM-0411,ISM-0412.
+          Length={{ _pm_password | length }}. Expiry={{ pm_expiry_days }} days.
+          Rotated by ansible/password_management.
+  delegate_to: localhost
+  no_log: true

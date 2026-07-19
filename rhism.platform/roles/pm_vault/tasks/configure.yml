@@ -1,0 +1,151 @@
+---
+# pm_vault — configure action.
+# Initialises Vault, captures unseal keys and root token, unseals,
+# enables KV v2 and AppRole auth, and writes an initial ISM-aligned policy.
+# Idempotent: checks vault status before each step.
+
+- name: Ensure Vault service is running before configuring
+  ansible.builtin.service:
+    name: vault
+    state: started
+  become: true
+
+- name: Check Vault initialisation status
+  ansible.builtin.command:
+    cmd: vault status -format=json
+  environment:
+    VAULT_ADDR: "http://127.0.0.1:8200"
+    VAULT_SKIP_VERIFY: "true"
+  register: _vault_status_raw
+  failed_when: false
+  changed_when: false
+  become: true
+
+- name: Parse Vault status
+  ansible.builtin.set_fact:
+    _vault_status: "{{ _vault_status_raw.stdout | from_json }}"
+
+- name: Initialise Vault (first-time only)
+  ansible.builtin.shell:
+    cmd: >
+      vault operator init
+      -key-shares={{ pm_vault_init_key_shares }}
+      -key-threshold={{ pm_vault_init_key_threshold }}
+      -format=json
+  environment:
+    VAULT_ADDR: "http://127.0.0.1:8200"
+    VAULT_SKIP_VERIFY: "true"
+  register: _vault_init_raw
+  when: not (_vault_status.initialized | default(false) | bool)
+  become: true
+  no_log: true
+
+- name: Write init output to file (PROTECT THIS FILE — contains unseal keys + root token)
+  ansible.builtin.copy:
+    content: "{{ _vault_init_raw.stdout }}"
+    dest: "{{ pm_vault_init_output_path }}"
+    mode: "0600"
+    owner: root
+    group: root
+  when:
+    - not (_vault_status.initialized | default(false) | bool)
+    - _vault_init_raw is defined
+  become: true
+  no_log: true
+
+- name: Load existing init output (when already initialised)
+  ansible.builtin.slurp:
+    src: "{{ pm_vault_init_output_path }}"
+  register: _vault_init_file
+  when: _vault_status.initialized | default(false) | bool
+  become: true
+  no_log: true
+
+- name: Parse init data
+  ansible.builtin.set_fact:
+    _vault_init: >-
+      {{
+        (_vault_init_raw.stdout | from_json)
+        if not (_vault_status.initialized | default(false) | bool)
+        else (_vault_init_file.content | b64decode | from_json)
+      }}
+  no_log: true
+
+- name: Unseal Vault (apply key shares up to threshold)
+  ansible.builtin.command:
+    cmd: "vault operator unseal {{ item }}"
+  environment:
+    VAULT_ADDR: "http://127.0.0.1:8200"
+    VAULT_SKIP_VERIFY: "true"
+  loop: "{{ _vault_init.unseal_keys_b64[:pm_vault_init_key_threshold] }}"
+  when: _vault_status.sealed | default(true) | bool
+  become: true
+  no_log: true
+  changed_when: true
+
+- name: Wait for Vault to become unsealed
+  ansible.builtin.command:
+    cmd: vault status -format=json
+  environment:
+    VAULT_ADDR: "http://127.0.0.1:8200"
+    VAULT_SKIP_VERIFY: "true"
+    VAULT_TOKEN: "{{ _vault_init.root_token }}"
+  register: _vault_unsealed
+  until: not (_vault_unsealed.stdout | from_json).sealed
+  retries: 10
+  delay: 3
+  changed_when: false
+  become: true
+  no_log: true
+
+- name: Enable KV v2 secrets engine at {{ pm_vault_kv_mount }}/
+  ansible.builtin.command:
+    cmd: vault secrets enable -path={{ pm_vault_kv_mount }} -version=2 kv
+  environment:
+    VAULT_ADDR: "http://127.0.0.1:8200"
+    VAULT_SKIP_VERIFY: "true"
+    VAULT_TOKEN: "{{ _vault_init.root_token }}"
+  register: _kv_enable
+  failed_when:
+    - _kv_enable.rc != 0
+    - '"path is already in use" not in _kv_enable.stderr'
+  changed_when: _kv_enable.rc == 0
+  become: true
+  no_log: true
+  when: pm_vault_baseline_kv_engine | bool
+
+- name: Enable AppRole auth method
+  ansible.builtin.command:
+    cmd: vault auth enable approle
+  environment:
+    VAULT_ADDR: "http://127.0.0.1:8200"
+    VAULT_SKIP_VERIFY: "true"
+    VAULT_TOKEN: "{{ _vault_init.root_token }}"
+  register: _approle_enable
+  failed_when:
+    - _approle_enable.rc != 0
+    - '"path is already in use" not in _approle_enable.stderr'
+  changed_when: _approle_enable.rc == 0
+  become: true
+  no_log: true
+  when: pm_vault_baseline_approle_auth | bool
+
+- name: Write ISM-aligned password management policy
+  ansible.builtin.shell:
+    cmd: |
+      vault policy write password-management - <<'EOF'
+      # ISM-aligned: permit read/write/delete on password_management path only
+      path "{{ pm_vault_kv_mount }}/data/password_management/*" {
+        capabilities = ["create", "read", "update", "delete", "list"]
+      }
+      path "{{ pm_vault_kv_mount }}/metadata/password_management/*" {
+        capabilities = ["list", "read", "delete"]
+      }
+      EOF
+  environment:
+    VAULT_ADDR: "http://127.0.0.1:8200"
+    VAULT_SKIP_VERIFY: "true"
+    VAULT_TOKEN: "{{ _vault_init.root_token }}"
+  changed_when: true
+  become: true
+  no_log: true

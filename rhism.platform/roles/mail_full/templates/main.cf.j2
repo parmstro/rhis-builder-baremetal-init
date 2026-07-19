@@ -1,0 +1,105 @@
+# Postfix main.cf — managed by Ansible (mail_full role)
+# Do not edit manually; changes will be overwritten.
+
+# Identity
+myhostname = {{ mail_hostname }}
+mydomain = {{ mail_domain }}
+myorigin = $mydomain
+
+# Network
+inet_interfaces = {{ mail_inet_interfaces }}
+inet_protocols = {{ mail_inet_protocols }}
+
+# Local delivery
+mydestination = $myhostname, localhost.$mydomain, localhost
+alias_maps = {{ mail_db_type }}:/etc/aliases
+alias_database = {{ mail_db_type }}:/etc/aliases
+{% if mail_virtual_domains | length > 0 %}
+virtual_mailbox_domains = {{ mail_db_type }}:/etc/postfix/virtual_domains
+virtual_mailbox_base = {{ mail_virtual_mailbox_base }}
+virtual_mailbox_maps = {{ mail_db_type }}:/etc/postfix/vmailbox
+virtual_minimum_uid = 100
+virtual_uid_maps = static:{{ mail_vmail_uid }}
+virtual_gid_maps = static:{{ mail_vmail_gid }}
+virtual_alias_maps = {{ mail_db_type }}:/etc/postfix/virtual
+{% endif %}
+
+# Relay
+{% if mail_relay_host %}
+relayhost = [{{ mail_relay_host }}]:{{ mail_relay_port }}
+{% if mail_relay_user %}
+smtp_sasl_auth_enable = yes
+smtp_sasl_password_maps = {{ mail_db_type }}:/etc/postfix/sasl_passwd
+smtp_sasl_security_options = noanonymous
+smtp_sasl_tls_security_options = noanonymous
+{% endif %}
+{% else %}
+relayhost =
+{% endif %}
+
+# TLS — outbound
+{% if mail_tls_enabled %}
+smtp_use_tls = yes
+smtp_tls_security_level = {{ mail_tls_security_level }}
+{% if mail_tls_cert_file %}
+smtp_tls_cert_file = {{ mail_tls_cert_file }}
+smtp_tls_key_file = {{ mail_tls_key_file }}
+{% endif %}
+smtp_tls_loglevel = 1
+smtp_tls_session_cache_database = btree:${data_directory}/smtp_scache
+
+# TLS — inbound
+smtpd_use_tls = yes
+smtpd_tls_security_level = {{ mail_tls_security_level }}
+{% if mail_tls_cert_file %}
+smtpd_tls_cert_file = {{ mail_tls_cert_file }}
+smtpd_tls_key_file = {{ mail_tls_key_file }}
+{% endif %}
+smtpd_tls_session_cache_database = btree:${data_directory}/smtpd_scache
+smtpd_tls_loglevel = 1
+smtpd_tls_received_header = yes
+smtpd_tls_auth_only = yes
+{% else %}
+smtp_use_tls = no
+smtpd_use_tls = no
+{% endif %}
+
+# Milter (DKIM + amavisd)
+{% if mail_dkim_enabled %}
+milter_default_action = accept
+milter_protocol = 6
+smtpd_milters = inet:localhost:8891
+non_smtpd_milters = inet:localhost:8891
+{% endif %}
+
+# Amavis content filter
+{% if mail_spamassassin_enabled or mail_clamav_enabled %}
+content_filter = smtp-amavis:[127.0.0.1]:10024
+{% endif %}
+
+# Limits
+message_size_limit = {{ mail_message_size_limit }}
+mailbox_size_limit = {{ mail_mailbox_size_limit }}
+
+# Queue and retry
+queue_run_delay = 300s
+maximal_queue_lifetime = 5d
+bounce_queue_lifetime = 5d
+
+# SMTP restrictions
+smtpd_recipient_restrictions =
+    permit_mynetworks,
+    permit_sasl_authenticated,
+    reject_unauth_destination
+
+# Anti-relay policy (BUG-124): postfix >= 2.10 REQUIRES an anti-relay
+# directive in smtpd_relay_restrictions — without one smtpd exits fatally on
+# every connection (no banner, master throttling; the server never serves).
+mynetworks = {{ mail_mynetworks | join(', ') }}
+smtpd_relay_restrictions = permit_mynetworks, permit_sasl_authenticated, reject_unauth_destination
+
+# Postmaster
+notify_classes = resource, software
+
+# Logging
+maillog_file = /dev/stdout

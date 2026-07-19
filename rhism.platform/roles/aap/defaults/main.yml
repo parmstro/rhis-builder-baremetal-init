@@ -1,0 +1,649 @@
+---
+# ===========================================================================
+# rhism.platform.aap — Red Hat Ansible Automation Platform full-lifecycle role.
+#
+# Product role, standalone-first, FULLY SELF-CONTAINED (owner decision
+# 2026-07-15: no include_role of awx_config or awx — code duplication with the
+# OSS awx role's config engine is traded for product independence). Installs
+# AAP with RED HAT'S OWN installer (never reimplemented — the role generates
+# the installer inventory / operator CR from these vars and invokes the
+# installer), then configures it with its OWN config-as-code engine (the
+# tasks/config_*.yml files) and provides day-2 operations. Distinct from the
+# OSS `awx` role (supported-vs-OSS, the freeipa/rh_idm parallel) and from
+# `aap_config_as_code` (a separate migration/extract-transform-import role).
+#
+# T-SHIRT SIZING NOTE: controller/hub/gateway/eda/db node RAM/CPU/disk minimums
+# are per-host group_vars concerns under the platform's additive t-shirt sizing
+# model — they are NOT baked into this role. Set them in inventory group_vars.
+# ===========================================================================
+
+# Which action to run:
+#   install | configure | baseline | backup | restore | upgrade | status
+action: install
+
+# ---------------------------------------------------------------------------
+# Version + install method
+# ---------------------------------------------------------------------------
+# Supported AAP versions — a version profile is loaded from
+# vars/versions/<aap_version>.yml at role entry.
+aap_version: "2.5"                         # choices: 2.4 | 2.5 | 2.6 | 2.7
+
+# How AAP is deployed:
+#   containerized — Red Hat's podman-based containerized installer (default).
+#   openshift     — the AAP Operator + AnsibleAutomationPlatform CR on OCP.
+# (The RPM/bundle setup.sh path is intentionally not supported — RPM install is
+# being obsoleted platform-wide.)
+aap_install_method: containerized          # choices: containerized | openshift
+
+# Dry-run gate. When false (default), install/backup/restore/upgrade RENDER the
+# installer inventory / operator CR and validate the contract, but do NOT invoke
+# the real Red Hat installer. Set true on an entitled host to run for real.
+aap_execute: false
+
+# ---------------------------------------------------------------------------
+# RHSM entitlement (reuses the rhel_subscription role)
+# ---------------------------------------------------------------------------
+# Register target hosts with RHSM before install. Set false if hosts are already
+# entitled (e.g. Satellite-managed).
+aap_manage_subscription: true
+# Subscription manifest for the controller (uploaded post-install). no_log.
+aap_manifest_path: ""
+
+# ---------------------------------------------------------------------------
+# Installer inventory — host groups (containerized method)
+# ---------------------------------------------------------------------------
+# Which target hosts fill each installer group. Empty by default (standalone
+# render still produces a valid, if empty, inventory the contract test exercises).
+aap_controller_hosts: []                   # automationcontroller group
+aap_hub_hosts: []                          # automationhub group
+aap_eda_hosts: []                          # automationeda group
+aap_gateway_hosts: []                      # automationgateway group (2.5+ only)
+aap_database_host: ""                       # database group (single host)
+
+# Installer all:vars — admin + database + registry credentials.
+aap_admin_password: ""                      # platform/controller admin password. no_log.
+aap_pg_username: "admin"                    # postgresql_admin_username
+aap_pg_password: ""                         # postgresql_admin_password. no_log.
+aap_pg_port: 5432
+# Red Hat registry credentials for containerized image pull (registry.redhat.io).
+aap_registry_host: "registry.redhat.io"
+aap_registry_username: ""                   # no_log
+aap_registry_password: ""                   # no_log
+
+# ---------------------------------------------------------------------------
+# OpenShift method (aap_install_method: openshift)
+# ---------------------------------------------------------------------------
+aap_openshift_namespace: "aap"
+aap_operator_channel: ""                    # "" -> version profile default channel
+aap_openshift_cr_name: "aap"               # metadata.name of the AAP CR
+
+# ---------------------------------------------------------------------------
+# configure / status — controller API connection
+# ---------------------------------------------------------------------------
+aap_controller_host: ""                     # https://controller.example.com (URL)
+aap_admin_user: "admin"                     # controller admin username
+# Config section to run, or `baseline` for all enabled sections (aap_apply_*):
+#   organization | credentials | projects | inventories | templates |
+#   workflows | schedules | baseline
+aap_configure_action: baseline
+aap_validate_certs: true
+aap_api_timeout: 60
+
+# ---------------------------------------------------------------------------
+# Work directory — where the installer inventory / operator CR is rendered.
+# Repo-confined (output/ is gitignored). Overridden to a scratch dir in tests.
+# ---------------------------------------------------------------------------
+aap_work_dir: "{{ playbook_dir }}/../output/aap"
+
+# ===========================================================================
+# CONFIG-AS-CODE (action: configure / baseline) — aap's OWN engine.
+#
+# Internalised 2026-07-15 (owner decision): aap must be fully self-contained —
+# it does NOT include_role awx_config (or awx). The duplication with the OSS
+# awx role's config engine is explicitly traded for product independence.
+# Variable map applied at internalisation: awx_host→aap_controller_host,
+# awx_username→aap_admin_user, awx_password→aap_admin_password,
+# awx_validate_certs→aap_validate_certs, awx_request_timeout→aap_api_timeout,
+# awx_apply_*→aap_apply_*, and every awx_* content var → aap_*.
+#
+# The awx.awx module FQCNs in tasks/config_*.yml are the API CLIENT for the
+# AAP controller, not a role dependency. Recorded future path: the certified
+# infra.aap_configuration / gateway collections (open Hub/EDA decision).
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# Baseline orchestrator toggles (aap_configure_action: baseline)
+# ---------------------------------------------------------------------------
+aap_apply_organization: true
+aap_apply_credentials: true
+aap_apply_projects: true
+aap_apply_inventories: true
+aap_apply_execution_environments: true
+aap_apply_templates: true
+aap_apply_workflows: true
+aap_apply_schedules: true
+
+# ---------------------------------------------------------------------------
+# Organization (aap_configure_action: organization)
+# ---------------------------------------------------------------------------
+aap_organization: rhism
+aap_organization_description: rhism automation platform
+
+aap_teams:
+  - name: platform-ops
+    description: Platform operations — infrastructure and security
+  - name: network-ops
+    description: Network operations — fabric and device management
+  - name: windows-ops
+    description: Windows server management
+
+# ---------------------------------------------------------------------------
+# Credentials (aap_configure_action: credentials)
+# ---------------------------------------------------------------------------
+
+# Credential types — custom types beyond the controller built-ins
+aap_credential_types:
+  - name: CMDB PostgreSQL
+    kind: cloud
+    inputs:
+      fields:
+        - id: cmdb_db_host
+          label: Database host
+          type: string
+        - id: cmdb_db_port
+          label: Database port
+          type: string
+          default: "5432"
+        - id: cmdb_db_name
+          label: Database name
+          type: string
+        - id: cmdb_db_user
+          label: Database user
+          type: string
+        - id: cmdb_db_password
+          label: Database password
+          type: string
+          secret: true
+      required:
+        - cmdb_db_host
+        - cmdb_db_name
+        - cmdb_db_user
+        - cmdb_db_password
+    injectors:
+      extra_vars:
+        cmdb_db_host: "{% raw %}{{ cmdb_db_host }}{% endraw %}"
+        cmdb_db_port: "{% raw %}{{ cmdb_db_port }}{% endraw %}"
+        cmdb_db_name: "{% raw %}{{ cmdb_db_name }}{% endraw %}"
+        cmdb_db_user: "{% raw %}{{ cmdb_db_user }}{% endraw %}"
+        cmdb_db_password: "{% raw %}{{ cmdb_db_password }}{% endraw %}"
+
+  - name: ITSM ServiceNow
+    kind: cloud
+    inputs:
+      fields:
+        - id: itsm_snow_host
+          label: ServiceNow instance
+          type: string
+        - id: itsm_snow_user
+          label: Username
+          type: string
+        - id: itsm_snow_password
+          label: Password
+          type: string
+          secret: true
+      required:
+        - itsm_snow_host
+        - itsm_snow_user
+        - itsm_snow_password
+    injectors:
+      extra_vars:
+        itsm_snow_host: "{% raw %}{{ itsm_snow_host }}{% endraw %}"
+        itsm_snow_user: "{% raw %}{{ itsm_snow_user }}{% endraw %}"
+        itsm_snow_password: "{% raw %}{{ itsm_snow_password }}{% endraw %}"
+
+# Credentials — actual credential instances
+aap_credentials:
+  - name: GitLab SCM
+    credential_type: Source Control
+    inputs:
+      ssh_key_data: "{{ aap_scm_ssh_key | default('') }}"
+    description: SSH key for the platform's GitLab group repos
+
+  - name: Linux Machine
+    credential_type: Machine
+    inputs:
+      username: "{{ aap_linux_user | default('ansible') }}"
+      ssh_key_data: "{{ aap_linux_ssh_key | default('') }}"
+      become_method: sudo
+    description: SSH credential for Linux targets
+
+  - name: Windows Machine
+    credential_type: Machine
+    inputs:
+      username: "{{ aap_windows_user | default('ansible') }}"
+      password: "{{ aap_windows_password | default('') }}"
+    description: WinRM credential for Windows targets
+
+  - name: Ansible Vault
+    credential_type: Vault
+    inputs:
+      vault_password: "{{ aap_vault_password | default('') }}"
+    description: Vault password for encrypted variables
+
+# Sensitive values — expected from vault
+aap_scm_ssh_key: ""
+aap_linux_user: ansible
+aap_linux_ssh_key: ""
+aap_windows_user: ansible
+aap_windows_password: ""
+aap_vault_password: ""
+
+# ---------------------------------------------------------------------------
+# Projects (aap_configure_action: projects)
+# ---------------------------------------------------------------------------
+aap_scm_url_base: "git@gitlab.example.com:platform"
+aap_scm_branch: main
+aap_scm_credential: GitLab SCM
+# Seconds to wait for each project's initial SCM sync to complete.
+aap_project_sync_timeout: 120
+
+aap_projects:
+  - name: ansible_galaxy
+    description: Orchestration repo — playbooks, inventory, CI
+    scm_url: "{{ aap_scm_url_base }}/ansible_galaxy.git"
+    scm_branch: "{{ aap_scm_branch }}"
+
+  - name: cmdb
+    description: CMDB role with Flask API backend
+    scm_url: "{{ aap_scm_url_base }}/roles/ansible-role-cmdb.git"
+    scm_branch: "{{ aap_scm_branch }}"
+
+  - name: linux_security
+    description: Linux security orchestrator (6 sub-roles)
+    scm_url: "{{ aap_scm_url_base }}/roles/ansible-role-linux_security.git"
+    scm_branch: "{{ aap_scm_branch }}"
+
+  - name: container_security
+    description: Container image security pipeline
+    scm_url: "{{ aap_scm_url_base }}/roles/ansible-role-container_security.git"
+    scm_branch: "{{ aap_scm_branch }}"
+
+  - name: risk_assessment
+    description: ISO 45001 risk assessment on CMDB data
+    scm_url: "{{ aap_scm_url_base }}/roles/ansible-role-risk_assessment.git"
+    scm_branch: "{{ aap_scm_branch }}"
+
+  - name: itsm_integration
+    description: Pull-first ITSM integration (ServiceNow, Jira, Zendesk)
+    scm_url: "{{ aap_scm_url_base }}/roles/ansible-role-itsm_integration.git"
+    scm_branch: "{{ aap_scm_branch }}"
+
+  - name: vm_provisioning
+    description: Hypervisor-agnostic VM provisioning from gold images
+    scm_url: "{{ aap_scm_url_base }}/roles/ansible-role-vm_provisioning.git"
+    scm_branch: "{{ aap_scm_branch }}"
+
+  - name: windows_management
+    description: Windows Chocolatey, hardening, monitoring, maintenance
+    scm_url: "{{ aap_scm_url_base }}/roles/ansible-role-windows_management.git"
+    scm_branch: "{{ aap_scm_branch }}"
+
+  - name: arista
+    description: Arista EOS network management
+    scm_url: "{{ aap_scm_url_base }}/roles/ansible-role-arista.git"
+    scm_branch: "{{ aap_scm_branch }}"
+
+  - name: netverse
+    description: Multi-vendor network fabric builder
+    scm_url: "{{ aap_scm_url_base }}/roles/ansible-role-netverse.git"
+    scm_branch: "{{ aap_scm_branch }}"
+
+  - name: postgres_guardian
+    description: PostgreSQL guardian for AAP
+    scm_url: "{{ aap_scm_url_base }}/roles/ansible-role-postgres_guardian.git"
+    scm_branch: "{{ aap_scm_branch }}"
+
+# ---------------------------------------------------------------------------
+# Inventories (aap_configure_action: inventories)
+# ---------------------------------------------------------------------------
+aap_inventories:
+  - name: dev
+    description: Development environment
+    variables:
+      env: dev
+
+  - name: prod
+    description: Production environment
+    variables:
+      env: prod
+
+  - name: test
+    description: Test environment
+    variables:
+      env: test
+
+# Inventory sources — SCM-based or custom scripts
+aap_inventory_sources:
+  - name: dev-constructed
+    inventory: dev
+    source: scm
+    source_project: ansible_galaxy
+    source_path: inventories/inventory/02_constructed.yml
+    overwrite: true
+    update_on_launch: true
+
+# ---------------------------------------------------------------------------
+# Job templates (aap_configure_action: templates)
+# ---------------------------------------------------------------------------
+aap_execution_environment: Default execution environment
+
+# Custom execution environments to register (config_execution_environments.yml,
+# runs before job templates so a template can reference one). Each item:
+# {name, image, description?, pull?, organization?, credential?}.
+aap_execution_environments: []
+
+aap_job_templates:
+  # ── CMDB ──
+  - name: "CMDB — Deploy"
+    project: ansible_galaxy
+    playbook: playbooks/cmdb.yml
+    inventory: dev
+    credentials:
+      - Linux Machine
+      - Ansible Vault
+    extra_vars:
+      cmdb_action: deploy
+    description: Deploy CMDB schema, API, and seed data
+
+  - name: "CMDB — Identity Sync"
+    project: ansible_galaxy
+    playbook: playbooks/cmdb.yml
+    inventory: dev
+    credentials:
+      - Linux Machine
+      - Ansible Vault
+    extra_vars:
+      cmdb_action: identity_sync
+    description: Sync FreeIPA/AD groups + members into the CMDB (identity_groups/group_members)
+
+  - name: "CMDB — Curate"
+    project: ansible_galaxy
+    playbook: playbooks/cmdb.yml
+    inventory: dev
+    credentials:
+      - Linux Machine
+      - Ansible Vault
+    extra_vars:
+      cmdb_action: curate
+    description: Upsert curated entities incl. ci_group_roles (run after identity_sync — needs synced groups)
+
+  # ── Monitoring ──
+  - name: "Monitoring — Stack Baseline"
+    project: ansible_galaxy
+    playbook: playbooks/monitoring_stack.yml
+    inventory: dev
+    credentials:
+      - Linux Machine
+      - Ansible Vault
+    extra_vars:
+      mon_action: baseline
+    description: Deploy the enabled monitoring products (Nagios/Splunk/Elastic/EDA) via the mon_apply_* toggles
+
+  # ── Event response (EDA-triggered remediation) ──
+  - name: "Event Response — Diagnose Host"
+    project: ansible_galaxy
+    playbook: playbooks/event_response.yml
+    inventory: dev
+    credentials:
+      - Linux Machine
+      - Ansible Vault
+    extra_vars:
+      event_action: diagnose_host
+    description: Run host diagnostics (safe default action); other event_action values wired via EDA rulebooks/survey
+
+  # ── Linux security ──
+  - name: "Linux Security — Baseline"
+    project: ansible_galaxy
+    playbook: playbooks/linux_security.yml
+    inventory: dev
+    credentials:
+      - Linux Machine
+      - Ansible Vault
+    description: Full Linux security baseline (packages, hardening, auditing, users, SELinux)
+
+  # ── Container security ──
+  - name: "Container Security — Pipeline"
+    project: ansible_galaxy
+    playbook: playbooks/container_security.yml
+    inventory: dev
+    credentials:
+      - Linux Machine
+      - Ansible Vault
+    extra_vars:
+      container_security_action: pipeline
+    description: Full container security pipeline (scan, assess, treat, rebuild, verify)
+
+  # ── Risk assessment ──
+  - name: "Risk Assessment — Report"
+    project: ansible_galaxy
+    playbook: playbooks/risk_assessment.yml
+    inventory: dev
+    credentials:
+      - Linux Machine
+      - Ansible Vault
+    extra_vars:
+      risk_action: report
+    description: Generate risk assessment report from CMDB data
+
+  # ── ITSM sync ──
+  - name: "ITSM — Sync Incidents"
+    project: ansible_galaxy
+    playbook: playbooks/itsm.yml
+    inventory: dev
+    credentials:
+      - Linux Machine
+      - Ansible Vault
+    extra_vars:
+      itsm_action: import_incidents
+    description: Import incidents from configured ITSM platform
+
+  - name: "ITSM — Sync Changes"
+    project: ansible_galaxy
+    playbook: playbooks/itsm.yml
+    inventory: dev
+    credentials:
+      - Linux Machine
+      - Ansible Vault
+    extra_vars:
+      itsm_action: import_changes
+    description: Import change requests from configured ITSM platform
+
+  - name: "ITSM — Link CIs"
+    project: ansible_galaxy
+    playbook: playbooks/itsm.yml
+    inventory: dev
+    credentials:
+      - Linux Machine
+      - Ansible Vault
+    extra_vars:
+      itsm_action: link_cis
+    description: Auto-link CMDB CIs to imported ITSM issues
+
+  # ── VM provisioning ──
+  - name: "VM — Provision"
+    project: ansible_galaxy
+    playbook: playbooks/vm_provision.yml
+    inventory: dev
+    credentials:
+      - Linux Machine
+      - Ansible Vault
+    ask_variables_on_launch: true
+    description: Create VM from gold image (pass vm_name, vm_gold_image, vm_hypervisor)
+
+  - name: "VM — Gold Image Patch"
+    project: ansible_galaxy
+    playbook: playbooks/vm_gold_image.yml
+    inventory: dev
+    credentials:
+      - Linux Machine
+      - Ansible Vault
+    extra_vars:
+      vm_action: gold_patch
+    ask_variables_on_launch: true
+    description: Patch gold images (pass vm_gold_image, vm_gold_image_execute)
+
+  # ── Windows management ──
+  - name: "Windows — Baseline"
+    project: ansible_galaxy
+    playbook: playbooks/windows_management.yml
+    inventory: dev
+    credentials:
+      - Windows Machine
+      - Ansible Vault
+    description: Full Windows baseline (packages, hardening, monitoring, maintenance)
+
+  # ── Network ──
+  - name: "Arista — Facts"
+    project: ansible_galaxy
+    playbook: playbooks/arista.yml
+    inventory: dev
+    credentials:
+      - Linux Machine
+    extra_vars:
+      arista_action: facts
+    description: Collect Arista EOS facts
+
+  - name: "Netverse — Build Configs"
+    project: ansible_galaxy
+    playbook: playbooks/netverse.yml
+    inventory: dev
+    credentials:
+      - Linux Machine
+    extra_vars:
+      netverse_action: build_configs
+    description: Build network fabric configurations
+
+  # ── PostgreSQL ──
+  - name: "PostgreSQL — Backup"
+    project: ansible_galaxy
+    playbook: playbooks/postgres_guardian.yml
+    inventory: dev
+    credentials:
+      - Linux Machine
+      - Ansible Vault
+    extra_vars:
+      pg_guardian_action: backup
+    description: PostgreSQL backup via postgres_guardian role
+
+# ---------------------------------------------------------------------------
+# Workflow templates (aap_configure_action: workflows)
+# ---------------------------------------------------------------------------
+aap_workflow_templates:
+  - name: "ITSM Full Sync"
+    description: Import incidents + changes from ITSM, then auto-link CIs
+    nodes:
+      - identifier: import_incidents
+        unified_job_template: "ITSM — Sync Incidents"
+        success_nodes:
+          - link_cis
+      - identifier: import_changes
+        unified_job_template: "ITSM — Sync Changes"
+        success_nodes:
+          - link_cis
+      - identifier: link_cis
+        unified_job_template: "ITSM — Link CIs"
+        all_parents_must_converge: true
+
+  - name: "Security Posture Refresh"
+    description: Linux security baseline + container scan + risk report
+    nodes:
+      - identifier: linux_security
+        unified_job_template: "Linux Security — Baseline"
+        success_nodes:
+          - risk_report
+      - identifier: container_security
+        unified_job_template: "Container Security — Pipeline"
+        success_nodes:
+          - risk_report
+      - identifier: risk_report
+        unified_job_template: "Risk Assessment — Report"
+        all_parents_must_converge: true
+
+  - name: "VM Provision + Harden"
+    description: Create VM then apply security baseline
+    nodes:
+      - identifier: provision
+        unified_job_template: "VM — Provision"
+        success_nodes:
+          - harden_linux
+          - harden_windows
+      - identifier: harden_linux
+        unified_job_template: "Linux Security — Baseline"
+      - identifier: harden_windows
+        unified_job_template: "Windows — Baseline"
+
+  - name: "Daily Operations"
+    description: ITSM sync + risk report + PostgreSQL backup
+    nodes:
+      - identifier: itsm_sync_incidents
+        unified_job_template: "ITSM — Sync Incidents"
+      - identifier: itsm_sync_changes
+        unified_job_template: "ITSM — Sync Changes"
+      - identifier: link_cis
+        unified_job_template: "ITSM — Link CIs"
+        all_parents_must_converge: true
+      - identifier: risk_report
+        unified_job_template: "Risk Assessment — Report"
+      - identifier: pg_backup
+        unified_job_template: "PostgreSQL — Backup"
+
+  - name: "Identity Refresh"
+    description: Nightly IdM sync into CMDB, then curate (ci_group_roles need synced groups)
+    nodes:
+      - identifier: identity_sync
+        unified_job_template: "CMDB — Identity Sync"
+      - identifier: curate
+        unified_job_template: "CMDB — Curate"
+        all_parents_must_converge: true
+
+# ---------------------------------------------------------------------------
+# Schedules (aap_configure_action: schedules)
+# ---------------------------------------------------------------------------
+aap_schedules:
+  - name: "ITSM Sync — Every 4 Hours"
+    unified_job_template: "ITSM Full Sync"
+    rrule: "DTSTART:20260101T000000Z RRULE:FREQ=HOURLY;INTERVAL=4"
+    enabled: true
+
+  - name: "Daily Operations — 02:00 UTC"
+    unified_job_template: "Daily Operations"
+    rrule: "DTSTART:20260101T020000Z RRULE:FREQ=DAILY;INTERVAL=1"
+    enabled: true
+
+  - name: "Security Posture — Weekly Sunday 03:00 UTC"
+    unified_job_template: "Security Posture Refresh"
+    rrule: "DTSTART:20260105T030000Z RRULE:FREQ=WEEKLY;BYDAY=SU"
+    enabled: true
+
+  - name: "PostgreSQL Backup — Daily 01:00 UTC"
+    unified_job_template: "PostgreSQL — Backup"
+    rrule: "DTSTART:20260101T010000Z RRULE:FREQ=DAILY;INTERVAL=1"
+    enabled: true
+
+  - name: "Gold Image Patch — Monthly First Sunday 04:00 UTC"
+    unified_job_template: "VM — Gold Image Patch"
+    rrule: "DTSTART:20260104T040000Z RRULE:FREQ=MONTHLY;BYDAY=1SU"
+    enabled: true
+    extra_data:
+      vm_gold_image: all
+      vm_gold_image_execute: true
+
+  - name: "Identity Refresh — Nightly 00:30 UTC"
+    unified_job_template: "Identity Refresh"
+    rrule: "DTSTART:20260101T003000Z RRULE:FREQ=DAILY;INTERVAL=1"
+    enabled: true
+
+  - name: "Monitoring Baseline — Weekly Sunday 05:00 UTC"
+    unified_job_template: "Monitoring — Stack Baseline"
+    rrule: "DTSTART:20260105T050000Z RRULE:FREQ=WEEKLY;BYDAY=SU"
+    enabled: true

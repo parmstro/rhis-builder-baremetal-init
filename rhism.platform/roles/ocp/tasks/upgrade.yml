@@ -1,0 +1,18 @@
+---
+# Action: upgrade — trigger OCP cluster upgrade
+
+- name: Trigger upgrade to specified version
+  ansible.builtin.command:
+    cmd: "oc adm upgrade --to={{ cp_upgrade_version }}"
+  environment:
+    KUBECONFIG: "{{ _cp_kubeconfig_path }}"
+  changed_when: true
+  when: cp_upgrade_version | default('') | length > 0
+
+- name: Trigger upgrade to latest
+  ansible.builtin.command:
+    cmd: "oc adm upgrade --to-latest"
+  environment:
+    KUBECONFIG: "{{ _cp_kubeconfig_path }}"
+  changed_when: true
+  when: cp_upgrade_version | default('') | length == 0

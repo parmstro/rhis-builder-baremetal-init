@@ -1,0 +1,6 @@
+---
+- name: Configure content management ({{ content_type }})
+  ansible.builtin.include_role:
+    name: "{{ content_type }}"
+  vars:
+    action: configure

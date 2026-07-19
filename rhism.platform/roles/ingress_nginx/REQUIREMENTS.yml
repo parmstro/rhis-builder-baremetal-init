@@ -1,0 +1,75 @@
+---
+# Functional requirements — ingress_nginx (requirements->test-case layer +
+# Tier-3 elevation, wave-3+ standard). Product role in the ingress family (a user
+# picks exactly one of ingress_default/nginx/traefik/haproxy). Deploys the NGINX
+# ingress controller (ingress-nginx) via Helm and sets it as the default
+# IngressClass. Capability curated from README + meta/argument_specs.yml +
+# tasks/main.yml, grounded in the official ingress-nginx docs
+# (kubernetes.github.io/ingress-nginx). Family lab:
+# playbooks/container_platform.yml (cp_ingress_type: nginx).
+functional_requirements:
+  - req_id: INGRESS_NGINX-FR-001
+    statement: >-
+      The role SHALL enforce the shared ingress interface (action in
+      ingress/present/absent, cp_* vars) via meta/argument_specs.yml and reject
+      an invalid action (negative test).
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: INGRESS_NGINX-FR-002
+    statement: >-
+      The role SHALL honour the cp_ingress_execute dry-run gate — validating
+      dispatch and the variable contract without touching the cluster.
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: INGRESS_NGINX-FR-003
+    statement: >-
+      On action present, the role SHALL deploy the NGINX ingress controller via
+      the ingress-nginx Helm chart into the ingress-nginx namespace with
+      cp_ingress_replicas replicas.
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#ingress
+
+  - req_id: INGRESS_NGINX-FR-004
+    statement: >-
+      The role SHALL register the NGINX IngressClass as the cluster default
+      (controller.ingressClassResource.default).
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#ingress
+
+  - req_id: INGRESS_NGINX-FR-005
+    statement: >-
+      The role SHALL expose the NGINX controller through a LoadBalancer-type
+      Service (requiring a cloud LB, MetalLB, or ServiceLB provider).
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#ingress
+
+  - req_id: INGRESS_NGINX-FR-006
+    statement: >-
+      When cp_ingress_ssl_passthrough is true, the role SHALL enable NGINX SSL
+      passthrough (ssl-passthrough config) — off by default and not exercised by
+      the default-values lab run.
+    tier: 3
+    verified_by: []
+
+  - req_id: INGRESS_NGINX-FR-007
+    statement: >-
+      The deployed controller SHALL terminate TLS for Ingress-defined hosts from
+      their referenced Secrets — a product capability beyond the role's deploy
+      path, exercised only against a real workload.
+    tier: 3
+    verified_by: []
+
+  - req_id: INGRESS_NGINX-FR-008
+    statement: >-
+      On action absent, the role SHALL remove the NGINX Helm release and the
+      ingress-nginx namespace.
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#ingress-absent

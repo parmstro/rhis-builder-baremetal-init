@@ -1,0 +1,10 @@
+---
+# pm_vault — stop action.
+# Stops the Vault systemd service gracefully.
+
+- name: Stop Vault service
+  ansible.builtin.service:
+    name: vault
+    state: stopped
+  become: true
+  when: pm_vault_manage_service | bool

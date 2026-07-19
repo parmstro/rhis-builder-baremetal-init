@@ -1,0 +1,33 @@
+---
+# Apply the rhism governed-estate AAP Config-as-Code (day-1 build workflow_job_template
+# + its per-capability jobs) to the control plane, via rhism's own vendored `aap`
+# role config engine (awx.awx API client). Model -> test -> efficacy pathway
+# (docs/aap-demo-estate-design.md):
+#   model    = vars/estate_cac.yml (the CaC — jobs + the day-1 build workflow DAG)
+#   test     = this apply + launching the workflow on the AWX/AAP control plane
+#   efficacy = the workflow DAG executes the jobs in dependency order and converges
+#              on the security node; product deploys run aap/execute-gated (real
+#              full IdM/Satellite/AAP deploy is Tier-3 on subscribed hosts; tang
+#              deploys for real as a container).
+#
+# Control-plane connection (aap_controller_host / aap_admin_user / aap_admin_password
+# / aap_validate_certs) is supplied at apply time (the live AWX fixture, or a real
+# AAP once installed). Nothing here is secret; creds come from the environment/vault.
+- name: Apply the rhism governed-estate AAP config-as-code
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    # sibling file relative to THIS playbook — playbook_dir is the correct magic
+    # var here (resolves to this playbook's own directory at run time).
+    - "{{ playbook_dir }}/vars/estate_cac.yml"
+  tasks:
+    - name: Configure the control plane (org, project, inventory, jobs, day-1 workflow)
+      ansible.builtin.include_role:
+        name: rhism.platform.aap
+      vars:
+        # The aap role dispatches on the bare `action` var (tasks/main.yml:
+        # include_tasks "{{ action }}.yml"); it does NOT read `aap_action`.
+        # Passing aap_action here left action at its default (install) and ran
+        # the RHSM/installer path instead of configure (BUG-187).
+        action: configure
+        aap_configure_action: baseline

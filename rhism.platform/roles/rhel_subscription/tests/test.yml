@@ -1,0 +1,36 @@
+---
+# Example functional playbooks for rhel_subscription — real usage references, distinct
+# from molecule/ (mechanical role validation) and from this orchestration repo's own
+# playbooks/ directory (the real, committed production playbooks). Run against a real
+# host with `ansible-playbook -i tests/inventory tests/test.yml`.
+
+- name: Example — register via activation key (the previous default across 5 duplicated callers)
+  hosts: localhost
+  become: true
+  vars:
+    rhel_subscription_action: register
+    rhel_subscription_method: activation_key
+    rhel_subscription_org_id: "{{ lookup('env', 'RHSM_ORG_ID') }}"
+    rhel_subscription_activation_key: "{{ lookup('env', 'RHSM_ACTIVATION_KEY') }}"
+  roles:
+    - rhel_subscription
+
+- name: Example — register via username/password
+  hosts: localhost
+  become: true
+  vars:
+    rhel_subscription_action: register
+    rhel_subscription_method: username_password
+    rhel_subscription_username: "{{ lookup('env', 'RHSM_USERNAME') }}"
+    rhel_subscription_password: "{{ lookup('env', 'RHSM_PASSWORD') }}"
+    rhel_subscription_auto_attach: true
+  roles:
+    - rhel_subscription
+
+- name: Example — unregister
+  hosts: localhost
+  become: true
+  vars:
+    rhel_subscription_action: unregister
+  roles:
+    - rhel_subscription

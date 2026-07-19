@@ -1,0 +1,31 @@
+---
+- name: Select backup system
+  ansible.builtin.command:
+    cmd: >-
+      {{ wizard_tui_backend }} --title "{{ wizard_tui_title }}"
+      --radiolist "Select backup system:" {{ wizard_tui_height }} {{ wizard_tui_width }} 3
+      "bareos" "Bareos (deploy server + clients, enterprise backup)" ON
+      "restic" "restic (lightweight agent-only, no server needed)"   OFF
+      "none"   "None — use existing backup solution"                 OFF
+      3>&1 1>&2 2>&3
+  register: _wizard_backup_result
+  changed_when: false
+  failed_when: _wizard_backup_result.rc not in [0, 1]
+  tags: infra_wizard
+
+- name: Handle backup cancel
+  ansible.builtin.fail:
+    msg: "Wizard cancelled by user at backup selection."
+  when: _wizard_backup_result.rc == 1
+  tags: infra_wizard
+
+- name: Record backup choice
+  ansible.builtin.set_fact:
+    wizard_components: >-
+      {{ wizard_components | combine({
+        'backup': {
+          'enabled': (_wizard_backup_result.stdout | trim) != 'none',
+          'type': _wizard_backup_result.stdout | trim
+        }
+      }) }}
+  tags: infra_wizard

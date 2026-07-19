@@ -1,0 +1,34 @@
+---
+# roles/pm_vault/tasks/main.yml
+# Standalone dispatcher. Set pm_vault_action directly OR call via password_management
+# (which passes action= via vars — bridged below).
+
+- name: Resolve effective action
+  ansible.builtin.set_fact:
+    _pm_vault_action: "{{ pm_vault_action if pm_vault_action | length > 0 else (action | default('')) }}"
+
+- name: Validate pm_vault_action
+  ansible.builtin.assert:
+    that:
+      - _pm_vault_action | length > 0
+      - >-
+        _pm_vault_action in [
+          'install', 'configure', 'start', 'stop', 'remove', 'baseline',
+          'create', 'read', 'delete', 'audit', 'rotate'
+        ]
+    fail_msg: >-
+      pm_vault_action must be one of:
+      install, configure, start, stop, remove, baseline (server ops)
+      create, read, delete, audit, rotate (secret ops).
+      Got: '{{ _pm_vault_action }}'
+
+- name: Resolve KV path (for secret operations)
+  ansible.builtin.set_fact:
+    _pm_vault_kv_path: "{{ pm_vault_path if pm_vault_path | length > 0 else 'password_management/' ~ pm_target }}"
+  when: _pm_vault_action in ['create', 'read', 'delete', 'audit', 'rotate']
+
+- name: "pm_vault — {{ _pm_vault_action }}"
+  ansible.builtin.include_tasks: "{{ _pm_vault_action }}.yml"
+  # Dry-run gate (shared family variable — see pm_ansible/pm_thycotic): validation
+  # above still runs; only the actual server/secret dispatch is skipped.
+  when: pm_execute | default(true) | bool

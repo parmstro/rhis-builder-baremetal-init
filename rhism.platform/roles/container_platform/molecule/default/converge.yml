@@ -1,0 +1,115 @@
+---
+- name: Converge — k3s baseline no-op (dispatcher + var loading)
+  hosts: all
+  gather_facts: false
+  vars:
+    cp_action: baseline
+    cp_type: k3s
+    cp_apply_install: false
+    cp_apply_configure: false
+    cp_apply_storage: false
+    cp_apply_registry: false
+    cp_apply_ingress: false
+  roles:
+    - role: rhism.platform.container_platform
+
+- name: Converge — rke2 baseline no-op
+  hosts: all
+  gather_facts: false
+  vars:
+    cp_action: baseline
+    cp_type: rke2
+    cp_apply_install: false
+    cp_apply_configure: false
+    cp_apply_storage: false
+    cp_apply_registry: false
+    cp_apply_ingress: false
+  roles:
+    - role: rhism.platform.container_platform
+
+- name: Converge — okd baseline no-op
+  hosts: all
+  gather_facts: false
+  vars:
+    cp_action: baseline
+    cp_type: okd
+    cp_apply_install: false
+    cp_apply_configure: false
+    cp_apply_storage: false
+    cp_apply_registry: false
+    cp_apply_ingress: false
+  roles:
+    - role: rhism.platform.container_platform
+
+- name: Converge — ocp baseline no-op
+  hosts: all
+  gather_facts: false
+  vars:
+    cp_action: baseline
+    cp_type: ocp
+    cp_apply_install: false
+    cp_apply_configure: false
+    cp_apply_storage: false
+    cp_apply_registry: false
+    cp_apply_ingress: false
+    cp_rhsm_skip_registration: true
+  roles:
+    - role: rhism.platform.container_platform
+
+# No "k3s install dry-run" play here — k3s (and rke2) have no cp_install_execute
+# gate at all: present.yml's install-script task carries no when: condition
+# (it's a curl|sh installer guarded only by `creates:` for idempotency, not a
+# dry-run switch). cp_install_execute never matched anything k3s/rke2 actually
+# check — only okd/ocp's openshift-install path is fail-closed on it. k3s's
+# real install is already validated by its own Tier-2 functional scenario
+# (roles/k3s/molecule/functional/); the baseline no-op play above already
+# exercises container_platform's own dispatcher + variable-loading logic.
+
+- name: Converge — ocp install dry-run
+  hosts: all
+  gather_facts: false
+  vars:
+    cp_action: install
+    cp_type: ocp
+    cp_install_execute: false
+    cp_base_domain: example.com
+    cp_cluster_name: testcluster
+    cp_ssh_pub_key: "ssh-rsa AAAA test@example.com"
+    cp_pull_secret: '{"auths":{}}'
+    cp_rhsm_skip_registration: true
+  roles:
+    - role: rhism.platform.container_platform
+
+- name: Converge — negative test (bogus cp_action)
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Attempt bogus cp_action (must fail)
+      block:
+        - name: Call role with invalid action
+          ansible.builtin.include_role:
+            name: container_platform
+          vars:
+            cp_action: bogus_action
+            cp_type: k3s
+      rescue:
+        - name: Confirm expected failure was caught
+          ansible.builtin.debug:
+            msg: "PASS — bogus cp_action correctly rejected"
+
+- name: Converge — negative test (bogus cp_type)
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Attempt bogus cp_type (must fail)
+      block:
+        - name: Call role with invalid type
+          ansible.builtin.include_role:
+            name: container_platform
+          vars:
+            cp_action: baseline
+            cp_type: bogus_type
+      rescue:
+        - name: Confirm expected failure was caught
+          ansible.builtin.debug:
+            msg: "PASS — bogus cp_type correctly rejected"

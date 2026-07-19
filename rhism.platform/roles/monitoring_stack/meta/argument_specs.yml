@@ -1,0 +1,56 @@
+---
+argument_specs:
+  main:
+    short_description: >-
+      Monitoring stack dispatcher — Nagios Core, Splunk, Elastic, and EDA
+      rulebooks, individually or as a full baseline.
+    description: >-
+      Validates the dispatcher interface at role entry (ansible-core runs this
+      automatically — replaces the former hand-written assert). Product-specific
+      tunables (mon_nagios_*, mon_splunk_*, mon_elastic_*, mon_eda_*) are
+      documented in defaults/main.yml and the README; they pass through
+      unvalidated here to keep the spec at interface level.
+    options:
+      mon_action:
+        type: str
+        default: baseline
+        choices:
+          - nagios_server
+          - nagios_client
+          - splunk_server
+          - splunk_forwarder
+          - elastic_server
+          - elastic_agent
+          - eda_rulebooks
+          - baseline
+        description: >-
+          Which part of the stack to run. 'baseline' orchestrates every
+          component enabled by the mon_apply_* toggles below.
+      mon_apply_nagios_server:
+        type: bool
+        default: true
+        description: baseline only — include the Nagios Core server component.
+      mon_apply_nagios_client:
+        type: bool
+        default: true
+        description: baseline only — include the Nagios client (NRPE) component.
+      mon_apply_splunk_server:
+        type: bool
+        default: true
+        description: baseline only — include the Splunk server component.
+      mon_apply_splunk_forwarder:
+        type: bool
+        default: true
+        description: baseline only — include the Splunk universal forwarder.
+      mon_apply_elastic_server:
+        type: bool
+        default: true
+        description: baseline only — include the Elasticsearch/Kibana server.
+      mon_apply_elastic_agent:
+        type: bool
+        default: true
+        description: baseline only — include the Elastic agent component.
+      mon_apply_eda_rulebooks:
+        type: bool
+        default: true
+        description: baseline only — deploy the Event-Driven Ansible rulebooks.

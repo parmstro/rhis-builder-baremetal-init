@@ -1,0 +1,70 @@
+---
+# Functional requirements — storage_ocs (requirements->test-case layer + Tier-3
+# elevation, owner rules 2026-07-12). Product role in the container_platform
+# storage family (a user picks exactly one of storage_local_path/storage_nfs/
+# storage_longhorn/storage_ocs). Product capability fact-checked against the
+# official Red Hat OpenShift Data Foundation docs (access.redhat.com — ODF,
+# formerly OpenShift Container Storage/OCS: OLM operator install via Subscription
+# + OperatorGroup, StorageCluster CR, Ceph-backed block/file/object, worker-node
+# dedicated block devices). Curated against README + meta/argument_specs.yml
+# action set + tasks/main.yml. OCS is OpenShift-only and needs a real OCP/OKD
+# cluster with an ODF entitlement + dedicated raw devices — none in this
+# environment, so real-cluster behaviour is honestly UNCOVERED. Family lab:
+# playbooks/container_platform.yml (cp_type: ocp/okd, cp_storage_type: ocs).
+functional_requirements:
+  - req_id: STORAGE_OCS-FR-001
+    statement: >-
+      The role SHALL consume the shared container_platform storage interface
+      (bare action + cp_storage_* + cp_kubeconfig_path) and pass its contract
+      scenario — argument-spec validation, standalone default (action=storage),
+      dispatch for storage/present/absent, negative bad-action rejection, and the
+      cp_storage_execute dry-run gate — without a cluster.
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: STORAGE_OCS-FR-002
+    statement: >-
+      The role SHALL refuse to deploy unless cp_type is ocp or okd AND the
+      OCS-specific hard gate cp_ocs_install_execute is true (fail-closed default,
+      preventing an accidental cluster-wide OLM operator install).
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#storage-ocs
+
+  - req_id: STORAGE_OCS-FR-003
+    statement: >-
+      On deploy the role SHALL create the openshift-storage namespace, an
+      OperatorGroup scoped to it, and an ODF OLM Subscription from the
+      redhat-operators catalog source.
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#storage-ocs
+
+  - req_id: STORAGE_OCS-FR-004
+    statement: >-
+      The role SHALL wait for the ODF operator ClusterServiceVersion to reach the
+      Succeeded phase and then create the StorageCluster custom resource with the
+      configured device-set size (cp_storage_ocs_size) and backing StorageClass
+      (cp_storage_ocs_storage_class).
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#storage-ocs
+
+  - req_id: STORAGE_OCS-FR-005
+    statement: >-
+      Ceph-backed replicated block, file, and object storage SHALL come online
+      from the worker nodes' dedicated block devices — UNCOVERED: requires a real
+      OCP/OKD cluster with an ODF entitlement and dedicated raw devices, absent
+      from this environment.
+    tier: 3
+    verified_by: []
+
+  - req_id: STORAGE_OCS-FR-006
+    statement: >-
+      On action absent (gated on ocp/okd + cp_ocs_install_execute) the role SHALL
+      remove the StorageCluster CR, the ODF OLM Subscription, and the
+      openshift-storage namespace.
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#storage-ocs

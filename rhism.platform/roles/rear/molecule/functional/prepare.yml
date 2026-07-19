@@ -1,0 +1,15 @@
+---
+- name: Prepare
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Install sudo (for become) and EPEL (provides the rear package on EL9)
+      ansible.builtin.raw: dnf install -y sudo epel-release 2>/dev/null
+      changed_when: false
+
+    # ReaR needs these runtime helpers (cpio, ps/pidof, mount/losetup) to run at all.
+    # They ship in RHEL's @core on any real host but are stripped from the minimal
+    # container image — install them so the container looks like a normal EL9 system.
+    - name: Install ReaR runtime prerequisites present in @core on a real RHEL host
+      ansible.builtin.raw: dnf install -y cpio procps-ng util-linux 2>/dev/null
+      changed_when: false

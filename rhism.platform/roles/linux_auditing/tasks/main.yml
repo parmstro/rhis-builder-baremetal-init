@@ -1,0 +1,25 @@
+---
+- name: Validate linux_auditing_action
+  ansible.builtin.assert:
+    that:
+      - linux_auditing_action is defined
+      - linux_auditing_action in ['configure', 'verify', 'report', 'baseline']
+    fail_msg: >-
+      linux_auditing_action must be one of: configure | verify | report | baseline
+      (got '{{ linux_auditing_action | default("undefined") }}')
+
+- name: Configure auditd and deploy audit rules
+  ansible.builtin.include_tasks: configure.yml
+  when: linux_auditing_action == 'configure'
+
+- name: Verify audit rules and service state
+  ansible.builtin.include_tasks: verify.yml
+  when: linux_auditing_action == 'verify'
+
+- name: Generate audit event report
+  ansible.builtin.include_tasks: report.yml
+  when: linux_auditing_action == 'report'
+
+- name: Baseline — configure then verify then report
+  ansible.builtin.include_tasks: baseline.yml
+  when: linux_auditing_action == 'baseline'

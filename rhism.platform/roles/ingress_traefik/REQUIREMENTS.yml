@@ -1,0 +1,76 @@
+---
+# Functional requirements — ingress_traefik (requirements->test-case layer +
+# Tier-3 elevation, wave-3+ standard). Product role in the ingress family (a user
+# picks exactly one of ingress_default/nginx/traefik/haproxy). On k3s (Traefik is
+# the built-in controller) it tunes the existing install via HelmChartConfig; on
+# other platforms it deploys Traefik fresh via Helm as the default IngressClass.
+# Capability curated from README + meta/argument_specs.yml + tasks/main.yml,
+# grounded in the official Traefik docs (doc.traefik.io/traefik) and the k3s
+# HelmChartConfig docs. Family lab: playbooks/container_platform.yml
+# (cp_ingress_type: traefik, cp_type: k3s).
+functional_requirements:
+  - req_id: INGRESS_TRAEFIK-FR-001
+    statement: >-
+      The role SHALL enforce the shared ingress interface (action in
+      ingress/present/absent, cp_* vars) via meta/argument_specs.yml and reject
+      an invalid action (negative test).
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: INGRESS_TRAEFIK-FR-002
+    statement: >-
+      The role SHALL honour the cp_ingress_execute dry-run gate — validating
+      dispatch and the variable contract without touching the cluster.
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: INGRESS_TRAEFIK-FR-003
+    statement: >-
+      On k3s with action present, the role SHALL tune the built-in Traefik via a
+      HelmChartConfig (cp_ingress_replicas replicas, dashboard IngressRoute
+      disabled, ingress endpoint published via kube-system/traefik).
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#ingress
+
+  - req_id: INGRESS_TRAEFIK-FR-004
+    statement: >-
+      The role SHALL disable Traefik anonymous usage reporting
+      (--global.sendanonymoususage=false) on both the k3s and Helm paths.
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#ingress
+
+  - req_id: INGRESS_TRAEFIK-FR-005
+    statement: >-
+      On non-k3s platforms with action present, the role SHALL deploy Traefik via
+      the traefik Helm chart and set it as the default IngressClass — the family
+      lab runs on k3s, so this path is uncovered here.
+    tier: 3
+    verified_by: []
+
+  - req_id: INGRESS_TRAEFIK-FR-006
+    statement: >-
+      On the Helm (non-k3s) deployment the role SHALL enable both the Kubernetes
+      Ingress and the Kubernetes CRD (IngressRoute) providers — uncovered by the
+      k3s-only family lab.
+    tier: 3
+    verified_by: []
+
+  - req_id: INGRESS_TRAEFIK-FR-007
+    statement: >-
+      On action absent, the role SHALL remove the k3s HelmChartConfig (k3s) or the
+      Traefik Helm release and namespace (non-k3s).
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#ingress-absent
+
+  - req_id: INGRESS_TRAEFIK-FR-008
+    statement: >-
+      The controller SHALL route traffic via the Traefik IngressRoute CRD with
+      optional Let's Encrypt/ACME certificate resolution — a product capability
+      beyond the role's deploy path, exercised only against a real workload.
+    tier: 3
+    verified_by: []

@@ -1,0 +1,104 @@
+---
+# pm_vault — install action.
+# Installs HashiCorp Vault from the official HashiCorp RPM/DEB repository.
+# Creates the vault user, directories, and registers the systemd service.
+
+- name: Install gnupg for GPG key import
+  ansible.builtin.package:
+    name: gnupg
+    state: present
+  become: true
+
+- name: Add HashiCorp GPG key (RHEL/EL)
+  ansible.builtin.rpm_key:
+    key: https://rpm.releases.hashicorp.com/gpg
+    state: present
+  become: true
+  when: ansible_os_family == 'RedHat'
+
+- name: Add HashiCorp YUM repository (RHEL/EL)
+  ansible.builtin.yum_repository:
+    name: hashicorp
+    description: HashiCorp Stable - $basearch
+    baseurl: "https://rpm.releases.hashicorp.com/RHEL/$releasever/$basearch/stable"
+    gpgkey: https://rpm.releases.hashicorp.com/gpg
+    gpgcheck: true
+    enabled: true
+  become: true
+  when: ansible_os_family == 'RedHat'
+
+- name: Add HashiCorp APT key (Debian/Ubuntu) # noqa: command-instead-of-module
+  ansible.builtin.shell:
+    cmd: >
+      curl -fsSL https://apt.releases.hashicorp.com/gpg
+      | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+    creates: /usr/share/keyrings/hashicorp-archive-keyring.gpg
+  become: true
+  when: ansible_os_family == 'Debian'
+
+- name: Add HashiCorp APT repository (Debian/Ubuntu)
+  ansible.builtin.apt_repository:
+    repo: >-
+      deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg]
+      https://apt.releases.hashicorp.com {{ ansible_distribution_release }} main
+    state: present
+    filename: hashicorp
+  become: true
+  when: ansible_os_family == 'Debian'
+
+- name: Install HashiCorp Vault
+  ansible.builtin.package:
+    name: "{{ pm_vault_package }}{% if pm_vault_version | length > 0 %}-{{ pm_vault_version }}{% endif %}"
+    state: present
+  become: true
+  notify: pm_vault - restart
+
+- name: Create Vault data directory
+  ansible.builtin.file:
+    path: "{{ pm_vault_data_dir }}"
+    state: directory
+    owner: "{{ pm_vault_user }}"
+    group: "{{ pm_vault_group }}"
+    mode: "0750"
+  become: true
+
+- name: Create Vault TLS directory
+  ansible.builtin.file:
+    path: "{{ pm_vault_tls_dir }}"
+    state: directory
+    owner: "{{ pm_vault_user }}"
+    group: "{{ pm_vault_group }}"
+    mode: "0750"
+  become: true
+  when: pm_vault_tls_enabled | bool
+
+- name: Create Vault log directory
+  ansible.builtin.file:
+    path: "{{ pm_vault_log_dir }}"
+    state: directory
+    owner: "{{ pm_vault_user }}"
+    group: "{{ pm_vault_group }}"
+    mode: "0750"
+  become: true
+
+- name: Render Vault configuration
+  ansible.builtin.template:
+    src: vault.hcl.j2
+    dest: "{{ pm_vault_config_dir }}/vault.hcl"
+    owner: "{{ pm_vault_user }}"
+    group: "{{ pm_vault_group }}"
+    mode: "0640"
+  become: true
+  notify: pm_vault - restart
+
+- name: Enable Vault systemd service (do not start — configure runs init/unseal)
+  ansible.builtin.service:
+    name: vault
+    enabled: true
+  become: true
+  when: pm_vault_manage_service | bool
+
+- name: Apply firewall policy for Vault (ports 8200/8201 via roles/firewall)
+  ansible.builtin.include_role:
+    name: firewall
+  when: pm_vault_apply_firewall | bool

@@ -1,0 +1,6 @@
+---
+- name: linux_hardening - reload sshd
+  ansible.builtin.service:
+    name: sshd
+    state: reloaded
+  when: ansible_service_mgr == 'systemd'

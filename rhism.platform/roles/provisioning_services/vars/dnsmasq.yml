@@ -1,0 +1,13 @@
+---
+_prov_packages:
+  - dnsmasq
+  - tftp-server
+  - syslinux-tftpboot
+_prov_service_name: dnsmasq
+_prov_config_dir: /etc/dnsmasq.d
+_prov_config_file: /etc/dnsmasq.d/rhism.platform.conf
+_prov_firewall_services:
+  - dns
+  - dhcp
+  - tftp
+_prov_has_smartproxy: false

@@ -1,0 +1,6 @@
+---
+- name: Install backup client ({{ backup_type }})
+  ansible.builtin.include_role:
+    name: "{{ backup_type }}"
+  vars:
+    action: client

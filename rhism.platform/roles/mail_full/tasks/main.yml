@@ -1,0 +1,17 @@
+---
+# mail_full — action-driven dispatch.
+#
+# The action + variable interface is validated by meta/argument_specs.yml (ansible-core
+# runs the validation automatically at role entry — no manual assert needed). The
+# argument-spec `choices` reject any action outside the set mapped below.
+
+- name: Set action file
+  ansible.builtin.set_fact:
+    _mail_full_action_file: >-
+      {{ 'present.yml' if action in ['present', 'absent']
+         else 'services.yml' if action in ['started', 'stopped', 'restarted']
+         else action ~ '.yml' }}
+
+- name: "Execute {{ action }}"
+  ansible.builtin.include_tasks:
+    file: "{{ _mail_full_action_file }}"

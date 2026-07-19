@@ -1,0 +1,6 @@
+define command {
+    command_name    eda-webhook-handler
+    command_line    /usr/bin/curl -s -X POST {{ mon_nagios_eda_webhook_url }} \
+                    -H "Content-Type: application/json" \
+                    -d '{"source":"nagios","host":"$HOSTADDRESS$","service":"$SERVICEDESC$","state":"$SERVICESTATE$","output":"$SERVICEOUTPUT$","timestamp":"$TIMET$"}'
+}

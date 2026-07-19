@@ -1,0 +1,59 @@
+---
+# Functional requirements — rh_idm (pilot of the requirements→test-case layer,
+# owner rule 2026-07-12). Same renderer contract as freeipa/REQUIREMENTS.yml.
+# rh_idm mirrors the freeipa interface (same shared family vars) with Red Hat
+# IdM specifics: RHSM registration (via the rhel_subscription role) and the
+# idm:DL1 module stream.
+functional_requirements:
+  - req_id: RHIDM-FR-001
+    statement: >-
+      The role SHALL validate `action` against the shared 19-action family set
+      at entry and fail fast on invalid input.
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: RHIDM-FR-002
+    statement: >-
+      Deployment actions SHALL be dry-run gated (`idm_server_install`/
+      `idm_replica_install`/`idm_client_install` default false), including the
+      shared prepare tasks — module-stream enable, packages, firewall
+      (BUG-094).
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: RHIDM-FR-003
+    statement: >-
+      Server preparation SHALL reuse the `rhel_subscription` role for RHSM
+      registration rather than inlining registration logic (reuse doctrine —
+      same pattern as satellite/gitlab_ee/ocp).
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: RHIDM-FR-004
+    statement: >-
+      The role SHALL consume the shared family interface unchanged so the
+      `identity_management` dispatcher selects it via `idm_type: rh_idm` with
+      no per-product code.
+    tier: 1
+    verified_by:
+      - molecule: identity_management/default
+
+  - req_id: RHIDM-FR-005
+    statement: >-
+      `action: acme` SHALL behave identically to freeipa's (shared task
+      design): ipa-acme-manage server-side, certmonger client `request`,
+      mutations gated by `idm_acme_execute`.
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: RHIDM-FR-006
+    statement: >-
+      With gates enabled on an entitled RHEL host, `action: server` SHALL
+      deploy a working Red Hat IdM server.
+    tier: 3
+    verified_by:
+      - lab: playbooks/identity_management.yml#freeipa

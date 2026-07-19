@@ -1,0 +1,29 @@
+---
+- name: Verify standalone variable contract
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Load role defaults
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../../defaults/main.yml"
+      delegate_to: localhost
+
+    - name: Assert standalone interface defaults resolve
+      ansible.builtin.assert:
+        that:
+          - rhel_subscription_action == 'register'
+          - rhel_subscription_method == 'activation_key'
+          - rhel_subscription_org_id == ''
+          - rhel_subscription_activation_key == ''
+          - rhel_subscription_username == ''
+          - rhel_subscription_password == ''
+          - rhel_subscription_pool_ids == []
+          - rhel_subscription_force_register == false
+          - rhel_subscription_skip == false
+        fail_msg: "rhel_subscription defaults did not resolve to the expected standalone contract"
+      delegate_to: localhost
+
+    - name: Report verification passed
+      ansible.builtin.debug:
+        msg: "PASS — rhel_subscription standalone contract verified, all 3 dispatch combinations exercised in converge"
+      delegate_to: localhost

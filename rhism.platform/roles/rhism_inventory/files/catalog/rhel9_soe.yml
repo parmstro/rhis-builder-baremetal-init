@@ -1,0 +1,77 @@
+---
+# SOE catalogue reference entry — RHEL 9 x86_64 Standard Operating Environment.
+# Provenance: object names derived from the rhis-builder-inventory upstream
+# snapshot (github.com/parmstro/rhis-builder-inventory, refs/heads/main zip,
+# downloaded 2026-07-14 — see roles/rhism/PROVENANCE.md), host_vars satellite
+# content files (repository_sets.yml, content_views.yml, activation_keys.yml,
+# hostgroups.yml). Trimmed reference entry — representative, not the full lists.
+name: rhel9_soe
+description: "Red Hat Enterprise Linux 9 x86_64 Standard Operating Environment"
+lifecycle_state: active
+content:
+  repository_sets:
+    - name: "Red Hat Enterprise Linux 9 for x86_64 - BaseOS (RPMs)"
+      product: "Red Hat Enterprise Linux for x86_64"
+    - name: "Red Hat Enterprise Linux 9 for x86_64 - AppStream (RPMs)"
+      product: "Red Hat Enterprise Linux for x86_64"
+    - name: "Red Hat Satellite Client 6 for RHEL 9 x86_64 (RPMs)"
+      product: "Red Hat Enterprise Linux for x86_64"
+  custom_products: []
+  content_views:
+    - name: "SOE9"
+      description: "Red Hat Enterprise Linux 9 x86_64 SOE content"
+      repositories:
+        - name: "Red Hat Enterprise Linux 9 for x86_64 - BaseOS RPMs 9"
+          product: "Red Hat Enterprise Linux for x86_64"
+        - name: "Red Hat Enterprise Linux 9 for x86_64 - AppStream RPMs 9"
+          product: "Red Hat Enterprise Linux for x86_64"
+        - name: "Red Hat Satellite Client 6 for RHEL 9 x86_64 RPMs"
+          product: "Red Hat Enterprise Linux for x86_64"
+templates:
+  provisioning_templates:
+    - name: "soe_kickstart_default"
+      template_kind: "provision"
+  partition_tables:
+    - name: "RHEL_Server_Compliance"
+  snippets:
+    - priority: 200
+      name: "subscription_manager_registration"
+    - priority: 210
+      name: "freeipa_register"
+    - priority: 400
+      name: "soe_kickstart_default_custom_packages"
+    - priority: 510
+      name: "soe_create_users_selinux"
+    - priority: 940
+      name: "soe_nbde_key_reset"
+lifecycle:
+  lifecycle_environments:
+    - name: "Development"
+    - name: "Qualification"
+    - name: "Production"
+  activation_keys:
+    - name: "SOE9_dev"
+      lifecycle_environment: "Development"
+      content_view: "SOE9"
+    - name: "SOE9_qa"
+      lifecycle_environment: "Qualification"
+      content_view: "SOE9"
+    - name: "SOE9_prod"
+      lifecycle_environment: "Production"
+      content_view: "SOE9"
+  hostgroups:
+    - name: "hg_x86_64_rhel9_metal"
+      description: "RHEL 9 SOE baremetal hostgroup"
+      lifecycle_environment: "Development"
+      content_view: "SOE9"
+      activation_keys: "SOE9_dev"
+      architecture: "x86_64"
+      operatingsystem: "RHEL 9.7"
+      kickstart_repository: "Red Hat Enterprise Linux 9 for x86_64 - BaseOS Kickstart 9.7"
+      ptable: "RHEL_Server_Compliance"
+      pxe_loader: "Grub2 UEFI"
+infrastructure_refs:
+  compute_resource: "kvm01.soe.example.com"
+  subnet: "provision.soe.example.com"
+  domain: "soe.example.com"
+  realm: "SOE.EXAMPLE.COM"

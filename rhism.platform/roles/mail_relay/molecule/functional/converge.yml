@@ -1,0 +1,37 @@
+---
+- name: Converge — mail_relay functional (Postfix smarthost relay)
+  hosts: all
+  become: true
+  vars:
+    mail_execute: true
+    mail_hostname: mail.example.local
+    mail_domain: example.local
+    mail_relay_host: "[smtp.example.test]:587"
+    mail_tls_enabled: false            # avoid TLS cert refs in a throwaway container
+  tasks:
+    - name: Configure Postfix as a relay (deploys main.cf from the role)
+      ansible.builtin.include_role:
+        name: rhism.platform.mail_relay
+      vars:
+        action: configure
+
+    # postfix.service (Type=forking) is unreliable under systemd inside a container:
+    # ExecStart returns 1 even though postfix starts cleanly. On a real EL9 host the
+    # role's service/handler works; here we tolerate the systemd restart handler and
+    # start postfix directly so the test can assert the deployed relay config works.
+    - name: Flush handlers, tolerating the container systemd quirk
+      block:
+        - name: Flush handlers
+          ansible.builtin.meta: flush_handlers
+      rescue:
+        - name: Note the systemd restart quirk (non-fatal for this test)
+          ansible.builtin.debug:
+            msg: "postfix systemd restart handler failed (container Type=forking quirk) — starting postfix directly"
+
+    - name: Start Postfix directly
+      ansible.builtin.command: /usr/sbin/postfix start
+      register: _pf
+      changed_when: true
+      failed_when:
+        - _pf.rc != 0
+        - "'already running' not in _pf.stderr"

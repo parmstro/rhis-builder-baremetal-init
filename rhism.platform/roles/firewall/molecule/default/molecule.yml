@@ -1,0 +1,22 @@
+---
+# Tier 1 (contract-only) scenario — firewalld needs dbus + the kernel netfilter
+# surface, neither of which a minimal CI container provides (same class as the
+# linux_hardening/auditd container limits documented in docs/testing-workflow.md).
+# The contract converge validates the interface, dispatch, and the
+# string-vs-list normalisation logic in check mode against localhost. Real
+# firewalld application is covered by linux_security's Tier 3 lab coverage.
+driver:
+  name: docker
+platforms:
+  - name: firewall-contract
+    image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+    pre_build_image: true
+provisioner:
+  name: ansible
+scenario:
+  test_sequence:
+    - destroy
+    - syntax
+    - converge
+    - verify
+    - destroy

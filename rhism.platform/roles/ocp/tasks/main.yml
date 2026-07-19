@@ -1,0 +1,8 @@
+---
+# The action + variable interface is validated by meta/argument_specs.yml (ansible-core
+# runs the validation automatically at role entry — no manual assert needed).
+
+# ── dispatch ──────────────────────────────────────────────────────────────────
+
+- name: "Run OCP action: {{ action }}"
+  ansible.builtin.include_tasks: "{{ action }}.yml"

@@ -1,0 +1,12 @@
+---
+# Shared validation for actions that connect to the Satellite server API.
+# Included by: register, status
+
+- name: Validate Satellite server connection requirements
+  ansible.builtin.assert:
+    that:
+      - prov_content_server_url is defined
+      - prov_content_server_url | length > 0
+      - prov_content_password is defined
+      - prov_content_password | length > 0
+    fail_msg: "{{ action }} requires prov_content_server_url and prov_content_password"

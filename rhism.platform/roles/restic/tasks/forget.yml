@@ -1,0 +1,24 @@
+---
+# forget: apply retention policy
+
+- name: Include restic environment
+  ansible.builtin.include_tasks: env.yml
+
+- name: Run restic forget with retention policy
+  ansible.builtin.command:
+    cmd: >-
+      restic forget
+      --keep-daily {{ backup_restic_retention_daily }}
+      --keep-weekly {{ backup_restic_retention_weekly }}
+      --keep-monthly {{ backup_restic_retention_monthly }}
+      --keep-yearly {{ backup_restic_retention_yearly }}
+      --prune
+  environment: "{{ _restic_env }}"
+  become: true
+  no_log: true
+  register: _restic_forget
+  changed_when: "'removed' in _restic_forget.stdout | lower"
+
+- name: Report forget result
+  ansible.builtin.debug:
+    msg: "{{ _restic_forget.stdout_lines | default([]) }}"

@@ -1,0 +1,40 @@
+---
+- name: Verify type vars loading
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Load relay vars
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../../vars/relay.yml"
+      delegate_to: localhost
+
+    - name: Assert relay is not full stack
+      ansible.builtin.assert:
+        that:
+          - _mail_full_stack is defined
+          - _mail_full_stack == false
+          - _mail_service_name == 'postfix'
+        fail_msg: "relay.yml did not load expected vars"
+      delegate_to: localhost
+
+    - name: Load full vars
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../../vars/full.yml"
+      delegate_to: localhost
+
+    - name: Assert full is full stack
+      ansible.builtin.assert:
+        that:
+          - _mail_full_stack is defined
+          - _mail_full_stack == true
+          - _mail_service_name == 'postfix'
+        fail_msg: "full.yml did not load expected vars"
+      delegate_to: localhost
+
+    - name: Report verification passed
+      ansible.builtin.debug:
+        msg: >-
+          PASS — mail_server type vars verified.
+          relay: _mail_full_stack=false
+          full: _mail_full_stack=true
+      delegate_to: localhost

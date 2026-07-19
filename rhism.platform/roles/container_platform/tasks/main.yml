@@ -1,0 +1,25 @@
+---
+- name: Validate cp_action
+  ansible.builtin.assert:
+    that:
+      - cp_action is defined
+      - cp_action in _cp_valid_actions
+    fail_msg: >-
+      cp_action '{{ cp_action | default('') }}' is invalid.
+      Valid actions: {{ _cp_valid_actions | join(', ') }}
+
+- name: Validate cp_type
+  ansible.builtin.assert:
+    that:
+      - cp_type is defined
+      - cp_type in _cp_valid_types
+    fail_msg: >-
+      cp_type '{{ cp_type | default('') }}' is invalid.
+      Valid types: {{ _cp_valid_types | join(', ') }}
+
+- name: Load type-specific variables
+  ansible.builtin.include_vars:
+    file: "{{ cp_type }}.yml"
+
+- name: Dispatch to action
+  ansible.builtin.include_tasks: "{{ cp_action }}.yml"

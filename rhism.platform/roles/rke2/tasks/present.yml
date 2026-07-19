@@ -1,0 +1,17 @@
+---
+# ── Install rke2 ─────────────────────────────────────────────────────────────
+
+- name: Install rke2 via install script  # noqa: command-instead-of-module
+  ansible.builtin.shell:
+    cmd: >
+      curl -sfL {{ _cp_install_script_url }} |
+      {% if cp_install_version | length > 0 %}INSTALL_RKE2_VERSION="{{ cp_install_version }}"{% endif %}
+      INSTALL_RKE2_TYPE="{{ 'server' if cp_node_role == 'control_plane' else 'agent' }}"
+      sh -
+    creates: "{{ _cp_binary }}"
+  become: true
+
+- name: Manage firewall ports for rke2
+  ansible.builtin.include_tasks: firewall.yml
+  vars:
+    _firewall_state: enabled

@@ -1,0 +1,20 @@
+---
+# Action: add_node — join a worker node to the k3s cluster
+
+- name: Install k3s agent via install script  # noqa: command-instead-of-module
+  ansible.builtin.shell:
+    cmd: >
+      curl -sfL {{ _cp_install_script_url }} |
+      K3S_URL="{{ cp_server_url }}"
+      K3S_TOKEN="{{ cp_node_token }}"
+      sh -
+    creates: "{{ _cp_binary }}"
+  become: true
+  no_log: true
+
+- name: Enable and start k3s-agent service
+  ansible.builtin.service:
+    name: "{{ _cp_service_name_agent }}"
+    state: started
+    enabled: true
+  become: true

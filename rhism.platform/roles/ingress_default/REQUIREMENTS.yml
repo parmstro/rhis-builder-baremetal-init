@@ -1,0 +1,58 @@
+---
+# Functional requirements — ingress_default (requirements->test-case layer +
+# Tier-3 elevation, wave-3+ standard). Product role in the ingress family (a
+# user picks exactly one of ingress_default/nginx/traefik/haproxy). Manages the
+# platform's BUILT-IN ingress controller — Traefik on k3s via HelmChartConfig;
+# status report only on distributions that ship their own. Capability curated
+# from README + meta/argument_specs.yml + tasks/main.yml, grounded in the
+# Kubernetes Ingress + k3s HelmChartConfig docs. Family lab:
+# playbooks/container_platform.yml (cp_ingress_type: default).
+functional_requirements:
+  - req_id: INGRESS_DEFAULT-FR-001
+    statement: >-
+      The role SHALL enforce the shared ingress interface (action in
+      ingress/present/absent, cp_* vars) via meta/argument_specs.yml and reject
+      an invalid action (negative test).
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: INGRESS_DEFAULT-FR-002
+    statement: >-
+      The role SHALL honour the cp_ingress_execute dry-run gate — validating
+      dispatch and the variable contract without touching the cluster.
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: INGRESS_DEFAULT-FR-003
+    statement: >-
+      On k3s with action present, the role SHALL apply a HelmChartConfig tuning
+      the built-in Traefik (web entrypoint :80, websecure entrypoint :443,
+      anonymous usage disabled).
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#ingress
+
+  - req_id: INGRESS_DEFAULT-FR-004
+    statement: >-
+      On action ingress, the role SHALL query the built-in ingress controller
+      Deployment in kube-system and report whether it is running.
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#ingress
+
+  - req_id: INGRESS_DEFAULT-FR-005
+    statement: >-
+      On k3s with action absent, the role SHALL remove the built-in-ingress
+      HelmChartConfig.
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#ingress-absent
+
+  - req_id: INGRESS_DEFAULT-FR-006
+    statement: >-
+      On non-k3s platforms (which ship their own ingress) the role SHALL only
+      report status and manage no manifest or Helm chart.
+    tier: 3
+    verified_by: []

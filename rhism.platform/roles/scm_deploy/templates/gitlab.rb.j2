@@ -1,0 +1,47 @@
+# Managed by Ansible — rhism scm_deploy ({{ scm_type }})
+external_url '{{ scm_external_url }}'
+
+# TLS
+{% if scm_tls_cert_file | length > 0 %}
+nginx['ssl_certificate'] = '{{ scm_tls_cert_file }}'
+nginx['ssl_certificate_key'] = '{{ scm_tls_key_file }}'
+{% elif scm_tls_letsencrypt %}
+letsencrypt['enable'] = true
+letsencrypt['contact_emails'] = ['{{ scm_admin_email }}']
+{% endif %}
+
+# Database
+{% if scm_db_host | length > 0 %}
+postgresql['enable'] = false
+gitlab_rails['db_adapter'] = '{{ scm_db_adapter }}'
+gitlab_rails['db_encoding'] = 'utf8'
+gitlab_rails['db_host'] = '{{ scm_db_host }}'
+gitlab_rails['db_port'] = {{ scm_db_port }}
+gitlab_rails['db_database'] = '{{ scm_db_name }}'
+gitlab_rails['db_username'] = '{{ scm_db_username }}'
+gitlab_rails['db_password'] = '{{ scm_db_password }}'
+{% endif %}
+
+# SMTP
+{% if scm_smtp_enabled %}
+gitlab_rails['smtp_enable'] = true
+gitlab_rails['smtp_address'] = '{{ scm_smtp_address }}'
+gitlab_rails['smtp_port'] = {{ scm_smtp_port }}
+gitlab_rails['smtp_tls'] = {{ scm_smtp_tls | lower }}
+{% if scm_smtp_user_name | length > 0 %}
+gitlab_rails['smtp_user_name'] = '{{ scm_smtp_user_name }}'
+gitlab_rails['smtp_password'] = '{{ scm_smtp_password }}'
+{% endif %}
+gitlab_rails['gitlab_email_from'] = '{{ scm_smtp_from }}'
+{% else %}
+gitlab_rails['smtp_enable'] = false
+{% endif %}
+
+# Backup
+gitlab_rails['backup_path'] = '{{ scm_backup_path }}'
+gitlab_rails['backup_keep_time'] = {{ scm_backup_keep_time }}
+
+# Performance tuning
+puma['worker_processes'] = {{ scm_puma_workers }}
+sidekiq['concurrency'] = {{ scm_sidekiq_concurrency }}
+postgresql['shared_buffers'] = '{{ scm_pg_shared_buffers }}'

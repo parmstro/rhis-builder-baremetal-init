@@ -1,0 +1,74 @@
+---
+# --------------------------------------------------------------------------- #
+# host — bare-host create + PXE build (rhism alignment Phase C item 2)        #
+#                                                                             #
+# Matches upstream RHIS's deploy_*.sh -> rhis_build_from_provisioner.yml      #
+# data shape 1:1 (per-host: fqdn, hostgroup, compute_resource, comment,       #
+# pxe_loader, parameters, interfaces_attributes — standard Foreman/Katello    #
+# host semantics, not an RHIS-specific quirk). List-guarded no-op with the    #
+# empty default, same pattern as compute_resource.yml/content_views.yml.     #
+#                                                                             #
+# Deliberately does NOT wait for kickstart completion — that varies wildly   #
+# by hardware/network and this platform doesn't invent unverified wait       #
+# logic (docs/tang.md-class honest-gap discipline). power_cycle only resets  #
+# the host's power state to kick off PXE boot; confirming the build actually #
+# completed is a Tier-3 lab / operator concern.                              #
+#                                                                             #
+# Unlike this role's other list-guarded API actions (content_views,          #
+# activation_keys, ...), a non-empty content_hosts is NOT itself enough to   #
+# act — this action creates real hosts and can trigger a real reboot-into-  #
+# installer, so it also requires content_host_execute: true (default        #
+# false), matching the double-gate carefulness this platform applies to its #
+# other high-consequence operations.                                        #
+# --------------------------------------------------------------------------- #
+- name: Report dry-run status for bare-host provisioning
+  ansible.builtin.debug:
+    msg: >-
+      {{ 'CREATING/REMOVING ' ~ (content_hosts | length) ~ ' host(s) for real'
+         if (content_host_execute | bool)
+         else 'DRY-RUN (content_host_execute=false): ' ~ (content_hosts | length) ~
+              ' host(s) declared, no Satellite API call made' }}
+  when: content_hosts | length > 0
+
+- name: Create or remove bare hosts
+  theforeman.foreman.host:
+    server_url: "{{ content_server_url }}"
+    username: "{{ content_username }}"
+    password: "{{ content_password }}"
+    validate_certs: "{{ content_validate_certs }}"
+    name: "{{ item.fqdn }}"
+    hostgroup: "{{ item.hostgroup | default(omit) }}"
+    compute_resource: "{{ item.compute_resource | default(omit) }}"
+    organization: "{{ item.organization | default(content_organization) }}"
+    location: "{{ item.location | default(content_location) }}"
+    comment: "{{ item.comment | default(omit) }}"
+    pxe_loader: "{{ item.pxe_loader | default(omit) }}"
+    parameters: "{{ item.parameters | default(omit) }}"
+    interfaces_attributes: "{{ item.interfaces_attributes | default(omit) }}"
+    build: "{{ item.build | default(true) }}"
+    state: "{{ item.state | default('present') }}"
+  loop: "{{ content_hosts }}"
+  loop_control:
+    label: "{{ item.fqdn }}"
+  no_log: "{{ content_no_log }}"
+  when:
+    - content_hosts | length > 0
+    - content_host_execute | bool
+  register: _satellite_host_results
+
+- name: Power-cycle newly built hosts to kick off PXE boot
+  theforeman.foreman.host_power:
+    server_url: "{{ content_server_url }}"
+    username: "{{ content_username }}"
+    password: "{{ content_password }}"
+    validate_certs: "{{ content_validate_certs }}"
+    name: "{{ item.fqdn }}"
+    state: reset
+  loop: "{{ content_hosts | selectattr('power_cycle', 'defined') | selectattr('power_cycle') | list }}"
+  loop_control:
+    label: "{{ item.fqdn }}"
+  no_log: "{{ content_no_log }}"
+  when:
+    - content_hosts | length > 0
+    - content_host_execute | bool
+    - item.state | default('present') == 'present'

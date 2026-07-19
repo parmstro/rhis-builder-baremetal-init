@@ -1,0 +1,67 @@
+---
+- name: Check manifest file exists
+  ansible.builtin.stat:
+    path: "{{ wizard_output_dir }}/{{ wizard_output_file }}"
+  register: _wizard_manifest_stat
+  tags: infra_wizard
+
+- name: Assert manifest file present
+  ansible.builtin.assert:
+    that:
+      - _wizard_manifest_stat.stat.exists
+    fail_msg: >-
+      Manifest not found at {{ wizard_output_dir }}/{{ wizard_output_file }}.
+      Run wizard_action=interactive first.
+  tags: infra_wizard
+
+- name: Read manifest
+  ansible.builtin.slurp:
+    src: "{{ wizard_output_dir }}/{{ wizard_output_file }}"
+  register: _wizard_manifest_raw
+  tags: infra_wizard
+
+- name: Parse manifest
+  ansible.builtin.set_fact:
+    _wizard_manifest: "{{ _wizard_manifest_raw.content | b64decode | from_yaml }}"
+  tags: infra_wizard
+
+- name: Validate manifest top-level keys
+  ansible.builtin.assert:
+    that:
+      - _wizard_manifest.components is defined
+      - _wizard_manifest.network is defined
+      - _wizard_manifest.network.domain is defined
+      - _wizard_manifest.network.domain | length > 0
+      - _wizard_manifest.sizing is defined
+    fail_msg: >-
+      Manifest is missing required top-level keys.
+      Expected: components, network (with domain), sizing.
+  tags: infra_wizard
+
+- name: Validate hypervisor component
+  ansible.builtin.assert:
+    that:
+      - _wizard_manifest.components.hypervisor is defined
+      - _wizard_manifest.components.hypervisor.type in ['kvm', 'proxmox']
+    fail_msg: >-
+      Manifest must define components.hypervisor.type as 'kvm' or 'proxmox'.
+  tags: infra_wizard
+
+- name: Validate identity component
+  ansible.builtin.assert:
+    that:
+      - _wizard_manifest.components.identity is defined
+      - _wizard_manifest.components.identity.type in ['freeipa', 'rh_idm', 'ad_integration']
+    fail_msg: >-
+      Manifest must define components.identity.type as one of:
+      freeipa, rh_idm, ad_integration.
+  tags: infra_wizard
+
+- name: Report validation success
+  ansible.builtin.debug:
+    msg: >-
+      Manifest at {{ wizard_output_dir }}/{{ wizard_output_file }} is valid.
+      Profile: {{ _wizard_manifest.profile | default('custom') }},
+      Domain: {{ _wizard_manifest.network.domain }},
+      Components: {{ _wizard_manifest.components.keys() | list | join(', ') }}
+  tags: infra_wizard

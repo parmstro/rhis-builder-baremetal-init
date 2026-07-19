@@ -1,0 +1,80 @@
+---
+# Action + variable interface are validated by meta/argument_specs.yml (ansible-core
+# runs the validation automatically at role entry — no manual assert needed).
+
+# present / absent: manage HelmChartConfig for the k3s built-in ingress
+- name: Manage k3s built-in ingress (HelmChartConfig)
+  when:
+    - action in ['present', 'absent']
+    - cp_type == 'k3s'
+    - cp_ingress_execute | bool
+  block:
+    - name: Deploy HelmChartConfig for k3s built-in ingress
+      kubernetes.core.k8s:
+        kubeconfig: "{{ cp_kubeconfig_path }}"
+        state: present
+        definition:
+          apiVersion: helm.cattle.io/v1
+          kind: HelmChartConfig
+          metadata:
+            name: traefik
+            namespace: kube-system
+          spec:
+            valuesContent: |
+              globalArguments:
+                - "--global.sendanonymoususage=false"
+              additionalArguments:
+                - "--entrypoints.web.address=:80"
+                - "--entrypoints.websecure.address=:443"
+      become: true
+      when: action == 'present'
+
+    - name: Remove HelmChartConfig for k3s built-in ingress
+      kubernetes.core.k8s:
+        kubeconfig: "{{ cp_kubeconfig_path }}"
+        state: absent
+        api_version: helm.cattle.io/v1
+        kind: HelmChartConfig
+        name: traefik
+        namespace: kube-system
+      become: true
+      when: action == 'absent'
+
+- name: Report built-in ingress status (non-k3s)
+  ansible.builtin.debug:
+    msg: >-
+      Platform type '{{ cp_type }}' uses a built-in ingress controller.
+      No manifest or Helm chart is managed by this role.
+      Domain: {{ cp_ingress_domain | default('not set', true) }}.
+  when:
+    - action in ['present', 'absent']
+    - cp_type != 'k3s'
+
+# ingress: main configuration action — verify built-in ingress and report
+- name: Check built-in ingress deployment status
+  when:
+    - action == 'ingress'
+    - cp_ingress_execute | bool
+  block:
+    - name: Query built-in ingress deployment
+      kubernetes.core.k8s_info:
+        kubeconfig: "{{ cp_kubeconfig_path }}"
+        api_version: apps/v1
+        kind: Deployment
+        namespace: kube-system
+        label_selectors:
+          - "app.kubernetes.io/name={{ _cp_builtin_ingress_name }}"
+      register: _ingress_default_deploy
+      become: true
+      failed_when: false
+
+    - name: Report built-in ingress status
+      ansible.builtin.debug:
+        msg: >-
+          Built-in ingress controller '{{ _cp_builtin_ingress_name }}'
+          {% if _ingress_default_deploy.resources | default([]) | length > 0 %}
+          is deployed and running. Domain: {{ cp_ingress_domain | default('not set', true) }}.
+          {% else %}
+          was not found in kube-system. Ensure the cluster is running.
+          Domain: {{ cp_ingress_domain | default('not set', true) }}.
+          {% endif %}

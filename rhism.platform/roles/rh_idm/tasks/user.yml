@@ -1,0 +1,9 @@
+---
+- name: Manage IPA users
+  freeipa.ansible_freeipa.ipauser:
+    ipaadmin_password: "{{ idm_admin_password }}"
+    users: "{{ idm_users }}"
+  no_log: true
+  when:
+    - idm_users is defined
+    - idm_users | length > 0

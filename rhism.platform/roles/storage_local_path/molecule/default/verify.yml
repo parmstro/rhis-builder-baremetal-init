@@ -1,0 +1,24 @@
+---
+- name: Verify standalone variable contract
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Load role defaults
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../../defaults/main.yml"
+      delegate_to: localhost
+
+    - name: Assert shared interface defaults resolve for standalone use
+      ansible.builtin.assert:
+        that:
+          - action == 'storage'
+          - cp_kubeconfig_path == '/etc/rancher/k3s/k3s.yaml'
+          - cp_storage_make_default | bool
+          - cp_storage_execute | bool
+        fail_msg: "storage_local_path defaults did not resolve to the expected standalone contract"
+      delegate_to: localhost
+
+    - name: Report verification passed
+      ansible.builtin.debug:
+        msg: "PASS — storage_local_path standalone contract verified"
+      delegate_to: localhost

@@ -1,0 +1,178 @@
+---
+- name: Load deployment manifest
+  ansible.builtin.include_vars:
+    file: "{{ pb_manifest_path }}"
+    name: pb_manifest
+
+# Resolve which components to tear down (and the types needed to name their
+# services) ONCE — every stop step then gates on pb_deploy_execute + a short
+# fact reference rather than repeating the manifest lookup. Same shape as
+# deploy.yml's decision block.
+- name: Resolve which components to tear down
+  ansible.builtin.set_fact:
+    pb_enabled:
+      automation: "{{ pb_manifest.components.automation.enabled | default(false) | bool }}"
+      monitoring: "{{ pb_manifest.components.monitoring.enabled | default(false) | bool }}"
+      container_platform: "{{ pb_manifest.components.container_platform.enabled | default(false) | bool }}"
+      backup: "{{ pb_manifest.components.backup.enabled | default(false) | bool }}"
+      scm: "{{ pb_manifest.components.scm.enabled | default(false) | bool }}"
+      mail: "{{ pb_manifest.components.mail.enabled | default(false) | bool }}"
+      provisioning: "{{ pb_manifest.components.provisioning.enabled | default(false) | bool }}"
+      hypervisor: "{{ pb_manifest.components.hypervisor.enabled | default(false) | bool }}"
+    pb_type:
+      container_platform: "{{ pb_manifest.components.container_platform.type | default('k3s') }}"
+      hypervisor: "{{ pb_manifest.components.hypervisor.type | default('kvm') }}"
+
+- name: Show teardown decisions
+  ansible.builtin.debug:
+    msg: >-
+      Teardown — execute: {{ pb_deploy_execute | bool }}, enabled: {{ pb_enabled }}
+
+- name: Assert teardown decisions resolved
+  ansible.builtin.assert:
+    that:
+      - pb_enabled is defined
+      - pb_type is defined
+    fail_msg: "Teardown decision facts failed to resolve — check the manifest."
+
+- name: Warn about destructive teardown
+  ansible.builtin.pause:
+    prompt: >-
+      WARNING: Teardown will stop all platform services.
+      This is destructive and may result in data loss.
+      Press Enter to continue or Ctrl+C to abort.
+  when: pb_deploy_execute | bool
+
+- name: DRY-RUN teardown notice
+  ansible.builtin.debug:
+    msg: >-
+      DRY-RUN: Would teardown services in reverse order:
+      aap -> monitoring -> container_platform -> backup -> scm -> mail -> content ->
+      provisioning -> identity -> hypervisor -> security.
+      Set pb_deploy_execute: true to apply.
+  when: not (pb_deploy_execute | bool)
+
+# Reverse order: aap -> monitoring -> container_platform -> backup -> scm -> mail ->
+# content -> provisioning -> identity -> hypervisor -> security
+
+- name: Stop Automation Platform (AAP) services
+  # Best-effort, mirroring the other stop steps (failed_when: false). AAP is the
+  # last thing deployed, so it is torn down first. The containerized installer
+  # registers per-component systemd services; a full/supported uninstall is the
+  # installer's own concern (this role has no uninstall action), so this only
+  # halts the running services — packages/containers/data are left in place, per
+  # the completion note below.
+  ansible.builtin.service:
+    name: "{{ item }}"
+    state: stopped
+    enabled: false
+  become: true
+  loop:
+    - automation-controller
+    - automation-hub
+    - automation-eda
+    - automation-gateway
+  failed_when: false
+  when:
+    - pb_deploy_execute | bool
+    - pb_enabled.automation | bool
+
+- name: Stop monitoring stack
+  ansible.builtin.service:
+    name: "{{ item }}"
+    state: stopped
+    enabled: false
+  become: true
+  loop:
+    - nagios
+    - splunkd
+    - elasticsearch
+  failed_when: false
+  when:
+    - pb_deploy_execute | bool
+    - pb_enabled.monitoring | bool
+
+- name: Stop container platform (k3s/rke2)
+  ansible.builtin.service:
+    name: "{{ (pb_type.container_platform == 'rke2') | ternary('rke2-server', 'k3s') }}"
+    state: stopped
+    enabled: false
+  become: true
+  failed_when: false
+  when:
+    - pb_deploy_execute | bool
+    - pb_enabled.container_platform | bool
+    - pb_type.container_platform in ['k3s', 'rke2']
+
+- name: Stop backup management (Bareos)
+  ansible.builtin.service:
+    name: "{{ item }}"
+    state: stopped
+    enabled: false
+  become: true
+  loop:
+    - bareos-dir
+    - bareos-sd
+    - bareos-fd
+  failed_when: false
+  when:
+    - pb_deploy_execute | bool
+    - pb_enabled.backup | bool
+
+- name: Stop SCM service (GitLab)
+  ansible.builtin.command:
+    cmd: gitlab-ctl stop
+  become: true
+  failed_when: false
+  changed_when: true
+  when:
+    - pb_deploy_execute | bool
+    - pb_enabled.scm | bool
+
+- name: Stop mail server
+  ansible.builtin.service:
+    name: postfix
+    state: stopped
+    enabled: false
+  become: true
+  failed_when: false
+  when:
+    - pb_deploy_execute | bool
+    - pb_enabled.mail | bool
+
+- name: Stop provisioning services
+  ansible.builtin.service:
+    name: "{{ item }}"
+    state: stopped
+    enabled: false
+  become: true
+  loop:
+    - dnsmasq
+    - cobblerd
+    - foreman-proxy
+  failed_when: false
+  when:
+    - pb_deploy_execute | bool
+    - pb_enabled.provisioning | bool
+
+- name: Stop KVM hypervisor (libvirtd)
+  # The hypervisor is deployed early (compute substrate), so it is torn down
+  # late. Best-effort service stop only (failed_when: false); running guests and
+  # storage pools/networks are left intact — packages/data removal is out of
+  # scope for teardown, same as every other component here.
+  ansible.builtin.service:
+    name: libvirtd
+    state: stopped
+    enabled: false
+  become: true
+  failed_when: false
+  when:
+    - pb_deploy_execute | bool
+    - pb_enabled.hypervisor | bool
+    - pb_type.hypervisor == 'kvm'
+
+- name: Report teardown complete
+  ansible.builtin.debug:
+    msg: >-
+      Teardown complete. Note: component packages and data were NOT removed.
+      Manual cleanup may be required for persistent data (databases, repos, etc.)

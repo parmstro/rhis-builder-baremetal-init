@@ -1,0 +1,8 @@
+---
+- name: Prepare
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Install sudo (for become) and EPEL (provides the restic package on EL9)
+      ansible.builtin.raw: dnf install -y sudo epel-release 2>/dev/null
+      changed_when: false

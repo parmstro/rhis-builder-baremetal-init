@@ -1,0 +1,182 @@
+---
+# ── Prerequisites ────────────────────────────────────────────────────
+- name: Install Nagios dependencies
+  ansible.builtin.package:
+    name:
+      - gcc
+      - glibc
+      - glibc-common
+      - gd
+      - gd-devel
+      - make
+      - net-snmp
+      - openssl-devel
+      - perl
+      - unzip
+      - httpd
+      - php
+      - php-cli
+    state: present
+  become: true
+
+- name: Create Nagios user and group
+  become: true
+  block:
+    - name: Create nagios group
+      ansible.builtin.group:
+        name: "{{ mon_nagios_group }}"
+        state: present
+
+    - name: Create nagios user
+      ansible.builtin.user:
+        name: "{{ mon_nagios_user }}"
+        group: "{{ mon_nagios_group }}"
+        shell: /sbin/nologin
+        system: true
+
+    - name: Add apache to nagios group
+      ansible.builtin.user:
+        name: apache
+        groups: "{{ mon_nagios_group }}"
+        append: true
+
+# ── Install Nagios Core ──────────────────────────────────────────────
+- name: Download Nagios Core
+  ansible.builtin.get_url:
+    url: "https://github.com/NagiosEnterprises/nagioscore/releases/download/nagios-{{ mon_nagios_version }}/nagios-{{ mon_nagios_version }}.tar.gz"
+    dest: "/tmp/nagios-{{ mon_nagios_version }}.tar.gz"
+    mode: "0644"
+
+- name: Extract Nagios Core
+  ansible.builtin.unarchive:
+    src: "/tmp/nagios-{{ mon_nagios_version }}.tar.gz"
+    dest: /tmp
+    remote_src: true
+    creates: "/tmp/nagios-{{ mon_nagios_version }}"
+
+- name: Compile and install Nagios Core
+  ansible.builtin.shell: |
+    cd /tmp/nagios-{{ mon_nagios_version }} && \
+    ./configure --with-command-group={{ mon_nagios_group }} && \
+    make all && \
+    make install && \
+    make install-init && \
+    make install-commandmode && \
+    make install-config && \
+    make install-webconf
+  args:
+    creates: /usr/local/nagios/bin/nagios
+  become: true
+
+# ── Install Nagios Plugins ───────────────────────────────────────────
+- name: Download Nagios Plugins
+  ansible.builtin.get_url:
+    url: >-
+      https://github.com/nagios-plugins/nagios-plugins/releases/download/release-{{
+      mon_nagios_plugins_version }}/nagios-plugins-{{ mon_nagios_plugins_version }}.tar.gz
+    dest: "/tmp/nagios-plugins-{{ mon_nagios_plugins_version }}.tar.gz"
+    mode: "0644"
+
+- name: Extract Nagios Plugins
+  ansible.builtin.unarchive:
+    src: "/tmp/nagios-plugins-{{ mon_nagios_plugins_version }}.tar.gz"
+    dest: /tmp
+    remote_src: true
+    creates: "/tmp/nagios-plugins-{{ mon_nagios_plugins_version }}"
+
+- name: Compile and install Nagios Plugins
+  ansible.builtin.shell: |
+    cd /tmp/nagios-plugins-{{ mon_nagios_plugins_version }} && \
+    ./configure --with-nagios-user={{ mon_nagios_user }} --with-nagios-group={{ mon_nagios_group }} && \
+    make && \
+    make install
+  args:
+    creates: /usr/local/nagios/libexec/check_ping
+  become: true
+
+# ── Configure ────────────────────────────────────────────────────────
+- name: Set Nagios admin password
+  ansible.builtin.command:
+    cmd: "htpasswd -bc /usr/local/nagios/etc/htpasswd.users {{ mon_nagios_web_user }} {{ mon_nagios_web_password }}"
+  become: true
+  changed_when: true
+  no_log: true
+  when: mon_nagios_web_password | length > 0
+
+- name: Deploy Nagios contacts configuration
+  ansible.builtin.template:
+    src: nagios_contacts.cfg.j2
+    dest: /usr/local/nagios/etc/objects/contacts.cfg
+    owner: "{{ mon_nagios_user }}"
+    group: "{{ mon_nagios_group }}"
+    mode: "0664"
+  become: true
+  notify: monitoring_stack - restart nagios
+
+- name: Deploy Nagios host templates
+  ansible.builtin.template:
+    src: nagios_templates.cfg.j2
+    dest: /usr/local/nagios/etc/objects/templates.cfg
+    owner: "{{ mon_nagios_user }}"
+    group: "{{ mon_nagios_group }}"
+    mode: "0664"
+  become: true
+  notify: monitoring_stack - restart nagios
+
+- name: Deploy Nagios host definitions
+  ansible.builtin.template:
+    src: nagios_hosts.cfg.j2
+    dest: /usr/local/nagios/etc/objects/ansible_hosts.cfg
+    owner: "{{ mon_nagios_user }}"
+    group: "{{ mon_nagios_group }}"
+    mode: "0664"
+  become: true
+  notify: monitoring_stack - restart nagios
+  when: mon_nagios_hosts | length > 0
+
+- name: Deploy Nagios service definitions
+  ansible.builtin.template:
+    src: nagios_services.cfg.j2
+    dest: /usr/local/nagios/etc/objects/ansible_services.cfg
+    owner: "{{ mon_nagios_user }}"
+    group: "{{ mon_nagios_group }}"
+    mode: "0664"
+  become: true
+  notify: monitoring_stack - restart nagios
+
+- name: Include custom config files in nagios.cfg
+  ansible.builtin.lineinfile:
+    path: /usr/local/nagios/etc/nagios.cfg
+    line: "cfg_file=/usr/local/nagios/etc/objects/{{ item }}"
+    state: present
+  loop:
+    - ansible_hosts.cfg
+    - ansible_services.cfg
+  become: true
+  notify: monitoring_stack - restart nagios
+
+- name: Deploy EDA webhook command
+  ansible.builtin.template:
+    src: nagios_eda_command.cfg.j2
+    dest: /usr/local/nagios/etc/objects/eda_command.cfg
+    owner: "{{ mon_nagios_user }}"
+    group: "{{ mon_nagios_group }}"
+    mode: "0664"
+  become: true
+  notify: monitoring_stack - restart nagios
+  when: mon_nagios_eda_webhook_enabled
+
+# ── Enable and start services ───────────────────────────────────────
+- name: Enable and start httpd
+  ansible.builtin.service:
+    name: httpd
+    state: started
+    enabled: true
+  become: true
+
+- name: Enable and start Nagios
+  ansible.builtin.service:
+    name: nagios
+    state: started
+    enabled: true
+  become: true

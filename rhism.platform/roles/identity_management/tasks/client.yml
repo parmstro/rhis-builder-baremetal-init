@@ -1,0 +1,47 @@
+---
+# Shared IPA client enrollment — works for both freeipa and rh_idm types.
+# For ad_integration, use idm_action: enroll instead.
+
+- name: Validate client action applies to this idm_type
+  ansible.builtin.assert:
+    that:
+      - idm_type in ['freeipa', 'rh_idm']
+    fail_msg: >-
+      idm_action: client is not applicable for idm_type: {{ idm_type }}.
+      For AD integration, use idm_action: enroll.
+
+- name: Validate required client variables
+  ansible.builtin.assert:
+    that:
+      - idm_server_hostname | length > 0
+      - idm_admin_password | length > 0
+    fail_msg: >-
+      idm_server_hostname and idm_admin_password must be set for client enrollment.
+
+- name: Install IPA client packages
+  ansible.builtin.package:
+    name: "{{ _idm_client_packages }}"
+    state: present
+  become: true
+
+- name: Skip client install (dry-run mode)
+  ansible.builtin.debug:
+    msg: >-
+      DRY RUN — idm_client_install=false.
+      Would enroll {{ inventory_hostname }} with server {{ idm_server_hostname }}
+      in domain {{ idm_domain }}.
+  when: not (idm_client_install | bool)
+
+- name: Enroll IPA client
+  freeipa.ansible_freeipa.ipaclient:
+    servers: "{{ idm_server_hostname }}"
+    domain: "{{ idm_domain }}"
+    realm: "{{ idm_realm }}"
+    principal: admin
+    password: "{{ idm_admin_password }}"
+    mkhomedir: "{{ idm_mkhomedir | bool }}"
+    state: present
+  become: true
+  when: idm_client_install | bool
+  notify: identity_management - restart sssd
+  no_log: true

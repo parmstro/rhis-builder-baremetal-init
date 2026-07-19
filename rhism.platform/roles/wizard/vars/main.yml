@@ -1,0 +1,28 @@
+---
+# Internal constants — not overridable by inventory.
+
+_wizard_valid_actions:
+  - interactive
+  - validate
+  - show_plan
+  - generate_inventory
+
+_wizard_valid_profiles:
+  - estate       # the governed RHEL estate this wizard exists for — see files/profiles/estate.yml
+  - custom
+  - ""
+
+_wizard_component_keys:
+  - hypervisor
+  - identity
+  - provisioning
+  - secrets
+  - content
+  - scm
+  - backup
+  - container_platform
+  - mail
+  - monitoring
+  - automation
+  - security
+  - tang         # NBDE/disk-encryption key escrow — rhism alignment gap #2

@@ -1,0 +1,40 @@
+---
+- name: Verify — restic goal outcomes (installed, backed up, restored)
+  hosts: all
+  become: true
+  gather_facts: false
+  vars:
+    _repo: /var/restic-repo
+    _pw: molecule-test-pw  # pragma: allowlist secret
+  tasks:
+    - name: restic binary is installed
+      ansible.builtin.command: restic version
+      register: _ver
+      changed_when: false
+
+    - name: Repository has at least one snapshot
+      ansible.builtin.command: "restic -r {{ _repo }} snapshots --json"
+      environment:
+        RESTIC_PASSWORD: "{{ _pw }}"
+      register: _snaps
+      changed_when: false
+
+    - name: Restored file exists at target
+      ansible.builtin.stat:
+        path: /var/restore/etc/restic-testdata/payload.txt
+      register: _restored
+
+    - name: Restored content matches the original
+      ansible.builtin.slurp:
+        src: /var/restore/etc/restic-testdata/payload.txt
+      register: _content
+
+    - name: Assert restic functional goal is met
+      ansible.builtin.assert:
+        that:
+          - "'restic' in _ver.stdout"
+          - "'short_id' in _snaps.stdout"
+          - _restored.stat.exists
+          - (_content.content | b64decode) == 'molecule restic functional payload 42\n'
+        fail_msg: "restic functional goal not met (install / init / backup / snapshot / restore)"
+        success_msg: "PASS — restic installed, repo initialised, backup taken, snapshot listed, file restored & matches"

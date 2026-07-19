@@ -1,0 +1,24 @@
+---
+# Action: status
+# Query satellite smart proxy status via the Satellite API.
+
+- name: Include Satellite server validation
+  ansible.builtin.include_tasks: validate_server.yml
+
+- name: Query smart proxy status via Satellite API
+  ansible.builtin.uri:
+    url: "{{ prov_content_server_url }}/api/smart_proxies"
+    user: "{{ prov_content_username }}"
+    password: "{{ prov_content_password }}"
+    validate_certs: "{{ prov_content_validate_certs }}"
+    method: GET
+    force_basic_auth: true
+    headers:
+      Accept: application/json
+  register: _sp_proxy_list
+  no_log: true
+  failed_when: false
+
+- name: Display satellite smart proxy status
+  ansible.builtin.debug:
+    msg: "{{ _sp_proxy_list.json | default(_sp_proxy_list.msg) }}"

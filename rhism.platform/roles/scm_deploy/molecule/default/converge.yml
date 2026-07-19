@@ -1,0 +1,70 @@
+---
+- name: Converge — GitLab CE baseline no-op (dispatcher + var loading)
+  hosts: all
+  gather_facts: false
+  vars:
+    scm_action: baseline
+    scm_type: gitlab_ce
+    scm_apply_install: false
+    scm_apply_configure: false
+    scm_apply_runners: false
+    scm_apply_backup: false
+  roles:
+    - role: rhism.platform.scm_deploy
+
+- name: Converge — GitLab EE baseline no-op (dispatcher + var loading)
+  hosts: all
+  gather_facts: false
+  vars:
+    scm_action: baseline
+    scm_type: gitlab_ee
+    scm_apply_install: false
+    scm_apply_configure: false
+    scm_apply_runners: false
+    scm_apply_backup: false
+    scm_rhsm_skip_registration: true
+  roles:
+    - role: rhism.platform.scm_deploy
+
+# No "install dry-run" play here — gitlab_ce (and gitlab_ee) have no
+# dry-run gate at all: present.yml's package-repo-setup-script and dnf
+# install tasks carry no when: condition. scm_install_execute never
+# matched anything the role actually checks; this play always tried a
+# real install and always failed. The two baseline no-op plays above
+# already exercise scm_deploy's own dispatcher + variable-loading logic;
+# a real GitLab install is out of scope for a minimal container (heavy
+# multi-service package, no functional scenario exists for this family).
+
+- name: Converge — negative test (bogus scm_action)
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Attempt bogus scm_action (must fail)
+      block:
+        - name: Call role with invalid action
+          ansible.builtin.include_role:
+            name: scm_deploy
+          vars:
+            scm_action: bogus_action
+            scm_type: gitlab_ce
+      rescue:
+        - name: Confirm expected failure was caught
+          ansible.builtin.debug:
+            msg: "PASS — bogus scm_action correctly rejected"
+
+- name: Converge — negative test (bogus scm_type)
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Attempt bogus scm_type (must fail)
+      block:
+        - name: Call role with invalid type
+          ansible.builtin.include_role:
+            name: scm_deploy
+          vars:
+            scm_action: baseline
+            scm_type: bogus_type
+      rescue:
+        - name: Confirm expected failure was caught
+          ansible.builtin.debug:
+            msg: "PASS — bogus scm_type correctly rejected"

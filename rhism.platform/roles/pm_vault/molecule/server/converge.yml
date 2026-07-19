@@ -1,0 +1,14 @@
+---
+- name: Converge — pm_vault install on EL9 container
+  hosts: all
+  gather_facts: true
+
+  tasks:
+    - name: Install Vault (no firewall, no systemd service in container)
+      ansible.builtin.include_role:
+        name: pm_vault
+      vars:
+        pm_vault_action: install
+        pm_vault_tls_enabled: false
+        pm_vault_apply_firewall: false
+        pm_vault_manage_service: false

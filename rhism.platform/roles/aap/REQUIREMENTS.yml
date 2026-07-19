@@ -1,0 +1,87 @@
+---
+# Functional requirements — aap (requirements->test-case layer, owner rule
+# 2026-07-12). Renderer contract: roles/cmdb requirements_traceability.
+functional_requirements:
+  - req_id: AAP-FR-001
+    statement: >-
+      The role SHALL load the correct version profile for aap_version
+      (2.4/2.5/2.6/2.7), render the containerized installer inventory with the
+      version's group model (2.4 pre-gateway, 2.5+ with automationgateway), and
+      dispatch the requested action via the argument-spec-validated interface.
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: AAP-FR-002
+    statement: >-
+      The aap_execute dry-run gate SHALL, when false, render the installer
+      inventory / operator CR but leave Red Hat's real installer UN-invoked
+      (no live install in CI).
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: AAP-FR-003
+    statement: >-
+      The configure action SHALL be the role's OWN self-contained
+      config-as-code engine (tasks/config_<section>.yml — organization,
+      credentials, projects, inventories, templates, workflows, schedules;
+      owner decision 2026-07-15, no include_role of awx_config or awx),
+      dispatching a single section or the toggled baseline via
+      aap_configure_action, with all aap_* config variables resolving from
+      the role's own defaults.
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: AAP-FR-004
+    statement: >-
+      The install action SHALL deploy a real AAP controller for a given version
+      via Red Hat's containerized installer (aap_execute true) on entitled hosts.
+    tier: 3
+    verified_by:
+      - lab: playbooks/aap.yml
+
+  - req_id: AAP-FR-005
+    statement: >-
+      The install action SHALL deploy AAP on OpenShift via the operator +
+      AnsibleAutomationPlatform CR (aap_install_method openshift).
+    tier: 3
+    verified_by:
+      - lab: playbooks/aap.yml
+
+  - req_id: AAP-FR-006
+    statement: >-
+      The configure action SHALL configure a running AAP end-to-end via the
+      role's own config-as-code engine against a live controller.
+    tier: 3
+    verified_by:
+      # Proven 2026-07-19 on the external test lab: the config-as-code engine
+      # (incl. config_execution_environments) applied org/projects/inventories/
+      # EE/job-templates/workflow against a live AWX 24.6.1 controller, and the
+      # 'rhism :: day-1 estate build' workflow converged full-DAG (all 8 nodes,
+      # security convergence node executed last) — TEST-RHISM-ESTATE-CAC-DAY1.
+      # Deepened 2026-07-19 (TEST-RHISM-ESTATE-GITOPS): the projects section now
+      # sources from a REAL GitLab CE (project SCM synced from GitLab via a
+      # GitLab SCM credential), the day-1 DAG converged cloning FROM GitLab, and
+      # an edit committed in GitLab reconciled into an AWX object (edit-in-git ->
+      # reconcile loop).
+      - lab: collections/rhism/platform/playbooks/estate_cac.yml
+      - register: TEST-RHISM-ESTATE-CAC-DAY1
+      - register: TEST-RHISM-ESTATE-GITOPS
+
+  - req_id: AAP-FR-007
+    statement: >-
+      The backup and restore actions SHALL complete a backup/restore round-trip
+      against a live AAP (containerized and OpenShift).
+    tier: 3
+    verified_by:
+      - lab: playbooks/aap.yml
+
+  - req_id: AAP-FR-008
+    statement: >-
+      The status action SHALL report controller health via the version-correct
+      ping endpoint against a live AAP.
+    tier: 3
+    verified_by:
+      - lab: playbooks/aap.yml

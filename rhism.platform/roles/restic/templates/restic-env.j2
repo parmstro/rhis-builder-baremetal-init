@@ -1,0 +1,8 @@
+# Managed by Ansible — rhism restic role
+# Repository environment. Source this file before invoking restic manually:
+#   set -a; . /etc/restic/env; set +a; restic snapshots
+RESTIC_REPOSITORY="{{ backup_restic_repository }}"
+RESTIC_PASSWORD="{{ backup_restic_password }}"
+{% for key, value in backup_restic_env.items() %}
+{{ key }}="{{ value }}"
+{% endfor %}

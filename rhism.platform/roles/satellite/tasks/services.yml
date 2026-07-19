@@ -1,0 +1,18 @@
+---
+# --------------------------------------------------------------------------- #
+# Service lifecycle — started / stopped / restarted                           #
+# State maps directly to action variable.                                     #
+# --------------------------------------------------------------------------- #
+- name: Manage foreman service (satellite)
+  ansible.builtin.service:
+    name: "{{ _content_service_name }}"
+    state: "{{ action }}"
+    enabled: "{{ action == 'started' }}"
+  become: true
+
+- name: Manage postgresql service (satellite)
+  ansible.builtin.service:
+    name: postgresql
+    state: "{{ action }}"
+    enabled: "{{ action == 'started' }}"
+  become: true

@@ -1,0 +1,43 @@
+---
+- name: Display welcome and select profile
+  ansible.builtin.command:
+    cmd: >-
+      {{ wizard_tui_backend }} --title "{{ wizard_tui_title }}"
+      --menu "Select a deployment profile or choose Custom to configure each component:"
+      {{ wizard_tui_height }} {{ wizard_tui_width }} 6
+      "supported"  "Red Hat Supported: IDM + Satellite + AAP + OpenShift (flagship)"
+      "oss"        "Open Source: FreeIPA + Foreman + AWX + OKD/K3s"
+      "rhis"       "RHIS (Full Estate): IDM + Satellite + AAP + KVM + Tang/NBDE"
+      "minimal"    "Minimal: RHEL hardening only"
+      "custom"     "Custom: choose each component"
+      3>&1 1>&2 2>&3
+  register: _wizard_profile_result
+  changed_when: false
+  failed_when: _wizard_profile_result.rc not in [0, 1]
+  tags: infra_wizard
+
+- name: Handle welcome cancel
+  ansible.builtin.fail:
+    msg: "Wizard cancelled by user at profile selection."
+  when: _wizard_profile_result.rc == 1
+  tags: infra_wizard
+
+- name: Record profile selection
+  ansible.builtin.set_fact:
+    wizard_profile: "{{ _wizard_profile_result.stdout | trim }}"
+  tags: infra_wizard
+
+- name: Load pre-baked profile components
+  when: wizard_profile not in ['custom', '']
+  block:
+    - name: Read selected profile file
+      ansible.builtin.include_vars:
+        # Explicit role_path — include_vars' relative-path search does not
+        # reliably include files/ when the role is loaded from a collection.
+        file: "{{ role_path }}/files/profiles/{{ wizard_profile }}.yml"
+        name: _wizard_loaded_profile
+
+    - name: Apply profile component defaults
+      ansible.builtin.set_fact:
+        wizard_components: "{{ _wizard_loaded_profile.components }}"
+        wizard_sizing: "{{ _wizard_loaded_profile.sizing_defaults | default({}) }}"

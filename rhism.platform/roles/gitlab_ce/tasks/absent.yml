@@ -1,0 +1,22 @@
+---
+# ---------------------------------------------------------------------------
+# gitlab_ce — absent: remove package and optionally purge configuration
+# ---------------------------------------------------------------------------
+
+- name: Remove GitLab CE package
+  ansible.builtin.dnf:
+    name: "{{ _scm_package_name }}"
+    state: absent
+  become: true
+
+- name: Purge GitLab CE configuration on absent
+  ansible.builtin.file:
+    path: /etc/gitlab
+    state: absent
+  become: true
+  when: scm_purge_config | default(false)
+
+- name: Remove firewall rules for GitLab CE
+  ansible.builtin.include_tasks: firewall.yml
+  vars:
+    _gitlab_ce_firewall_state: disabled

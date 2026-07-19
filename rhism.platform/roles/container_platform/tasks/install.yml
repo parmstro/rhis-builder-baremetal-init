@@ -1,0 +1,6 @@
+---
+- name: Install container platform ({{ cp_type }})
+  ansible.builtin.include_role:
+    name: "{{ cp_type }}"
+  vars:
+    action: present

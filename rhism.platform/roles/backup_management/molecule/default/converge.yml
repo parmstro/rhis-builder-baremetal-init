@@ -1,0 +1,96 @@
+---
+- name: Converge — restic baseline no-op (dispatcher + var loading)
+  hosts: all
+  gather_facts: false
+  vars:
+    backup_action: baseline
+    backup_type: restic
+    backup_apply_server: false
+    backup_apply_client: false
+    backup_apply_schedule: false
+    backup_apply_verify: false
+  roles:
+    - role: rhism.platform.backup_management
+
+- name: Converge — bareos baseline no-op (dispatcher + var loading)
+  hosts: all
+  gather_facts: false
+  vars:
+    backup_action: baseline
+    backup_type: bareos
+    backup_apply_server: false
+    backup_apply_client: false
+    backup_apply_schedule: false
+    backup_apply_verify: false
+  roles:
+    - role: rhism.platform.backup_management
+
+- name: Converge — rear baseline no-op (dispatcher + var loading)
+  hosts: all
+  gather_facts: false
+  vars:
+    backup_action: baseline
+    backup_type: rear
+    backup_apply_server: false
+    backup_apply_client: false
+    backup_apply_schedule: false
+    backup_apply_verify: false
+  roles:
+    - role: rhism.platform.backup_management
+
+- name: Converge — oadp baseline no-op (dispatcher + var loading)
+  hosts: all
+  gather_facts: false
+  vars:
+    backup_action: baseline
+    backup_type: oadp
+    backup_apply_server: false
+    backup_apply_client: false
+    backup_apply_schedule: false
+    backup_apply_verify: false
+  roles:
+    - role: rhism.platform.backup_management
+
+# No "install dry-run" play here — restic has no dry-run gate at all (see
+# roles/restic/molecule/default/converge.yml's own comment: its actions
+# install packages / write files via become, which fails on a minimal
+# container with no sudo). backup_install_execute never matched anything
+# the role actually checks; this play always tried a real install and
+# always failed. The two baseline no-op plays above already exercise
+# backup_management's own dispatcher + variable-loading logic; a real
+# restic client install is validated in restic's own Tier-2 functional
+# scenario (roles/restic/molecule/functional/).
+
+- name: Converge — negative test (bogus backup_action)
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Attempt bogus backup_action (must fail)
+      block:
+        - name: Call role with invalid action
+          ansible.builtin.include_role:
+            name: rhism.platform.backup_management
+          vars:
+            backup_action: bogus_action
+            backup_type: restic
+      rescue:
+        - name: Confirm expected failure was caught
+          ansible.builtin.debug:
+            msg: "PASS — bogus backup_action correctly rejected"
+
+- name: Converge — negative test (bogus backup_type)
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Attempt bogus backup_type (must fail)
+      block:
+        - name: Call role with invalid type
+          ansible.builtin.include_role:
+            name: rhism.platform.backup_management
+          vars:
+            backup_action: baseline
+            backup_type: bogus_type
+      rescue:
+        - name: Confirm expected failure was caught
+          ansible.builtin.debug:
+            msg: "PASS — bogus backup_type correctly rejected"

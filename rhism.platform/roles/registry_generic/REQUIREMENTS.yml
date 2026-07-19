@@ -1,0 +1,69 @@
+---
+# Functional requirements — registry_generic (requirements->test-case layer +
+# Tier-3 elevation, owner rules 2026-07-12). Product role in the container_platform
+# registry family (a user picks exactly one of registry_generic/registry_internal).
+# DISTINCT PURPOSE: configures the cluster to consume an EXTERNAL container
+# registry (Harbor/Nexus/Artifactory/plain distribution or any OCI endpoint) —
+# it creates a pull secret and points the cluster at that registry; it does not
+# run a registry. Product capability fact-checked against the CNCF/Docker
+# distribution registry docs (distribution.github.io/distribution), the k3s
+# private-registry docs (docs.k3s.io/installation/private-registry —
+# registries.yaml mirrors + configs auth), and the OpenShift image config docs
+# (Image/cluster allowedRegistries). Curated against README +
+# meta/argument_specs.yml action set + tasks/main.yml. Family lab:
+# playbooks/container_platform.yml (cp_registry_type: generic).
+functional_requirements:
+  - req_id: REGISTRY_GENERIC-FR-001
+    statement: >-
+      The role SHALL consume the shared container_platform registry interface
+      (bare action + cp_registry_* + cp_kubeconfig_path + cp_type) and pass its
+      contract scenario — argument-spec validation, standalone default
+      (action=registry), dispatch for registry/present/absent, negative bad-action
+      rejection, and the cp_registry_execute dry-run gate — without a cluster.
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: REGISTRY_GENERIC-FR-002
+    statement: >-
+      Before configuring, the role SHALL fail closed unless cp_registry_url is set
+      (non-empty).
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#registry-generic
+
+  - req_id: REGISTRY_GENERIC-FR-003
+    statement: >-
+      The role SHALL create a kubernetes.io/dockerconfigjson pull secret
+      (cp_registry_secret_name) in the default namespace with optional basic-auth
+      credentials (anonymous when username/password are omitted), handled with
+      no_log.
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#registry-generic
+
+  - req_id: REGISTRY_GENERIC-FR-004
+    statement: >-
+      On k3s/rke2 the role SHALL write a containerd registries.yaml mirror (mirror
+      endpoint plus optional configs auth) under cp_registry_config_dir on the
+      nodes.
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#registry-generic
+
+  - req_id: REGISTRY_GENERIC-FR-005
+    statement: >-
+      On ocp/okd, when cp_registry_trust_cluster is true, the role SHALL add the
+      registry to the cluster Image config allowedRegistries (alongside the default
+      trusted registries).
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#registry-generic
+
+  - req_id: REGISTRY_GENERIC-FR-006
+    statement: >-
+      On action absent the role SHALL remove the pull secret and delete the
+      containerd registries.yaml mirror on k3s/rke2 nodes.
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#registry-generic

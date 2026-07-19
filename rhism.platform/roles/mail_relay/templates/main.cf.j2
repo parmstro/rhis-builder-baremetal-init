@@ -1,0 +1,71 @@
+# Postfix main.cf — managed by Ansible (mail_relay role)
+# Do not edit manually; changes will be overwritten.
+
+# Identity
+myhostname = {{ mail_hostname }}
+mydomain = {{ mail_domain }}
+myorigin = $mydomain
+
+# Network
+inet_interfaces = {{ mail_inet_interfaces }}
+inet_protocols = {{ mail_inet_protocols }}
+mydestination = localhost
+
+# Relay
+{% if mail_relay_host %}
+relayhost = [{{ mail_relay_host }}]:{{ mail_relay_port }}
+{% if mail_relay_user %}
+smtp_sasl_auth_enable = yes
+smtp_sasl_password_maps = {{ mail_db_type }}:/etc/postfix/sasl_passwd
+smtp_sasl_security_options = noanonymous
+smtp_sasl_tls_security_options = noanonymous
+{% endif %}
+{% else %}
+relayhost =
+{% endif %}
+
+# TLS
+{% if mail_tls_enabled %}
+smtp_use_tls = yes
+smtp_tls_security_level = {{ mail_tls_security_level }}
+{% if mail_tls_cert_file %}
+smtp_tls_cert_file = {{ mail_tls_cert_file }}
+smtp_tls_key_file = {{ mail_tls_key_file }}
+{% endif %}
+smtp_tls_loglevel = 1
+smtp_tls_session_cache_database = btree:${data_directory}/smtp_scache
+smtpd_tls_security_level = {{ mail_tls_security_level }}
+{% if mail_tls_cert_file %}
+smtpd_tls_cert_file = {{ mail_tls_cert_file }}
+smtpd_tls_key_file = {{ mail_tls_key_file }}
+{% endif %}
+smtpd_tls_session_cache_database = btree:${data_directory}/smtpd_scache
+smtpd_tls_loglevel = 1
+{% else %}
+smtp_use_tls = no
+smtpd_use_tls = no
+{% endif %}
+
+# Limits
+message_size_limit = {{ mail_message_size_limit }}
+mailbox_size_limit = {{ mail_mailbox_size_limit }}
+
+# Queue and retry
+queue_run_delay = 300s
+maximal_queue_lifetime = 5d
+bounce_queue_lifetime = 5d
+
+# Postmaster
+notify_classes = resource, software
+
+# Logging
+maillog_file = /dev/stdout
+
+alias_maps = {{ mail_db_type }}:/etc/aliases
+alias_database = {{ mail_db_type }}:/etc/aliases
+
+# Anti-relay policy (BUG-124): postfix >= 2.10 REQUIRES an anti-relay
+# directive in smtpd_relay_restrictions — without one smtpd exits fatally on
+# every connection (no banner, master throttling; the relay never served).
+mynetworks = {{ mail_mynetworks | join(', ') }}
+smtpd_relay_restrictions = permit_mynetworks, reject_unauth_destination

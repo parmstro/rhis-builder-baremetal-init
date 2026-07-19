@@ -1,0 +1,27 @@
+---
+galaxy_info:
+  role_name: linux_users
+  namespace: cx_ansible_galaxy
+  author: cx_ansible_galaxy
+  description: >-
+    User account security policy for EL 8/9/10 — sudo access controls, account
+    lockout via faillock, and optional uid/gid standards enforcement. Dispatcher
+    driven by linux_users_action variable.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: EL
+      versions:
+        - "8"
+        - "9"
+        - "10"
+  galaxy_tags:
+    - linux
+    - security
+    - users
+    - sudo
+    - faillock
+    - pam
+    - cis
+
+dependencies: []

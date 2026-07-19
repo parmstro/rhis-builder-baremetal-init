@@ -1,0 +1,32 @@
+---
+# tang — role defaults (the questionnaire). Every value here is overridable
+# by inventory; nothing is a hard-coded environment fact.
+
+action: deploy
+
+tang_image_repository: registry.redhat.io/rhel9/tang
+tang_image_tag: latest
+tang_image_digest: "sha256:6e94ae19a27caeba726e46a2124a396fc1f7d6c5f4f55ca11fe75e24e232deda"
+
+tang_container_name: tang
+tang_port: 8080
+tang_volume_name: tang-keys
+
+tang_manage_selinux: true
+tang_manage_firewall: true
+
+tang_verify_test_string: "tang-verify-round-trip-check"
+tang_verify_url: "http://{{ ansible_default_ipv4.address | default('127.0.0.1', true) }}:{{ tang_port }}"
+tang_manage_packages: true
+
+# Dry-run gate — deploy makes NO changes until true (needs a target with
+# real podman; keeps Tier-1 contract runs side-effect-free).
+tang_deploy_execute: false
+
+# Real-world-only key-material resilience (owner ask 2026-07-16) — never
+# exercised in molecule/CI. tang_key_backup_vault_password_file has NO
+# default: the role fails closed rather than ever writing key material to
+# disk unencrypted.
+tang_backup_keys: true
+tang_key_backup_dir: "{{ lookup('ansible.builtin.env', 'HOME') }}/.rhism/tang_key_backups"
+tang_key_backup_vault_password_file: ""

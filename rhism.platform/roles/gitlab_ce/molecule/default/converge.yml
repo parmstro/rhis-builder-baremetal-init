@@ -1,0 +1,38 @@
+---
+# Dry-run converge — exercises dispatch + the shared contract WITHOUT installing GitLab.
+# We never run a real install action against the bare container; instead we prove the two
+# guards a standalone caller depends on: argument-spec action validation and the existing
+# scm_upgrade_execute dry-run gate. Both fail closed and are caught by rescue.
+
+- name: Converge — upgrade dry-run gate (scm_upgrade_execute=false must block)
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Attempt upgrade with the gate closed
+      block:
+        - name: Call role with action=upgrade and gate false
+          ansible.builtin.include_role:
+            name: gitlab_ce
+          vars:
+            action: upgrade
+            scm_upgrade_execute: false
+      rescue:
+        - name: Confirm the dry-run gate blocked the upgrade
+          ansible.builtin.debug:
+            msg: "PASS — scm_upgrade_execute=false correctly blocked the upgrade"
+
+- name: Converge — negative test (bogus action must fail argument-spec validation)
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Attempt bogus action
+      block:
+        - name: Call role with invalid action
+          ansible.builtin.include_role:
+            name: gitlab_ce
+          vars:
+            action: bogus_action
+      rescue:
+        - name: Confirm expected failure was caught
+          ansible.builtin.debug:
+            msg: "PASS — bogus action correctly rejected"

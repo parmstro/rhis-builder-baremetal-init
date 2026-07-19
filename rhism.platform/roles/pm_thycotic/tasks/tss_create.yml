@@ -1,0 +1,28 @@
+---
+# TSS API call for create — only included when pm_thycotic_skip_api is false.
+# Requires delinea.tss collection to be installed.
+- name: Create secret in Thycotic Secret Server
+  delinea.tss.secret:
+    server_url: "{{ pm_thycotic_server_url }}"
+    username: "{{ pm_thycotic_username }}"
+    password: "{{ pm_thycotic_password }}"
+    domain: "{{ pm_thycotic_domain | default(omit) }}"
+    state: present
+    name: "{{ pm_target }}{% if pm_service | length > 0 %} ({{ pm_service }}){% endif %}"
+    folder_id: "{{ pm_thycotic_folder_id }}"
+    secret_template_id: "{{ pm_thycotic_template_id }}"
+    fields:
+      - slug: password
+        value: "{{ _pm_password }}"
+      - slug: notes
+        value: >-
+          ISM-compliant: ISM-0406,ISM-0407,ISM-0408,ISM-0410,ISM-0411,ISM-0412.
+          Length={{ _pm_password | length }}. Expiry={{ pm_expiry_days }} days.
+          Service={{ pm_service | default('N/A') }}.
+  register: _pm_tss_result
+  delegate_to: localhost
+  no_log: true
+
+- name: Record secret ID for future operations
+  ansible.builtin.debug:
+    msg: "Secret created in TSS with ID: {{ _pm_tss_result.secret.id }}. Store this as pm_thycotic_secret_id."

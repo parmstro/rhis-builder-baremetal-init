@@ -1,0 +1,13 @@
+# {{ ansible_managed }}
+# rhism.platform.rear (action: schedule) — unattended ReaR protection timer.
+[Unit]
+Description=Relax-and-Recover scheduled backup timer
+Documentation=man:rear(8)
+
+[Timer]
+OnCalendar={{ backup_rear_schedule_oncalendar }}
+Persistent=true
+Unit=rear-mkbackup.service
+
+[Install]
+WantedBy=timers.target

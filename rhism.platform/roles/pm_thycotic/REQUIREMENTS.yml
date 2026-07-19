@@ -1,0 +1,29 @@
+---
+# Functional requirements — pm_thycotic (requirements→test-case layer +
+# Tier-3 elevation, owner rules 2026-07-12).
+functional_requirements:
+  - req_id: PMTHY-FR-001
+    statement: >-
+      Secret lifecycle SHALL drive Delinea/Thycotic Secret Server via the
+      forked delinea.tss collection (REST, no SDK), with TSS-touching tasks
+      isolated in include_tasks files so pm_thycotic_skip_api dry-runs never
+      resolve the collection (BUG-029).
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: PMTHY-FR-002
+    statement: >-
+      Generated passwords SHALL be ISM-compliant with the real generator's
+      retry-until-compliant guarantee mirrored in the compliance test
+      (BUG-088 — no flaky assertions).
+    tier: 2
+    verified_by:
+      - molecule: default
+
+  - req_id: PMTHY-FR-003
+    statement: >-
+      The full lifecycle SHALL run against a real Secret Server instance.
+    tier: 3
+    verified_by:
+      - lab: playbooks/password_management.yml#pm_hosts

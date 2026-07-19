@@ -1,0 +1,45 @@
+filebeat.inputs:
+{% for input in mon_filebeat_inputs %}
+  - type: {{ input.type }}
+    enabled: true
+    paths:
+{% for path in input.paths %}
+      - {{ path }}
+{% endfor %}
+{% if input.fields is defined %}
+    fields:
+{% for key, value in input.fields.items() %}
+      {{ key }}: {{ value }}
+{% endfor %}
+    fields_under_root: false
+{% endif %}
+{% if input.multiline is defined %}
+    multiline.pattern: '{{ input.multiline.pattern }}'
+    multiline.negate: {{ input.multiline.negate | lower }}
+    multiline.match: {{ input.multiline.match }}
+{% endif %}
+
+{% endfor %}
+
+filebeat.config.modules:
+  path: ${path.config}/modules.d/*.yml
+  reload.enabled: true
+
+output.elasticsearch:
+  hosts: ["{{ mon_filebeat_output_protocol }}://{{ mon_filebeat_output_host }}"]
+  username: "{{ mon_filebeat_output_username }}"
+  password: "{{ mon_filebeat_output_password }}"
+  ssl.verification_mode: none
+
+processors:
+  - add_host_metadata:
+      when.not.contains.tags: forwarded
+  - add_cloud_metadata: ~
+
+logging.level: warning
+logging.to_files: true
+logging.files:
+  path: /var/log/filebeat
+  name: filebeat
+  keepfiles: 7
+  permissions: 0644

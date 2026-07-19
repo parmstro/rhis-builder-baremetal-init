@@ -1,0 +1,11 @@
+---
+galaxy_info:
+  author: rhism
+  description: Mail server role — Postfix relay or full stack with Dovecot, DKIM, SpamAssassin, ClamAV
+  license: Apache-2.0
+  min_ansible_version: "2.14"
+  platforms:
+    - name: EL
+      versions: ["8", "9"]
+  galaxy_tags: [postfix, dovecot, mail, smtp, dkim, spamassassin, clamav]
+dependencies: []

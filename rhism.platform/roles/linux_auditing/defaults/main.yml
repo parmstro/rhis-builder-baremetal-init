@@ -1,0 +1,24 @@
+---
+# Dispatcher variable — selects which task file(s) to run.
+# configure — install auditd, deploy CIS/STIG rules, start service
+# verify    — assert rules file exists with expected keys; check service state
+# report    — run aureport summary and key/access/auth event counts
+# baseline  — configure → verify → report in sequence
+linux_auditing_action: configure
+
+# Maximum audit log file size in KB before rotation.
+linux_auditing_log_size: 8192
+
+# Number of audit log files to retain.
+linux_auditing_num_logs: 5
+
+# Action when log space is exhausted: ROTATE, SYSLOG, SUSPEND, SINGLE, HALT.
+linux_auditing_space_left_action: SYSLOG
+
+# Additional raw audit rule strings appended after the baseline ruleset.
+# Example: ["-a always,exit -F arch=b64 -S open -F path=/etc/passwd -F perm=r"]
+linux_auditing_rules_extra: []
+
+# Set to false to skip enabling/starting the auditd service (e.g. in containers
+# where the kernel audit subsystem is not independently controllable).
+linux_auditing_start_service: true

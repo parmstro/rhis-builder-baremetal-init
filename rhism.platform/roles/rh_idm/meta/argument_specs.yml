@@ -1,0 +1,268 @@
+---
+argument_specs:
+  main:
+    short_description: Deploy and manage a Red Hat Identity Management (IdM) domain.
+    description: >-
+      Standalone-first Red Hat IdM identity-management product role. Same IPA lifecycle as
+      freeipa (server/replica/client, keytabs, AD trusts, DNS/user/group/HBAC/sudo) but built
+      on the RHEL `ipa-server` packages with RHSM registration and the idm:DL1 module stream
+      enabled first. Consumes the shared identity interface (bare `action` + `idm_*` vars) so
+      the identity_management dispatcher selects this product (idm_type: rh_idm) with identical
+      code to freeipa. Server/replica/client actions are gated (idm_server_install /
+      idm_replica_install / idm_client_install) and dry-run by default.
+    options:
+      action:
+        description: >-
+          Lifecycle action, shared across identity products. server/replica/client deploy or
+          enroll; enroll obtains a host keytab; trust establishes an AD trust; dns/user/group/
+          hbac/sudo manage directory objects; otp/smart_card/radius_proxy configure
+          multi-factor authentication; present/absent manage packages; started/stopped/
+          restarted manage the ipa service.
+        type: str
+        default: server
+        choices:
+          - server
+          - replica
+          - client
+          - enroll
+          - trust
+          - dns
+          - user
+          - group
+          - hbac
+          - sudo
+          - otp
+          - smart_card
+          - radius_proxy
+          - acme
+          - present
+          - absent
+          - started
+          - stopped
+          - restarted
+      idm_acme_mode:
+        description: >-
+          For action=acme — enable/disable/status drive ipa-acme-manage on a CA
+          server (CLI-only); request drives ipa-getcert on an enrolled host
+          (certmonger-tracked, auto-renewing).
+        type: str
+        default: status
+        choices: [enable, disable, status, request]
+      idm_acme_execute:
+        description: Dry-run gate for acme enable/disable/request (status is read-only).
+        type: bool
+        default: false
+      idm_acme_cert_file:
+        description: request mode — path to write the issued certificate.
+        type: str
+        default: ""
+      idm_acme_key_file:
+        description: request mode — path to write the private key.
+        type: str
+        default: ""
+      idm_acme_cert_subject:
+        description: request mode — certificate CN (defaults to inventory_hostname).
+        type: str
+        default: ""
+      idm_acme_cert_principal:
+        description: request mode — Kerberos principal the cert is bound to (defaults to host/<hostname>).
+        type: str
+        default: ""
+      idm_domain:
+        description: Kerberos/DNS domain, e.g. corp.example.com. Shared interface var.
+        type: str
+        default: ""
+      idm_realm:
+        description: Kerberos realm; derived as the uppercase domain when empty.
+        type: str
+        default: ""
+      idm_hostname:
+        description: Server FQDN; defaults to inventory_hostname when empty.
+        type: str
+        default: ""
+      idm_server_install:
+        description: >-
+          Execute gate for action=server. false = dry-run (log the intended install without
+          running it). Reused by the molecule scenario.
+        type: bool
+        default: false
+      idm_replica_install:
+        description: Execute gate for action=replica. false = dry-run.
+        type: bool
+        default: false
+      idm_client_install:
+        description: Execute gate for action=client. false = dry-run.
+        type: bool
+        default: false
+      idm_rhsm_org_id:
+        description: RHSM organization ID for host registration (vault). rh_idm-specific.
+        type: str
+        default: ""
+      idm_rhsm_activation_key:
+        description: RHSM activation key for host registration (vault). rh_idm-specific.
+        type: str
+        default: ""
+      idm_rhsm_skip_registration:
+        description: Skip RHSM registration (host already registered). rh_idm-specific.
+        type: bool
+        default: false
+      idm_admin_password:
+        description: Admin Kerberos principal password (vault).
+        type: str
+        default: ""
+      idm_ds_password:
+        description: Directory Server (LDAP) password (vault).
+        type: str
+        default: ""
+      idm_setup_dns:
+        description: Configure the integrated BIND DNS server on install.
+        type: bool
+        default: true
+      idm_auto_forwarders:
+        description: Auto-detect DNS forwarders from /etc/resolv.conf.
+        type: bool
+        default: false
+      idm_forwarders:
+        description: Explicit DNS forwarder addresses.
+        type: list
+        elements: str
+        default: []
+      idm_no_forwarders:
+        description: Use root DNS hints only (no forwarders).
+        type: bool
+        default: false
+      idm_ip_addresses:
+        description: IP addresses to register (default autodetect).
+        type: list
+        elements: str
+        default: []
+      idm_idstart:
+        description: Starting UID/GID for IPA-managed users.
+        type: int
+        default: 100000
+      idm_idmax:
+        description: Ending UID/GID range for IPA-managed users.
+        type: int
+        default: 199999
+      idm_mkhomedir:
+        description: Auto-create home directories on first login.
+        type: bool
+        default: true
+      idm_manage_firewall:
+        description: >-
+          Open IdM service ports via firewalld during server/replica prepare.
+          Disable where no firewalld runs (containers, externally-managed
+          firewalls).
+        type: bool
+        default: true
+      idm_master_server:
+        description: FQDN of the existing server to replicate from (action=replica).
+        type: str
+        default: ""
+      idm_replica_setup_dns:
+        description: Configure DNS on the replica.
+        type: bool
+        default: true
+      idm_replica_setup_ca:
+        description: Configure a CA on the replica.
+        type: bool
+        default: true
+      idm_server_hostname:
+        description: FQDN of the IDM server to enroll clients with (action=client/enroll).
+        type: str
+        default: ""
+      idm_trust_type:
+        description: Trust type passed to ipa trust-add (action=trust).
+        type: str
+        default: ad
+      idm_ad_trust_domain:
+        description: AD domain to establish trust with (action=trust).
+        type: str
+        default: ""
+      idm_ad_trust_admin:
+        description: AD administrator user for the trust.
+        type: str
+        default: Administrator
+      idm_ad_trust_password:
+        description: AD administrator password for the trust (vault).
+        type: str
+        default: ""
+      idm_ad_trust_range_type:
+        description: ID range type passed to ipatrust (action=trust).
+        type: str
+        default: ipa-ad-trust
+      idm_otp_tokens:
+        description: OTP token definitions (action=otp). Each entry {owner, type, description}.
+        type: list
+        elements: dict
+        default: []
+      idm_smart_card_ca_cert:
+        description: PEM string of the CA that issued smart cards (action=smart_card).
+        type: str
+        default: ""
+      idm_smart_card_ca_cert_file:
+        description: Path to the smart card CA cert file, alternative to idm_smart_card_ca_cert.
+        type: str
+        default: ""
+      idm_smart_card_server_configure:
+        description: Run ipa-advise config-server-for-smart-card-auth (action=smart_card).
+        type: bool
+        default: true
+      idm_smart_card_configure_clients:
+        description: Run ipa-advise config-client-for-smart-card-auth (action=smart_card).
+        type: bool
+        default: false
+      idm_smart_card_password_fallback:
+        description: Allow password login as a fallback to smart card auth.
+        type: bool
+        default: true
+      idm_smart_card_required_users:
+        description: Users who must authenticate with a smart card (action=smart_card).
+        type: list
+        elements: str
+        default: []
+      idm_smart_card_cert_map_rules:
+        description: Certificate mapping rule definitions (action=smart_card).
+        type: list
+        elements: dict
+        default: []
+      idm_radius_servers:
+        description: RADIUS proxy server definitions (action=radius_proxy).
+        type: list
+        elements: dict
+        default: []
+      idm_radius_user_mappings:
+        description: User-to-RADIUS-proxy mapping definitions (action=radius_proxy).
+        type: list
+        elements: dict
+        default: []
+      idm_dns_zones:
+        description: DNS zone definitions (action=dns).
+        type: list
+        elements: dict
+        default: []
+      idm_dns_records:
+        description: DNS record definitions (action=dns).
+        type: list
+        elements: dict
+        default: []
+      idm_users:
+        description: IPA user definitions passed to ipauser (action=user).
+        type: list
+        elements: dict
+        default: []
+      idm_groups:
+        description: IPA group definitions passed to ipagroup (action=group).
+        type: list
+        elements: dict
+        default: []
+      idm_hbac_rules:
+        description: HBAC rule definitions (action=hbac).
+        type: list
+        elements: dict
+        default: []
+      idm_sudo_rules:
+        description: Sudo rule definitions (action=sudo).
+        type: list
+        elements: dict
+        default: []

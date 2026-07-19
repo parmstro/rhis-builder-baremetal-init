@@ -1,0 +1,76 @@
+---
+# Functional requirements — ingress_haproxy (requirements->test-case layer +
+# Tier-3 elevation, wave-3+ standard). Product role in the ingress family (a user
+# picks exactly one of ingress_default/nginx/traefik/haproxy). Deploys the HAProxy
+# Kubernetes ingress controller via Helm and sets it as the default IngressClass;
+# on OCP/OKD (HAProxy is the built-in router) it only reports status. Capability
+# curated from README + meta/argument_specs.yml + tasks/main.yml, grounded in the
+# official HAProxy Kubernetes Ingress Controller docs
+# (haproxy.com/documentation/kubernetes-ingress/). Family lab:
+# playbooks/container_platform.yml (cp_ingress_type: haproxy).
+functional_requirements:
+  - req_id: INGRESS_HAPROXY-FR-001
+    statement: >-
+      The role SHALL enforce the shared ingress interface (action in
+      ingress/present/absent, cp_* vars) via meta/argument_specs.yml and reject
+      an invalid action (negative test).
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: INGRESS_HAPROXY-FR-002
+    statement: >-
+      The role SHALL honour the cp_ingress_execute dry-run gate — validating
+      dispatch and the variable contract without touching the cluster.
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: INGRESS_HAPROXY-FR-003
+    statement: >-
+      On non-OCP/OKD platforms with action present, the role SHALL deploy the
+      HAProxy ingress controller via the haproxytech Helm chart into the
+      haproxy-controller namespace with cp_ingress_replicas replicas.
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#ingress
+
+  - req_id: INGRESS_HAPROXY-FR-004
+    statement: >-
+      The role SHALL set HAProxy as the default IngressClass
+      (ingressclass.kubernetes.io/is-default-class).
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#ingress
+
+  - req_id: INGRESS_HAPROXY-FR-005
+    statement: >-
+      The role SHALL expose the HAProxy controller through a LoadBalancer-type
+      Service (requiring a cloud LB, MetalLB, or ServiceLB provider).
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#ingress
+
+  - req_id: INGRESS_HAPROXY-FR-006
+    statement: >-
+      On action absent (non-OCP/OKD), the role SHALL remove the HAProxy Helm
+      release and the haproxy-controller namespace.
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#ingress-absent
+
+  - req_id: INGRESS_HAPROXY-FR-007
+    statement: >-
+      On OCP/OKD (where HAProxy is the built-in router) the role SHALL deploy
+      nothing and only report ingress status — genuinely uncoverable without an
+      OpenShift cluster.
+    tier: 3
+    verified_by: []
+
+  - req_id: INGRESS_HAPROXY-FR-008
+    statement: >-
+      The deployed controller SHALL load-balance both L7 (HTTP/FastCGI) and L4
+      (TCP) traffic via HAProxy backend/TCP CRDs — a product capability beyond
+      the role's deploy path, exercised only against a real workload.
+    tier: 3
+    verified_by: []

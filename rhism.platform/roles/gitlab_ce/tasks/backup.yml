@@ -1,0 +1,25 @@
+---
+# ---------------------------------------------------------------------------
+# gitlab_ce — backup: run gitlab-backup create
+# ---------------------------------------------------------------------------
+
+- name: Run GitLab CE backup
+  become: true
+  block:
+    - name: Run backup preflight checks
+      ansible.builtin.include_tasks: backup_preflight.yml
+
+    - name: Create GitLab backup
+      ansible.builtin.command:
+        cmd: >-
+          {{ _scm_rake_cmd }} gitlab:backup:create
+          {% if scm_backup_skip | default('') | length > 0 %}
+          SKIP={{ scm_backup_skip }}
+          {% endif %}
+      environment:
+        CRON: "1"
+      changed_when: true
+
+    - name: Display backup directory
+      ansible.builtin.debug:
+        msg: "Backup created in {{ scm_backup_path | default('/var/opt/gitlab/backups') }}"

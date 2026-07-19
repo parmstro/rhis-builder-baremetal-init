@@ -1,0 +1,64 @@
+---
+argument_specs:
+  main:
+    short_description: Security-focused package management for EL 8/9/10.
+    options:
+      linux_packages_action:
+        type: str
+        required: true
+        choices:
+          - remove
+          - install
+          - patch
+          - all
+        description: >-
+          Selects which task file(s) to run. 'all' runs remove then install.
+          'patch' upgrades the packages in linux_packages_patch (derived from
+          CMDB CVE exposure data when the list is empty).
+      linux_packages_remove:
+        type: list
+        elements: str
+        default: [telnet, rsh, rsh-server, ypserv, ypbind, tftp, tftp-server, xinetd]
+        description: Packages to remove. Defaults to insecure legacy services.
+      linux_packages_install:
+        type: list
+        elements: str
+        default: [aide, rkhunter, audit, firewalld]
+        description: Packages to install. Defaults to common security tooling.
+      linux_packages_enable_epel:
+        type: bool
+        default: false
+        description: >-
+          Enable EPEL repository before installing packages. Required for aide
+          and rkhunter on standard EL systems without EPEL pre-configured.
+      linux_packages_aide_init:
+        type: bool
+        default: false
+        description: >-
+          After install, build and activate the AIDE baseline database
+          (aide --init) so scheduled integrity checks work. Opt-in — slow, and
+          only meaningful on real hosts, not throwaway containers.
+      linux_packages_rkhunter_init:
+        type: bool
+        default: false
+        description: >-
+          After install, refresh rkhunter data files (--update) and baseline
+          file properties (--propupd). Opt-in — --update may need network.
+      linux_packages_patch:
+        type: list
+        elements: str
+        default: []
+        description: >-
+          Packages to upgrade when action=patch. When empty, the patch action
+          derives the list from CMDB CVE exposure data.
+      linux_packages_patch_min_severity:
+        type: str
+        default: HIGH
+        choices: [CRITICAL, HIGH, MEDIUM, LOW]
+        description: >-
+          Minimum CVSS severity included when deriving the auto-patch list
+          from CMDB.
+      linux_packages_cmdb_api_url:
+        type: str
+        default: "http://localhost:5000"
+        description: CMDB API base URL used by the patch action.

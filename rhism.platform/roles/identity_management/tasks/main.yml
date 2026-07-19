@@ -1,0 +1,39 @@
+---
+- name: Validate idm_action
+  ansible.builtin.assert:
+    that:
+      - idm_action is defined
+      - idm_action in ['server', 'replica', 'client', 'enroll', 'trust', 'dns',
+                       'otp', 'smart_card', 'radius_proxy', 'acme', 'baseline']
+    fail_msg: >-
+      idm_action must be one of: server, replica, client, enroll, trust, dns,
+      otp, smart_card, radius_proxy, acme, baseline.
+      Got '{{ idm_action | default("undefined") }}'.
+
+- name: Validate idm_type
+  ansible.builtin.assert:
+    that:
+      - idm_type is defined
+      - idm_type in ['freeipa', 'rh_idm', 'ad_integration']
+    fail_msg: >-
+      idm_type must be one of: freeipa, rh_idm, ad_integration.
+      Got '{{ idm_type | default("undefined") }}'.
+
+- name: Validate required domain
+  ansible.builtin.assert:
+    that:
+      - idm_domain is defined
+      - idm_domain | length > 0
+    fail_msg: "idm_domain must be set (e.g. corp.example.com)."
+
+- name: Derive realm from domain when not set
+  ansible.builtin.set_fact:
+    idm_realm: "{{ idm_domain | upper }}"
+  when: idm_realm | length == 0
+
+- name: Load identity type settings
+  ansible.builtin.include_vars:
+    file: "{{ idm_type }}.yml"
+
+- name: "Execute task file for: {{ idm_action }}"
+  ansible.builtin.include_tasks: "{{ idm_action }}.yml"

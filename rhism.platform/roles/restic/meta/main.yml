@@ -1,0 +1,23 @@
+---
+galaxy_info:
+  namespace: rhism
+  role_name: restic
+  author: rhism
+  description: >-
+    Install and operate the restic backup client — initialise an encrypted repository, deploy
+    backup/restore scripts and a cron schedule, and run the full snapshot lifecycle (backup,
+    restore, forget, prune, snapshots, verify, unlock). Standalone-first product role, also
+    selectable by the backup_management dispatcher (backup_type: restic).
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: EL
+      versions:
+        - "9"
+  galaxy_tags:
+    - backup
+    - restic
+    - snapshot
+    - restore
+    - disasterrecovery
+dependencies: []

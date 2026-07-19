@@ -1,0 +1,10 @@
+---
+# Actions: started, stopped, restarted
+# Service management — state driven by action variable.
+
+- name: Manage foreman-proxy service
+  ansible.builtin.service:
+    name: "{{ _prov_service_name }}"
+    state: "{{ action }}"
+    enabled: "{{ action == 'started' }}"
+  become: true

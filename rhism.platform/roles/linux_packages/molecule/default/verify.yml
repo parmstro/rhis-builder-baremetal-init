@@ -1,0 +1,27 @@
+---
+- name: Verify — package state
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Gather package facts
+      ansible.builtin.package_facts:
+        manager: auto
+
+    - name: Assert telnet is absent
+      ansible.builtin.assert:
+        that: "'telnet' not in ansible_facts.packages"
+        fail_msg: "telnet should have been removed but is still installed"
+
+    - name: Assert audit package is installed
+      ansible.builtin.assert:
+        that: "'audit' in ansible_facts.packages"
+        fail_msg: "audit package should be installed"
+
+- name: Verify — summary
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Print summary
+      ansible.builtin.debug:
+        msg: "linux_packages verified on EL8, EL9, EL10 containers."

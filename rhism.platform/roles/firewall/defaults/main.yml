@@ -1,0 +1,7 @@
+---
+# The role's questionnaire — a list of firewalld rule-set entries. Empty by
+# default so a bare standalone run is a clean no-op; inventory fulfils it.
+# Each entry may combine: zone, source (str|list), interface, masquerade,
+# service (str|list), port (str|list), icmp_block, rich_rule, state,
+# permanent, immediate. See README.md for examples.
+firewall: []

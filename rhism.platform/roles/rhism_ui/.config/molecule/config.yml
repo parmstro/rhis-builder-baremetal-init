@@ -1,0 +1,17 @@
+---
+# Molecule base config for every scenario in this role.
+#
+# BUG-112: molecule's prerun (ansible-compat) probes the role-root
+# `requirements.yml`; on a case-insensitive filesystem (macOS, shared into the
+# EE via virtiofs) the probe HITS `REQUIREMENTS.yml` — the functional-
+# requirements layer file — misparses it as a galaxy requirements file, and
+# aborts every scenario. Prerun adds nothing in this platform (content
+# resolves via ANSIBLE_ROLES_PATH / ANSIBLE_COLLECTIONS_PATH / ANSIBLE_LIBRARY
+# set by ci_runner and the EE), so it is disabled for the whole role.
+#
+# Collection-hosted scenario, same reason: molecule's collection-under-test
+# auto-install (prerun) would try to ansible-galaxy-install this collection
+# into the workspace collections path, clobbering the loader symlink at
+# collections/ansible_collections/rhism/rhism ("Cannot call rmtree on a
+# symbolic link"). Local checkouts already resolve via ANSIBLE_COLLECTIONS_PATH.
+prerun: false

@@ -1,0 +1,15 @@
+---
+- name: Basic linux_security orchestrator test
+  hosts: linux_hosts
+  gather_facts: true
+  roles:
+    - role: linux_security
+      vars:
+        linux_security_apply_firewall: false
+        linux_hardening_action: pam
+        linux_packages_action: install
+        linux_packages_install: [audit]
+        linux_packages_remove: []
+        linux_auditing_action: configure
+        linux_users_action: faillock
+        linux_selinux_action: enforce

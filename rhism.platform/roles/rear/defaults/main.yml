@@ -1,0 +1,136 @@
+---
+# Lifecycle action (bare shared var). Standalone default takes a full ReaR backup
+# (rescue image + data). The backup_management dispatcher overrides this via
+# include_role vars. Full choice list and typed defaults are declared and validated
+# in meta/argument_specs.yml.
+action: backup
+
+# Standalone-first defaults over the SHARED backup family interface (backup_rear_*).
+# These are the SAME variable names the backup_management dispatcher exposes, so the
+# dispatcher selects this product with one call passing only `action`, and every
+# backup_rear_* value flows straight through. Standalone callers set these same names
+# directly. NEVER bare rear_* — that is the BUG-040 failure this family guards against.
+#
+# ReaR emits TWO independent artifacts and the config is split accordingly:
+#   OUTPUT side — the bootable rescue image (how you boot to recover)
+#   BACKUP side — the data backup (what gets restored once booted)
+# OUTPUT_URL falls back to BACKUP_URL when unset, so the two sides can share one target.
+
+# --- OUTPUT side (rescue image) ---
+# Rescue image format: ISO (default), USB, PXE, RAWDISK, OBDR, RAMDISK.
+backup_rear_output_format: ISO
+# Where the rescue image is written. Empty => ReaR falls back to backup_rear_backup_url.
+backup_rear_output_url: ""
+# Install a rescue entry into the local GRUB menu (GRUB_RESCUE=y).
+backup_rear_grub_rescue: false
+
+# --- BACKUP side (data backup) ---
+# Backup method: NETFS (default), RSYNC, BLOCKCLONE, or an external integration
+# (TSM, NBU, NSR, BAREOS, BORG, DUPLICITY, EXTERNAL).
+backup_rear_backup_method: NETFS
+# Backup target URL. Schemes: nfs://, cifs://, rsync://, sshfs://, file:///path,
+# usb:///dev/disk/by-label/REAR-000, tape://, iso://.
+backup_rear_backup_url: "file:///var/lib/rear/output"
+# Backup archiver program: tar (default) or rsync.
+backup_rear_backup_prog: tar
+# Paths excluded from the data backup (BACKUP_PROG_EXCLUDE, appended to ReaR defaults).
+backup_rear_exclude_patterns:
+  - /tmp/*
+  - /var/tmp/*
+  - /var/crash/*
+
+# --- Retention / rotation ---
+# Keep the previous backup copy alongside the new one (NETFS_KEEP_OLD_BACKUP_COPY=y).
+backup_rear_keep_old_backup_copy: false
+# Backup type: "" (full, default), incremental, or differential.
+backup_rear_backup_type: ""
+# Day a full backup is forced when using incremental/differential (FULLBACKUPDAY).
+backup_rear_fullbackup_day: Sun
+
+# Scratch directory ReaR uses while building artifacts (TMPDIR).
+backup_rear_tmpdir: /var/tmp
+
+# --- Config file management ---
+# Directory holding ReaR configuration (local.conf / site.conf).
+backup_rear_config_dir: /etc/rear
+# Also render the fleet-wide site.conf (in addition to the per-host local.conf).
+backup_rear_manage_site_conf: false
+
+# --- server action: storage-target preparation ---
+# Local directory ensured to exist for a file:// backup/output target. Also used as
+# a validation anchor. Set to "" to skip local directory creation (remote targets).
+backup_rear_server_local_dir: /var/lib/rear/output
+
+# --- backup action ---
+# Sub-mode for the standalone backup action:
+#   mkbackup     — rescue image + data backup (full protection, default)
+#   mkbackuponly — data backup only (assumes an up-to-date rescue image exists)
+#   mkrescue     — rescue image only (no data backup)
+backup_rear_backup_mode: mkbackup
+
+# --- schedule action (systemd timer) ---
+backup_rear_schedule_enabled: true
+# systemd OnCalendar expression for the timer.
+backup_rear_schedule_oncalendar: "Mon..Fri 22:00:00"
+# Command the scheduled service runs. The upstream-recommended robust pattern keeps the
+# rescue image current cheaply and only rebuilds when the layout changed; switch to
+# "/usr/sbin/rear mkbackup" for full data+image protection on every run.
+backup_rear_schedule_command: "/usr/sbin/rear checklayout || /usr/sbin/rear mkrescue"
+
+# --- restore action (rear recover) — DOUBLE execute gate ---
+# rear recover REPARTITIONS DISKS and REINSTALLS THE BOOTLOADER — genuinely
+# destructive and irreversible. BOTH flags must be true together (convert2rhel-style)
+# for the restore action to run. Tier-3 KVM-lab only; never enabled in CI.
+backup_rear_recover_execute: false
+backup_rear_recover_confirm_irreversible: false
+
+# --- baseline action orchestration toggles ---
+# baseline runs server -> client -> schedule -> verify (never restore) gated on these.
+backup_rear_apply_server: true
+backup_rear_apply_client: true
+backup_rear_apply_schedule: true
+backup_rear_apply_verify: true
+
+# ---------------------------------------------------------------------------
+# Internal (underscore-prefixed) — NOT part of the shared family interface.
+# ---------------------------------------------------------------------------
+# Base package always installed.
+_rear_packages:
+  - rear
+
+# OUTPUT formats that need an ISO/media builder + bootloader (chosen by RHEL major
+# version AND architecture in client.yml — xorriso on EL9/10, genisoimage on EL7/8;
+# the BIOS bootloader syslinux is x86_64-only, EFI arches boot via grub2).
+_rear_output_media_formats:
+  - ISO
+  - USB
+  - PXE
+  - OBDR
+
+# Extra packages by BACKUP method.
+_rear_backup_method_pkg_map:
+  NETFS:
+    - nfs-utils
+  RSYNC:
+    - rsync
+  BORG:
+    - borgbackup
+  DUPLICITY:
+    - duplicity
+  BLOCKCLONE: []
+  EXTERNAL: []
+
+# Extra packages by backup URL scheme (mount/transport tooling).
+_rear_url_scheme_pkg_map:
+  nfs:
+    - nfs-utils
+  cifs:
+    - cifs-utils
+  rsync:
+    - rsync
+  sshfs:
+    - fuse-sshfs
+  usb: []
+  file: []
+  tape: []
+  iso: []

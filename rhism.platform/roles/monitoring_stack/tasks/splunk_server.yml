@@ -1,0 +1,154 @@
+---
+# ── User / group ─────────────────────────────────────────────────────
+- name: Create Splunk group
+  ansible.builtin.group:
+    name: "{{ mon_splunk_group }}"
+    state: present
+  become: true
+
+- name: Create Splunk user
+  ansible.builtin.user:
+    name: "{{ mon_splunk_user }}"
+    group: "{{ mon_splunk_group }}"
+    home: "{{ mon_splunk_home }}"
+    shell: /sbin/nologin
+    system: true
+  become: true
+
+# ── Install Splunk Enterprise ────────────────────────────────────────
+- name: Check if Splunk is already installed
+  ansible.builtin.stat:
+    path: "{{ mon_splunk_home }}/bin/splunk"
+  register: splunk_binary
+
+- name: Download Splunk Enterprise RPM
+  ansible.builtin.get_url:
+    url: "https://download.splunk.com/products/splunk/releases/{{ mon_splunk_version }}/linux/splunk-{{ mon_splunk_version }}-linux-x86_64.rpm"
+    dest: "/tmp/splunk-{{ mon_splunk_version }}.rpm"
+    mode: "0644"
+  when: not splunk_binary.stat.exists
+
+- name: Install Splunk Enterprise RPM
+  ansible.builtin.package:
+    name: "/tmp/splunk-{{ mon_splunk_version }}.rpm"
+    state: present
+    disable_gpg_check: true
+  become: true
+  when: not splunk_binary.stat.exists
+
+- name: Accept license and set admin credentials
+  ansible.builtin.command:
+    cmd: >-
+      {{ mon_splunk_home }}/bin/splunk start --accept-license
+      --answer-yes --no-prompt
+      --seed-passwd {{ mon_splunk_admin_password }}
+  become: true
+  become_user: "{{ mon_splunk_user }}"
+  changed_when: true
+  no_log: true
+  when:
+    - not splunk_binary.stat.exists
+    - mon_splunk_admin_password | length > 0
+
+# ── Configure receiver ───────────────────────────────────────────────
+- name: Enable receiving port for forwarders
+  ansible.builtin.command:
+    cmd: >-
+      {{ mon_splunk_home }}/bin/splunk enable listen {{ mon_splunk_receive_port }}
+      -auth {{ mon_splunk_admin_user }}:{{ mon_splunk_admin_password }}
+  become: true
+  become_user: "{{ mon_splunk_user }}"
+  changed_when: true
+  no_log: true
+
+# ── Configure HEC ───────────────────────────────────────────────────
+- name: Enable HTTP Event Collector
+  ansible.builtin.command:
+    cmd: >-
+      {{ mon_splunk_home }}/bin/splunk http-event-collector enable
+      -uri https://localhost:{{ mon_splunk_mgmt_port }}
+      -auth {{ mon_splunk_admin_user }}:{{ mon_splunk_admin_password }}
+  become: true
+  become_user: "{{ mon_splunk_user }}"
+  changed_when: true
+  no_log: true
+
+- name: Create HEC token
+  ansible.builtin.command:
+    cmd: >-
+      {{ mon_splunk_home }}/bin/splunk http-event-collector create
+      -name ansible-eda
+      -uri https://localhost:{{ mon_splunk_mgmt_port }}
+      -auth {{ mon_splunk_admin_user }}:{{ mon_splunk_admin_password }}
+  become: true
+  become_user: "{{ mon_splunk_user }}"
+  changed_when: true
+  no_log: true
+  failed_when: false
+
+# ── Create indexes ───────────────────────────────────────────────────
+- name: Create Splunk indexes
+  ansible.builtin.command:
+    cmd: >-
+      {{ mon_splunk_home }}/bin/splunk add index {{ item.name }}
+      -maxTotalDataSizeMB {{ item.max_size_mb }}
+      -frozenTimePeriodInSecs {{ item.frozen_time_period_secs }}
+      -auth {{ mon_splunk_admin_user }}:{{ mon_splunk_admin_password }}
+  loop: "{{ mon_splunk_indexes }}"
+  loop_control:
+    label: "{{ item.name }}"
+  become: true
+  become_user: "{{ mon_splunk_user }}"
+  changed_when: true
+  no_log: true
+  failed_when: false
+
+# ── Deploy alert configurations ──────────────────────────────────────
+- name: Deploy Splunk saved searches (alerts)
+  ansible.builtin.template:
+    src: splunk_savedsearches.conf.j2
+    dest: "{{ mon_splunk_home }}/etc/system/local/savedsearches.conf"
+    owner: "{{ mon_splunk_user }}"
+    group: "{{ mon_splunk_group }}"
+    mode: "0600"
+  become: true
+  notify: monitoring_stack - restart splunk
+
+# ── Firewall ─────────────────────────────────────────────────────────
+- name: Open Splunk firewall ports
+  ansible.posix.firewalld:
+    port: "{{ item }}/tcp"
+    permanent: true
+    immediate: true
+    state: enabled
+  loop:
+    - "{{ mon_splunk_http_port }}"
+    - "{{ mon_splunk_mgmt_port }}"
+    - "{{ mon_splunk_receive_port }}"
+    - "{{ mon_splunk_hec_port }}"
+  become: true
+  failed_when: false
+
+# ── Enable on boot ──────────────────────────────────────────────────
+- name: Enable Splunk at boot
+  ansible.builtin.command:
+    cmd: "{{ mon_splunk_home }}/bin/splunk enable boot-start -user {{ mon_splunk_user }}"
+  become: true
+  changed_when: true
+
+- name: Ensure Splunk is running
+  ansible.builtin.command:
+    cmd: "{{ mon_splunk_home }}/bin/splunk status"
+  become: true
+  become_user: "{{ mon_splunk_user }}"
+  changed_when: false
+  failed_when: false
+  register: splunk_status
+
+- name: Start Splunk if not running
+  ansible.builtin.command:
+    cmd: "{{ mon_splunk_home }}/bin/splunk start"
+  become: true
+  become_user: "{{ mon_splunk_user }}"
+  changed_when: true
+  when: "'running' not in splunk_status.stdout"

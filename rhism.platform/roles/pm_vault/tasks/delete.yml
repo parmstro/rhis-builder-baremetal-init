@@ -1,0 +1,27 @@
+---
+# pm_vault — delete action.
+# Permanently destroys the KV secret (all versions for KV v2).
+# Use rotate instead if you want to keep version history.
+
+- name: Authenticate to Vault
+  ansible.builtin.include_tasks: connect.yml
+
+- name: Delete all versions of the KV secret (KV v2)
+  community.hashi_vault.vault_kv2_delete:
+    url: "{{ pm_vault_url }}"
+    namespace: "{{ pm_vault_namespace | default(omit) }}"
+    token: "{{ _pm_vault_token }}"
+    engine_mount_point: "{{ pm_vault_kv_mount }}"
+    path: "{{ _pm_vault_kv_path }}"
+  delegate_to: localhost
+  when: pm_vault_kv_version | int == 2
+
+- name: Delete KV v1 secret via Vault REST API DELETE
+  ansible.builtin.uri:
+    url: "{{ pm_vault_url }}/v1/{{ pm_vault_kv_mount }}/{{ _pm_vault_kv_path }}"
+    method: DELETE
+    headers:
+      X-Vault-Token: "{{ _pm_vault_token }}"
+    status_code: [204]
+  delegate_to: localhost
+  when: pm_vault_kv_version | int == 1

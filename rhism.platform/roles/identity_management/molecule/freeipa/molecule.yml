@@ -1,0 +1,46 @@
+---
+# Molecule freeipa scenario — package install validation and server dry-run.
+# Uses a RHEL9 UBI container. Does NOT run ipa-server-install (idm_server_install=false).
+# Tests: package listing, firewall tasks (dry-run), SSSD config structure.
+#
+# To run a real install, set idm_server_install=true on a RHEL 9 VM:
+#   molecule converge -s freeipa -- -e idm_server_install=true
+# Collection-hosted scenario: molecule's collection-under-test auto-install
+# (prerun) would try to ansible-galaxy-install this collection and its
+# dependency into the workspace collections path, clobbering the loader
+# symlink at collections/ansible_collections/rhism/<name> ("Cannot call
+# rmtree on a symbolic link"). Disabled — local collection checkouts already
+# resolve via ANSIBLE_COLLECTIONS_PATH.
+prerun: false
+
+dependency:
+  name: galaxy
+  enabled: false
+
+driver:
+  name: docker
+
+platforms:
+  - name: freeipa-test
+    image: registry.access.redhat.com/ubi9/ubi:latest
+    pre_build_image: true
+    override_command: true
+    # privileged needed for systemd + firewalld in the container
+    privileged: true
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    cgroupns_mode: host
+    command: /sbin/init
+
+provisioner:
+  name: ansible
+
+scenario:
+  test_sequence:
+    - dependency
+    - destroy
+    - syntax
+    - create
+    - converge
+    - verify
+    - destroy

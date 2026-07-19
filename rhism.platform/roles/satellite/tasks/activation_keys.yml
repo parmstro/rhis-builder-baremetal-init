@@ -1,0 +1,35 @@
+---
+# --------------------------------------------------------------------------- #
+# activation_keys — host collections and activation keys                      #
+# --------------------------------------------------------------------------- #
+- name: Manage host collections
+  theforeman.foreman.host_collection:
+    server_url: "{{ content_server_url }}"
+    username: "{{ content_username }}"
+    password: "{{ content_password }}"
+    validate_certs: "{{ content_validate_certs }}"
+    organization: "{{ content_organization }}"
+    name: "{{ item.name }}"
+    description: "{{ item.description | default(omit) }}"
+    state: present
+  loop: "{{ content_host_collections }}"
+  no_log: "{{ content_no_log }}"
+  when: content_host_collections | length > 0
+
+- name: Manage activation key
+  theforeman.foreman.activation_key:
+    server_url: "{{ content_server_url }}"
+    username: "{{ content_username }}"
+    password: "{{ content_password }}"
+    validate_certs: "{{ content_validate_certs }}"
+    organization: "{{ content_organization }}"
+    name: "{{ item.name }}"
+    lifecycle_environment: "{{ item.lifecycle_environment | default(omit) }}"
+    content_view: "{{ item.content_view | default(omit) }}"
+    auto_attach: "{{ item.auto_attach | default(true) }}"
+    subscriptions: "{{ item.subscriptions | default(omit) }}"
+    host_collections: "{{ item.host_collections | default(omit) }}"
+    state: present
+  loop: "{{ content_activation_keys }}"
+  no_log: "{{ content_no_log }}"
+  when: content_activation_keys | length > 0

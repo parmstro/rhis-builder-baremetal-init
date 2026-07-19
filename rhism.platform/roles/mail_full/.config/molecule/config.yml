@@ -1,0 +1,13 @@
+---
+# Molecule base config for every scenario in this role.
+#
+# BUG-112: molecule's prerun (ansible-compat) probes the role-root
+# `requirements.yml`; on a case-insensitive filesystem (macOS, shared into the
+# EE via virtiofs) the probe HITS `REQUIREMENTS.yml` — the functional-
+# requirements layer file — misparses it as a galaxy requirements file, and
+# aborts every scenario. Prerun adds nothing in this platform (content
+# resolves via ANSIBLE_ROLES_PATH / ANSIBLE_COLLECTIONS_PATH / ANSIBLE_LIBRARY
+# set by ci_runner and the EE), so it is disabled for the whole role. The EE's
+# baked /etc/xdg/molecule/config.yml carries the same default from the next
+# rebuild onward.
+prerun: false

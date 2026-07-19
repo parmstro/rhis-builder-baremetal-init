@@ -1,0 +1,30 @@
+---
+# roles/password_management/tasks/main.yml
+# Convenience dispatcher — validates inputs, routes to the correct backend role.
+# The backend roles (pm_ansible, pm_vault, pm_thycotic) are fully standalone
+# and can also be invoked directly with their own pm_<type>_action variable.
+
+- name: Validate required password_management variables
+  ansible.builtin.assert:
+    that:
+      - pm_action is defined
+      - pm_action in ['create', 'delete', 'audit', 'rotate']
+      - pm_type is defined
+      - pm_type in ['ansible', 'vault', 'thycotic']
+      - pm_target is defined
+      - pm_target | length > 0
+    fail_msg: >-
+      pm_action must be one of: create, delete, audit, rotate.
+      pm_type must be one of: ansible, vault, thycotic.
+      pm_target must be set (e.g. "db_app_user", "svc_ansible").
+      Got pm_action='{{ pm_action | default("undefined") }}'
+          pm_type='{{ pm_type | default("undefined") }}'
+          pm_target='{{ pm_target | default("undefined") }}'
+
+- name: "Execute {{ pm_action }} via {{ pm_type }} backend"
+  ansible.builtin.include_role:
+    name: "pm_{{ pm_type }}"
+  vars:
+    pm_ansible_action: "{{ pm_action }}"    # consumed by pm_ansible
+    pm_vault_action: "{{ pm_action }}"      # consumed by pm_vault
+    pm_thycotic_action: "{{ pm_action }}"   # consumed by pm_thycotic

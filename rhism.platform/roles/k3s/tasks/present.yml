@@ -1,0 +1,18 @@
+---
+# Action: present — install k3s server or agent
+
+- name: Install k3s via install script  # noqa: command-instead-of-module
+  ansible.builtin.shell:
+    cmd: >
+      curl -sfL {{ _cp_install_script_url }} |
+      {% if cp_install_version | length > 0 %}INSTALL_K3S_VERSION="{{ cp_install_version }}"{% endif %}
+      {% if cp_node_role == 'worker' %}K3S_URL="{{ cp_server_url }}" K3S_TOKEN="{{ cp_node_token }}"{% endif %}
+      sh -
+    creates: "{{ _cp_binary }}"
+  become: true
+  no_log: "{{ cp_node_token | length > 0 }}"
+
+- name: Enable firewall ports
+  ansible.builtin.include_tasks: firewall.yml
+  vars:
+    _k3s_firewall_state: enabled

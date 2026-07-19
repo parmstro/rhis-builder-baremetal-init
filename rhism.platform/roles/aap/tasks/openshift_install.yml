@@ -1,0 +1,50 @@
+---
+# OpenShift install path — render the AAP operator custom resource, then apply
+# the operator subscription + CR via kubernetes.core (gated by aap_execute).
+
+- name: Render the AAP operator custom resource
+  ansible.builtin.template:
+    src: openshift_aap_cr.yml.j2
+    dest: "{{ aap_work_dir }}/aap_cr.yml"
+    mode: "0600"
+
+- name: Ensure the AAP operator namespace exists (real run)
+  kubernetes.core.k8s:
+    api_version: v1
+    kind: Namespace
+    name: "{{ aap_openshift_namespace }}"
+    state: present
+    validate_certs: "{{ aap_validate_certs }}"
+  when: aap_execute | bool
+
+- name: Subscribe to the AAP operator (real run)
+  kubernetes.core.k8s:
+    state: present
+    validate_certs: "{{ aap_validate_certs }}"
+    definition:
+      apiVersion: operators.coreos.com/v1alpha1
+      kind: Subscription
+      metadata:
+        name: "{{ aap_version_profile.openshift.operator_package }}"
+        namespace: "{{ aap_openshift_namespace }}"
+      spec:
+        channel: "{{ aap_operator_channel | default(aap_version_profile.openshift.operator_channel, true) }}"
+        name: "{{ aap_version_profile.openshift.operator_package }}"
+        source: redhat-operators
+        sourceNamespace: openshift-marketplace
+  when: aap_execute | bool
+
+- name: Apply the AnsibleAutomationPlatform custom resource (real run)
+  kubernetes.core.k8s:
+    state: present
+    src: "{{ aap_work_dir }}/aap_cr.yml"
+    validate_certs: "{{ aap_validate_certs }}"
+  when: aap_execute | bool
+
+- name: Report dry-run (operator/CR NOT applied)
+  ansible.builtin.debug:
+    msg: >-
+      aap_execute is false — rendered {{ aap_work_dir }}/aap_cr.yml
+      ({{ aap_version_profile.openshift.cr_kind }}) for AAP {{ aap_version }}
+      but did NOT apply the operator or CR.
+  when: not (aap_execute | bool)

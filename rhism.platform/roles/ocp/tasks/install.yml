@@ -1,0 +1,24 @@
+---
+# Action: install — run openshift-install create cluster
+
+- name: Assert install execute flag is set
+  ansible.builtin.assert:
+    that: cp_install_execute | bool
+    fail_msg: "Set cp_install_execute: true to run openshift-install create cluster"
+
+- name: Run openshift-install create cluster
+  ansible.builtin.command:
+    cmd: "openshift-install create cluster --dir {{ cp_install_dir }} --log-level info"
+  register: _ocp_install_result
+  changed_when: true
+  async: 7200
+  poll: 30
+  become: true
+
+- name: Display cluster access information
+  ansible.builtin.debug:
+    msg:
+      - "OCP cluster installation complete"
+      - "Kubeconfig: {{ _cp_kubeconfig_path }}"
+      - "Console URL: https://console-openshift-console.apps.{{ cp_cluster_name }}.{{ cp_base_domain }}"
+      - "API URL: https://api.{{ cp_cluster_name }}.{{ cp_base_domain }}:6443"

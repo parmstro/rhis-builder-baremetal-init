@@ -1,0 +1,123 @@
+---
+# RHSM registration against the real Red Hat CDN needs a live entitlement + external
+# network — can't run in CI. This validates the standalone contract on the control host
+# (argument-spec negative tests, the default contract) plus a real dispatch of all three
+# action/method combinations with rhel_subscription_skip: true, which proves the
+# assert/branch logic end-to-end without ever calling community.general.redhat_subscription
+# for real (no subscription-manager binary needed at all).
+- name: Validate rhel_subscription dispatcher + standalone variable contract (control host only)
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Load role defaults
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../../defaults/main.yml"
+
+    - name: Negative test — argument spec rejects a bogus action
+      block:
+        - name: Call role with invalid action
+          ansible.builtin.include_role:
+            name: rhel_subscription
+          vars:
+            rhel_subscription_action: bogus_action
+        - name: Fail if validation did not catch invalid action
+          ansible.builtin.fail:
+            msg: "argument_spec should have rejected the bogus action"
+      rescue:
+        - name: Confirm expected failure was caught
+          ansible.builtin.debug:
+            msg: "PASS — bogus action correctly rejected"
+
+    - name: Negative test — argument spec rejects a bogus method
+      block:
+        - name: Call role with invalid method
+          ansible.builtin.include_role:
+            name: rhel_subscription
+          vars:
+            rhel_subscription_method: bogus_method
+        - name: Fail if validation did not catch invalid method
+          ansible.builtin.fail:
+            msg: "argument_spec should have rejected the bogus method"
+      rescue:
+        - name: Confirm expected failure was caught
+          ansible.builtin.debug:
+            msg: "PASS — bogus method correctly rejected"
+
+    - name: Negative test — activation_key method requires org_id + activation_key
+      block:
+        - name: Call role with activation_key method but no fields
+          ansible.builtin.include_role:
+            name: rhel_subscription
+          vars:
+            rhel_subscription_action: register
+            rhel_subscription_method: activation_key
+            rhel_subscription_skip: false
+        - name: Fail if the manual assert did not catch missing fields
+          ansible.builtin.fail:
+            msg: "register.yml's assert should have rejected missing org_id/activation_key"
+      rescue:
+        - name: Confirm expected failure was caught
+          ansible.builtin.debug:
+            msg: "PASS — missing activation_key fields correctly rejected"
+
+    - name: Assert standalone variable/default contract
+      ansible.builtin.assert:
+        that:
+          - rhel_subscription_action == 'register'
+          - rhel_subscription_method == 'activation_key'
+          - rhel_subscription_skip == false
+        fail_msg: "rhel_subscription standalone default contract not satisfied"
+
+    - name: Verify a dispatch task file exists for every declared action
+      ansible.builtin.stat:
+        path: "{{ playbook_dir }}/../../tasks/{{ item }}.yml"
+      register: _rhel_subscription_action_stat
+      failed_when: not _rhel_subscription_action_stat.stat.exists
+      loop:
+        - register
+        - unregister
+
+# NOTE: play-level `vars:` is not enough here — the first play's `include_vars` of
+# defaults/main.yml registers rhel_subscription_org_id etc. as host FACTS for localhost,
+# which persist across plays and outrank a later play's own `vars:` (BUG-060). Reset via
+# an explicit pre_tasks set_fact instead, the documented fix for this class of gotcha.
+- name: Real dispatch — register via activation_key, skipped (no real RHSM call)
+  hosts: localhost
+  gather_facts: false
+  pre_tasks:
+    - name: Reset facts for this play
+      ansible.builtin.set_fact:
+        rhel_subscription_action: register
+        rhel_subscription_method: activation_key
+        rhel_subscription_org_id: molecule-org
+        rhel_subscription_activation_key: molecule-key
+        rhel_subscription_skip: true
+  roles:
+    - role: rhel_subscription
+
+- name: Real dispatch — register via username_password, skipped (no real RHSM call)
+  hosts: localhost
+  gather_facts: false
+  pre_tasks:
+    - name: Reset facts for this play
+      ansible.builtin.set_fact:
+        rhel_subscription_action: register
+        rhel_subscription_method: username_password
+        rhel_subscription_org_id: ""
+        rhel_subscription_activation_key: ""
+        rhel_subscription_username: molecule-user
+        rhel_subscription_password: molecule-pass
+        rhel_subscription_skip: true
+  roles:
+    - role: rhel_subscription
+
+- name: Real dispatch — unregister, skipped (no real RHSM call)
+  hosts: localhost
+  gather_facts: false
+  pre_tasks:
+    - name: Reset facts for this play
+      ansible.builtin.set_fact:
+        rhel_subscription_action: unregister
+        rhel_subscription_skip: true
+  roles:
+    - role: rhel_subscription

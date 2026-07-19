@@ -1,0 +1,72 @@
+---
+# Functional requirements — storage_longhorn (requirements->test-case layer +
+# Tier-3 elevation, owner rules 2026-07-12). Product role in the container_platform
+# storage family (a user picks exactly one of storage_local_path/storage_nfs/
+# storage_longhorn/storage_ocs). Product capability fact-checked against the
+# official Longhorn docs (longhorn.io/docs — architecture, Helm install,
+# installation prerequisites: open-iscsi/iscsid, replica count, default
+# StorageClass). Curated against README + meta/argument_specs.yml action set +
+# tasks/main.yml. Family lab: playbooks/container_platform.yml
+# (cp_storage_type: longhorn).
+functional_requirements:
+  - req_id: STORAGE_LONGHORN-FR-001
+    statement: >-
+      The role SHALL consume the shared container_platform storage interface
+      (bare action + cp_storage_* + cp_kubeconfig_path) and pass its contract
+      scenario — argument-spec validation, standalone default (action=storage),
+      dispatch for storage/present/absent, negative bad-action rejection, and the
+      cp_storage_execute dry-run gate — without a cluster.
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: STORAGE_LONGHORN-FR-002
+    statement: >-
+      On deploy the role SHALL install the Longhorn node prerequisites
+      (open-iscsi, nfs-utils, util-linux) and enable and start iscsid on every
+      cluster node (required by the Longhorn engine).
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#storage-longhorn
+
+  - req_id: STORAGE_LONGHORN-FR-003
+    statement: >-
+      The role SHALL add the official Longhorn Helm repository
+      (https://charts.longhorn.io) and deploy the longhorn chart into the
+      longhorn-system namespace, waiting for the release to roll out.
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#storage-longhorn
+
+  - req_id: STORAGE_LONGHORN-FR-004
+    statement: >-
+      The role SHALL configure the default volume replica count
+      (cp_storage_longhorn_replicas) and the on-node data path
+      (cp_storage_longhorn_data_path) on the Longhorn deployment.
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#storage-longhorn
+
+  - req_id: STORAGE_LONGHORN-FR-005
+    statement: >-
+      When cp_storage_make_default is true, the role SHALL make Longhorn the
+      cluster-default StorageClass.
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#storage-longhorn
+
+  - req_id: STORAGE_LONGHORN-FR-006
+    statement: >-
+      On action absent the role SHALL remove the Longhorn Helm release and delete
+      the longhorn-system namespace.
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#storage-longhorn
+
+  - req_id: STORAGE_LONGHORN-FR-007
+    statement: >-
+      Replicated node-local persistent volumes SHALL survive a node failure by
+      rebuilding replicas on the surviving nodes — genuinely uncoverable in this
+      environment, which has no multi-node Kubernetes cluster.
+    tier: 3
+    verified_by: []

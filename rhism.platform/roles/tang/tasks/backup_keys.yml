@@ -1,0 +1,85 @@
+---
+# backup_keys — real-world-only resilience (owner ask 2026-07-16): a single
+# Tang server is a network-reachability point of failure for every host
+# bound to it. Fetch the escrow key material (/var/db/tang/*.jwk) and write
+# a VAULT-ENCRYPTED backup to the control node running the build — never
+# left as the only copy on the Tang server itself. Fails closed: refuses to
+# run at all without a vault password file, rather than ever writing key
+# material to disk unencrypted. Included from deploy.yml only when
+# tang_deploy_execute + tang_backup_keys are both true — never in
+# molecule/CI.
+
+- name: Fail closed if no vault password file is configured for the key backup
+  ansible.builtin.assert:
+    that:
+      - tang_key_backup_vault_password_file | length > 0
+    fail_msg: >-
+      tang_backup_keys is true but tang_key_backup_vault_password_file is
+      unset — refusing to fetch escrow key material with nowhere safe to
+      encrypt it. Set tang_key_backup_vault_password_file, or explicitly set
+      tang_backup_keys: false to accept the single-point-of-failure risk.
+
+- name: List the Tang key files inside the container
+  containers.podman.podman_container_exec:
+    name: "{{ tang_container_name }}"
+    command: "find /var/db/tang -maxdepth 1 -type f -name *.jwk -printf %f\\n"
+  register: _tang_key_filenames
+  changed_when: false
+
+- name: Read each key file's content
+  containers.podman.podman_container_exec:
+    name: "{{ tang_container_name }}"
+    command: "cat /var/db/tang/{{ item }}"
+  loop: "{{ _tang_key_filenames.stdout | trim | split('\n') | select() | list }}"
+  loop_control:
+    label: "{{ item }}"
+  register: _tang_key_contents
+  changed_when: false
+
+- name: Build the backup document
+  ansible.builtin.set_fact:
+    _tang_key_backup_doc:
+      tang_container_name: "{{ tang_container_name }}"
+      tang_port: "{{ tang_port }}"
+      backed_up_at: "{{ ansible_date_time.iso8601 | default('') }}"
+      keys: >-
+        {{ dict(_tang_key_contents.results
+                | map(attribute='item')
+                | zip(_tang_key_contents.results | map(attribute='stdout'))) }}
+
+- name: Ensure the local key-backup directory exists
+  ansible.builtin.file:
+    path: "{{ tang_key_backup_dir }}"
+    state: directory
+    mode: "0700"
+  delegate_to: localhost
+  become: false
+
+- name: Write the key backup document (plaintext, tight perms, pre-vault)
+  ansible.builtin.copy:
+    content: "{{ _tang_key_backup_doc | to_nice_yaml(indent=2) }}"
+    dest: "{{ tang_key_backup_dir }}/{{ tang_container_name }}_keys_{{ ansible_date_time.iso8601_basic | default('backup') }}.yml"
+    mode: "0600"
+  delegate_to: localhost
+  become: false
+  register: _tang_key_backup_file
+
+- name: Vault-encrypt the key backup document
+  ansible.builtin.command:
+    cmd: >-
+      ansible-vault encrypt
+      --vault-password-file={{ tang_key_backup_vault_password_file }}
+      {{ _tang_key_backup_file.dest }}
+  delegate_to: localhost
+  become: false
+  changed_when: true
+  # ansible-vault encrypt fails ("input is already encrypted") on a file
+  # that's already vault-format — idempotent by construction since this
+  # task only ever runs against a file it just wrote plaintext, never a
+  # pre-existing one (the destination filename is timestamped, always new).
+
+- name: Report the key backup location
+  ansible.builtin.debug:
+    msg: >-
+      PASS — Tang escrow key material backed up (vault-encrypted) to
+      {{ _tang_key_backup_file.dest }} on the control node.

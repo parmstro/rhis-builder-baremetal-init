@@ -1,0 +1,72 @@
+---
+# configure — aap's OWN configuration-as-code engine (orgs/credentials/
+# projects/inventories/templates/workflows/schedules over the controller API).
+#
+# Fully self-contained by owner decision 2026-07-15: configuration NEVER
+# delegates to another role (the OSS awx role keeps its own copy of this
+# engine — the code duplication is explicitly traded for product
+# independence; molecule verify asserts this file stays delegation-free).
+# The awx.awx module FQCNs in the config_*.yml sections are the API CLIENT
+# for the AAP controller, not a role dependency; the certified
+# infra.aap_configuration / gateway collections are the recorded future path
+# (open Hub/EDA decision).
+#
+# Dispatch: aap_configure_action is either a single section name
+# (organization|credentials|projects|inventories|templates|workflows|schedules)
+# or `baseline` — all enabled sections in dependency order, honouring the
+# aap_apply_* toggles. Dict-form include_tasks throughout (BUG-084).
+
+- name: Assert the controller URL is set for configuration
+  ansible.builtin.assert:
+    that:
+      - aap_controller_host | length > 0
+    fail_msg: "aap_controller_host must be set (the controller URL) to configure AAP."
+
+- name: "Configure a single section: {{ aap_configure_action }}"
+  ansible.builtin.include_tasks:
+    file: "config_{{ aap_configure_action }}.yml"
+  when: aap_configure_action != 'baseline'
+
+- name: Configure the full baseline (all enabled sections)
+  when: aap_configure_action == 'baseline'
+  block:
+    - name: Configure organization
+      ansible.builtin.include_tasks:
+        file: config_organization.yml
+      when: aap_apply_organization | bool
+
+    - name: Configure credentials
+      ansible.builtin.include_tasks:
+        file: config_credentials.yml
+      when: aap_apply_credentials | bool
+
+    - name: Configure projects
+      ansible.builtin.include_tasks:
+        file: config_projects.yml
+      when: aap_apply_projects | bool
+
+    - name: Configure inventories
+      ansible.builtin.include_tasks:
+        file: config_inventories.yml
+      when: aap_apply_inventories | bool
+
+    - name: Register execution environments
+      # Before job templates — a template's execution_environment must exist first.
+      ansible.builtin.include_tasks:
+        file: config_execution_environments.yml
+      when: aap_apply_execution_environments | bool
+
+    - name: Configure job templates
+      ansible.builtin.include_tasks:
+        file: config_templates.yml
+      when: aap_apply_templates | bool
+
+    - name: Configure workflow templates
+      ansible.builtin.include_tasks:
+        file: config_workflows.yml
+      when: aap_apply_workflows | bool
+
+    - name: Configure schedules
+      ansible.builtin.include_tasks:
+        file: config_schedules.yml
+      when: aap_apply_schedules | bool

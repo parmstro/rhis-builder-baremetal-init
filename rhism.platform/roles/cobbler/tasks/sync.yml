@@ -1,0 +1,6 @@
+---
+- name: Run cobbler sync
+  ansible.builtin.command:
+    cmd: cobbler sync
+  become: true
+  changed_when: true

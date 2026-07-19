@@ -1,0 +1,93 @@
+---
+- name: Converge — ReaR functional install / configure / dump / produce a real artifact
+  hosts: all
+  become: true
+  vars:
+    # Point BOTH artifacts at one local file:// target. ReaR forbids a NETFS backup
+    # directory that lives on the '/' filesystem (you cannot store the backup inside the
+    # very filesystem you would restore); the container's /tmp is a separate tmpfs mount
+    # (see molecule.yml), so the target sits on its own filesystem and passes that guard.
+    # NETFS writes $BACKUP_URL/<hostname>/backup.tar.gz (+ rescue ISO when mkrescue works).
+    backup_rear_backup_method: NETFS
+    backup_rear_backup_url: "file:///tmp/rear-target"
+    backup_rear_output_url: "file:///tmp/rear-target"
+    backup_rear_server_local_dir: /tmp/rear-target
+    # Trim the data backup so mkbackuponly stays quick in CI.
+    backup_rear_exclude_patterns:
+      - /tmp/*
+      - /var/tmp/*
+      - /var/crash/*
+      - /usr/*
+      - /var/cache/*
+  tasks:
+    - name: Prepare the storage target (server action)
+      ansible.builtin.include_role:
+        name: rhism.platform.rear
+      vars:
+        action: server
+
+    - name: Install ReaR + render /etc/rear config (client action)
+      ansible.builtin.include_role:
+        name: rhism.platform.rear
+      vars:
+        action: client
+
+    # TEST-ONLY container shim. A container shares the host kernel and has no
+    # /boot/vmlinuz, so ReaR's prep kernel-detection guard aborts even the data-only
+    # workflow — even though mkbackuponly builds NO rescue image and therefore packages
+    # NO kernel. Pin KERNEL_FILE at a placeholder so the (here-irrelevant) guard passes;
+    # the produced backup.tar.gz is a REAL tar of the real filesystem and is unaffected.
+    # A real host has a real /boot kernel and needs none of this.
+    - name: Provide a placeholder KERNEL_FILE for the container (test shim)
+      ansible.builtin.copy:
+        dest: /boot/vmlinuz-placeholder
+        content: "placeholder\n"
+        mode: "0644"
+
+    - name: Pin KERNEL_FILE in local.conf so ReaR's prep guard passes (test shim)
+      ansible.builtin.lineinfile:
+        path: /etc/rear/local.conf
+        line: 'KERNEL_FILE="/boot/vmlinuz-placeholder"'
+        create: false
+
+    - name: Resolve the effective ReaR configuration (rear dump)
+      ansible.builtin.command: /usr/sbin/rear -v dump
+      register: _dump
+      changed_when: false
+
+    - name: Assert OUTPUT + BACKUP config actually resolved
+      ansible.builtin.assert:
+        that:
+          - "'OUTPUT' in _dump.stdout"
+          - "'BACKUP' in _dump.stdout"
+        fail_msg: "rear dump did not surface the OUTPUT/BACKUP configuration"
+
+    - name: Check the recovery layout (rear checklayout — read-only)
+      ansible.builtin.command: /usr/sbin/rear checklayout
+      register: _checklayout
+      changed_when: false
+      failed_when: false
+
+    # Attempt the rescue ISO — a genuine signal when it works, but block/bootloader
+    # introspection can fail inside a container, so this is TOLERANT and the scenario
+    # does not depend on it. The reliable artifact is produced next.
+    - name: Attempt to build the rescue image (rear mkrescue — tolerant)
+      ansible.builtin.command: /usr/sbin/rear -v mkrescue
+      register: _mkrescue
+      changed_when: _mkrescue.rc == 0
+      failed_when: false
+
+    - name: Record whether the rescue ISO build succeeded
+      ansible.builtin.debug:
+        msg: >-
+          rear mkrescue rc={{ _mkrescue.rc }} —
+          {{ 'rescue ISO built' if _mkrescue.rc == 0
+             else 'rescue ISO build not available in this container (expected); relying on data backup' }}
+
+    # Reliable, container-friendly artifact: data backup only (tar NETFS to file://).
+    - name: Produce the data backup (backup action, mode mkbackuponly)
+      ansible.builtin.include_role:
+        name: rhism.platform.rear
+      vars:
+        action: backup
+        backup_rear_backup_mode: mkbackuponly

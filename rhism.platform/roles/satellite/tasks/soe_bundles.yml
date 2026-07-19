@@ -1,0 +1,106 @@
+---
+# --------------------------------------------------------------------------- #
+# soe_bundles — SOE (Standard Operating Environment) bundle model             #
+# (docs/rhism-alignment-plan.md "reuse map" item 1 — "the strongest idea").   #
+#                                                                             #
+# A content_soe_bundles entry is a single composable spec for ONE OS build:  #
+# its content view, lifecycle environment, activation key, and a hostgroup / #
+# kickstart-snippet reference. This file TRANSFORMS the list of bundles into #
+# the SAME content_lifecycle_environments/content_views/content_host_       #
+# collections/content_activation_keys shapes those flat actions already      #
+# consume, then dispatches through content_views.yml / activation_keys.yml — #
+# the SAME task files, not a parallel implementation. No theforeman.foreman  #
+# module is called here that those two files don't already call.             #
+#                                                                             #
+# content_views.yml's own FIRST task already manages lifecycle environments  #
+# (it's the identical module call lifecycle.yml makes standalone) — calling  #
+# content_views.yml therefore already covers the lifecycle-environment half  #
+# of an SOE bundle. A separate call to lifecycle.yml would just re-run the   #
+# same module a second time for the same object, so it is deliberately NOT   #
+# called again here.                                                        #
+#                                                                             #
+# hostgroup / kickstart_snippet are carried through as REFERENCE metadata    #
+# only. This role has never managed Satellite hostgroups or provisioning     #
+# templates via API — content_hosts[].hostgroup (host.yml) is likewise       #
+# always a by-name reference to a hostgroup that already exists. An SOE      #
+# bundle's hostgroup/kickstart_snippet are meant to be read by whoever is    #
+# authoring content_hosts entries for this SOE, not created by this role.    #
+# See docs/satellite.md's SOE bundle model section for the full rationale.   #
+#                                                                             #
+# content_soe_bundles_execute (default true) gates only the two dispatch     #
+# calls at the bottom — validation and the transform into _soe_* facts       #
+# always run, so the transform can be proven in molecule without a live      #
+# Satellite server (content_soe_bundles_execute: false).                     #
+#                                                                             #
+# List-guarded no-op with the empty content_soe_bundles default.             #
+# --------------------------------------------------------------------------- #
+- name: Fail if an SOE bundle is missing a required field
+  ansible.builtin.assert:
+    that:
+      - item.name is defined
+      - item.lifecycle_environment is defined
+    fail_msg: >-
+      every content_soe_bundles entry needs at least name and
+      lifecycle_environment ({{ item }})
+  loop: "{{ content_soe_bundles }}"
+  loop_control:
+    label: "{{ item.name | default('(unnamed SOE bundle)') }}"
+  when: content_soe_bundles | length > 0
+
+- name: Initialize derived SOE structures
+  ansible.builtin.set_fact:
+    _soe_lifecycle_environments: []
+    _soe_content_views: []
+    _soe_host_collections: []
+    _soe_activation_keys: []
+  when: content_soe_bundles | length > 0
+
+- name: Derive the lifecycle-environment, content-view, host-collection, and activation-key
+    shapes from each SOE bundle
+  ansible.builtin.set_fact:
+    _soe_lifecycle_environments: "{{ _soe_lifecycle_environments + [_soe_le] }}"
+    _soe_content_views: "{{ _soe_content_views + [_soe_cv] }}"
+    _soe_host_collections: "{{ _soe_host_collections + (item.host_collections | default([])) }}"
+    _soe_activation_keys: "{{ _soe_activation_keys + [_soe_ak] }}"
+  vars:
+    _soe_le:
+      name: "{{ item.lifecycle_environment }}"
+      prior: "{{ item.lifecycle_environment_prior | default('Library') }}"
+    _soe_cv: >-
+      {{ {'name': item.content_view | default(item.name),
+          'lifecycle_environments': [item.lifecycle_environment]}
+         | combine({'description': item.content_view_description}
+              if item.content_view_description is defined else {})
+         | combine({'repositories': item.repositories}
+              if item.repositories is defined else {}) }}
+    _soe_ak: >-
+      {{ {'name': item.activation_key | default(item.name),
+          'lifecycle_environment': item.lifecycle_environment,
+          'content_view': item.content_view | default(item.name),
+          'auto_attach': item.auto_attach | default(true)}
+         | combine({'subscriptions': item.subscriptions}
+              if item.subscriptions is defined else {})
+         | combine({'host_collections': item.host_collections | map(attribute='name') | list}
+              if (item.host_collections | default([]) | length > 0) else {}) }}
+  loop: "{{ content_soe_bundles }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: content_soe_bundles | length > 0
+
+- name: Manage the content view + lifecycle environment for every SOE bundle
+  ansible.builtin.include_tasks: content_views.yml
+  vars:
+    content_lifecycle_environments: "{{ _soe_lifecycle_environments }}"
+    content_views: "{{ _soe_content_views }}"
+  when:
+    - content_soe_bundles | length > 0
+    - content_soe_bundles_execute | bool
+
+- name: Manage the host collections + activation key for every SOE bundle
+  ansible.builtin.include_tasks: activation_keys.yml
+  vars:
+    content_host_collections: "{{ _soe_host_collections }}"
+    content_activation_keys: "{{ _soe_activation_keys }}"
+  when:
+    - content_soe_bundles | length > 0
+    - content_soe_bundles_execute | bool

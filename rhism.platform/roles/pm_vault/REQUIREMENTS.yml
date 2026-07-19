@@ -1,0 +1,29 @@
+---
+# Functional requirements — pm_vault (requirements→test-case layer +
+# Tier-3 elevation, owner rules 2026-07-12).
+functional_requirements:
+  - req_id: PMVAULT-FR-001
+    statement: >-
+      server SHALL deploy and initialise a Vault server (init/unseal via the
+      vault CLI where no module exists, KV v2 + AppRole enablement), with
+      service handlers gated on pm_vault_manage_service (BUG-026).
+    tier: 2
+    verified_by:
+      - molecule: server
+
+  - req_id: PMVAULT-FR-002
+    statement: >-
+      Secret lifecycle SHALL use the community.hashi_vault v7 KV2 modules
+      (vault_kv2_write/get/delete, engine_mount_point — BUG-027) against a
+      live Vault, generating ISM-compliant secrets; a REAL hvac-backed call
+      SHALL work in the EE (BUG-087).
+    tier: 2
+    verified_by:
+      - molecule: default
+
+  - req_id: PMVAULT-FR-003
+    statement: >-
+      The full lifecycle SHALL run via the dispatcher against lab hosts.
+    tier: 3
+    verified_by:
+      - lab: playbooks/password_management.yml#pm_hosts

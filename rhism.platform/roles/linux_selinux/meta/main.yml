@@ -1,0 +1,25 @@
+---
+galaxy_info:
+  role_name: linux_selinux
+  namespace: cx_ansible_galaxy
+  author: cx_ansible_galaxy
+  description: >-
+    SELinux policy management for EL 8/9/10 — enforcement mode, boolean management,
+    and file context fixes. Gracefully skips when SELinux is absent (containers).
+    Dispatcher driven by linux_selinux_action variable.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: EL
+      versions:
+        - "8"
+        - "9"
+        - "10"
+  galaxy_tags:
+    - linux
+    - security
+    - selinux
+    - hardening
+    - cis
+
+dependencies: []

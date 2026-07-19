@@ -1,0 +1,25 @@
+---
+galaxy_info:
+  namespace: rhism
+  role_name: rh_idm
+  author: rhism
+  description: >-
+    Deploy and manage a subscription Red Hat Identity Management (IdM) domain — server or
+    replica install, client enrolment, host keytabs, AD trusts, and DNS/user/group/HBAC/sudo
+    management, built on the RHEL ipa-server packages with RHSM registration + idm:DL1 module
+    stream. Standalone-first product role, also selectable by the identity_management
+    dispatcher (idm_type: rh_idm). Install actions are gated and dry-run by default.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: EL
+      versions:
+        - "9"
+  galaxy_tags:
+    - rhidm
+    - idm
+    - identity
+    - redhat
+    - kerberos
+    - ldap
+dependencies: []

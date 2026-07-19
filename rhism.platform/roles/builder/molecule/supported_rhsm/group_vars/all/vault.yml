@@ -1,0 +1,19 @@
+---
+# Encrypt each value with: ansible-vault encrypt_string 'VALUE' --name 'VARNAME'
+# Then replace the placeholder comment with the output block.
+#
+# vault_rhsm_org_id: !vault |
+#   $ANSIBLE_VAULT;1.1;AES256
+#   ...
+#
+# vault_rhsm_activation_key: !vault |
+#   $ANSIBLE_VAULT;1.1;AES256
+#   ...
+#
+# vault_idm_admin_password: !vault |
+#   $ANSIBLE_VAULT;1.1;AES256
+#   ...
+#
+# vault_idm_ds_password: !vault |
+#   $ANSIBLE_VAULT;1.1;AES256
+#   ...

@@ -1,0 +1,68 @@
+---
+# dpa.yml — assemble and apply the DataProtectionApplication (DPA) CR.
+#
+# The DPA (oadp.openshift.io/v1alpha1) is the OADP operator CR that installs and
+# configures the whole Velero stack: the OpenShift/CSI/kubevirt plugins, the
+# node-agent (filesystem backup via Kopia or Restic), and — because backupLocations
+# and snapshotLocations are declared inline here — the default BackupStorageLocation
+# and (optionally) VolumeSnapshotLocation. Do NOT also create BSL/VSL as separate CRs
+# unless adding EXTRA locations beyond the DPA-owned defaults.
+#
+# Shared: included by server.yml (and thus by baseline via server).
+
+- name: Build the BackupStorageLocation config block
+  ansible.builtin.set_fact:
+    _oadp_bsl_config: >-
+      {{
+        {'region': backup_oadp_region}
+        | combine({'s3Url': backup_oadp_s3_url} if backup_oadp_s3_url | length > 0 else {})
+        | combine({'s3ForcePathStyle': backup_oadp_s3_force_path_style | string | lower}
+                  if backup_oadp_s3_force_path_style | bool else {})
+        | combine({'insecureSkipTLSVerify': backup_oadp_insecure_skip_tls_verify | string | lower}
+                  if backup_oadp_insecure_skip_tls_verify | bool else {})
+      }}
+
+- name: Build the snapshotLocations list
+  ansible.builtin.set_fact:
+    _oadp_snapshot_locations: >-
+      {{
+        [{'velero': {'provider': backup_oadp_snapshot_provider,
+                     'config': {'region': backup_oadp_snapshot_region}}}]
+        if backup_oadp_snapshot_location_enabled | bool else []
+      }}
+
+- name: Assemble the DataProtectionApplication definition
+  ansible.builtin.set_fact:
+    _oadp_dpa_definition:
+      apiVersion: oadp.openshift.io/v1alpha1
+      kind: DataProtectionApplication
+      metadata:
+        name: "{{ backup_oadp_dpa_name }}"
+        namespace: "{{ backup_oadp_namespace }}"
+      spec:
+        configuration:
+          velero:
+            defaultPlugins: "{{ backup_oadp_default_plugins }}"
+          nodeAgent:
+            enable: "{{ backup_oadp_node_agent_enable | bool }}"
+            uploaderType: "{{ backup_oadp_node_agent_uploader_type }}"
+        backupLocations:
+          - velero:
+              provider: "{{ backup_oadp_provider }}"
+              default: true
+              objectStorage:
+                bucket: "{{ backup_oadp_bucket }}"
+                prefix: "{{ backup_oadp_prefix }}"
+              credential:
+                name: "{{ backup_oadp_credential_secret }}"
+                key: "{{ backup_oadp_credential_key }}"
+              config: "{{ _oadp_bsl_config }}"
+        snapshotLocations: "{{ _oadp_snapshot_locations }}"
+
+- name: Apply the DataProtectionApplication
+  kubernetes.core.k8s:
+    kubeconfig: "{{ backup_oadp_kubeconfig | default(omit) }}"
+    state: present
+    apply: true
+    definition: "{{ _oadp_dpa_definition }}"
+  notify: oadp - wait for velero rollout

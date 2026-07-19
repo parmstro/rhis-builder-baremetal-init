@@ -1,0 +1,4 @@
+---
+- name: okd - restart api
+  ansible.builtin.debug:
+    msg: "OKD API restart is managed by the OpenShift control plane; no direct service restart available."

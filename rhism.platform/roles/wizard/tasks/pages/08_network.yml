@@ -1,0 +1,83 @@
+---
+- name: Collect domain name
+  ansible.builtin.command:
+    cmd: >-
+      {{ wizard_tui_backend }} --title "{{ wizard_tui_title }}"
+      --inputbox "Enter your domain name (e.g. corp.example.com):"
+      8 {{ wizard_tui_width }} "corp.example.com"
+      3>&1 1>&2 2>&3
+  register: _wizard_domain_result
+  changed_when: false
+  failed_when: _wizard_domain_result.rc not in [0, 1]
+  tags: infra_wizard
+
+- name: Handle domain cancel
+  ansible.builtin.fail:
+    msg: "Wizard cancelled by user at domain entry."
+  when: _wizard_domain_result.rc == 1
+  tags: infra_wizard
+
+- name: Collect management subnet
+  ansible.builtin.command:
+    cmd: >-
+      {{ wizard_tui_backend }} --title "{{ wizard_tui_title }}"
+      --inputbox "Enter management subnet in CIDR notation (e.g. 10.0.1.0/24):"
+      8 {{ wizard_tui_width }} "10.0.1.0/24"
+      3>&1 1>&2 2>&3
+  register: _wizard_subnet_result
+  changed_when: false
+  failed_when: _wizard_subnet_result.rc not in [0, 1]
+  tags: infra_wizard
+
+- name: Handle subnet cancel
+  ansible.builtin.fail:
+    msg: "Wizard cancelled by user at subnet entry."
+  when: _wizard_subnet_result.rc == 1
+  tags: infra_wizard
+
+- name: Collect default gateway
+  ansible.builtin.command:
+    cmd: >-
+      {{ wizard_tui_backend }} --title "{{ wizard_tui_title }}"
+      --inputbox "Enter default gateway IP:"
+      8 {{ wizard_tui_width }} "10.0.1.1"
+      3>&1 1>&2 2>&3
+  register: _wizard_gateway_result
+  changed_when: false
+  failed_when: _wizard_gateway_result.rc not in [0, 1]
+  tags: infra_wizard
+
+- name: Handle gateway cancel
+  ansible.builtin.fail:
+    msg: "Wizard cancelled by user at gateway entry."
+  when: _wizard_gateway_result.rc == 1
+  tags: infra_wizard
+
+- name: Collect DNS server
+  ansible.builtin.command:
+    cmd: >-
+      {{ wizard_tui_backend }} --title "{{ wizard_tui_title }}"
+      --inputbox "Enter DNS server IP (primary — will be overridden by IDM/AD after deploy):"
+      8 {{ wizard_tui_width }} "8.8.8.8"
+      3>&1 1>&2 2>&3
+  register: _wizard_dns_result
+  changed_when: false
+  failed_when: _wizard_dns_result.rc not in [0, 1]
+  tags: infra_wizard
+
+- name: Handle DNS cancel
+  ansible.builtin.fail:
+    msg: "Wizard cancelled by user at DNS entry."
+  when: _wizard_dns_result.rc == 1
+  tags: infra_wizard
+
+- name: Record network configuration
+  ansible.builtin.set_fact:
+    wizard_network:
+      domain: "{{ _wizard_domain_result.stdout | trim }}"
+      realm: "{{ _wizard_domain_result.stdout | trim | upper }}"
+      subnet: "{{ _wizard_subnet_result.stdout | trim }}"
+      gateway: "{{ _wizard_gateway_result.stdout | trim }}"
+      dns:
+        - "{{ _wizard_dns_result.stdout | trim }}"
+  tags: infra_wizard

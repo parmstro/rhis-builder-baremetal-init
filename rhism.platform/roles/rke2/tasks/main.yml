@@ -1,0 +1,13 @@
+---
+# ── Shared envelope: dispatch (no common post-tasks) ────────────────────────────
+# The action + variable interface is validated by meta/argument_specs.yml (ansible-core
+# runs the validation automatically at role entry — no manual assert needed).
+
+# Service state actions share a single file — state: "{{ action }}"
+- name: Dispatch to service management
+  ansible.builtin.include_tasks: service.yml
+  when: action in ['started', 'stopped', 'restarted']
+
+- name: Dispatch to {{ action }}
+  ansible.builtin.include_tasks: "{{ action }}.yml"
+  when: action not in ['started', 'stopped', 'restarted']

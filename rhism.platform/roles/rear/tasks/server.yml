@@ -1,0 +1,38 @@
+---
+# server — prepare/validate the STORAGE TARGET the rescue image + data backup URLs
+# point at. ReaR has no server daemon: the "server" is the repository that stores
+# the artifacts. For a file:// target this ensures the local directory exists; for a
+# real NFS/rsync export a dedicated provisioning role should own the target and this
+# action just validates reachability of the local anchor. Standalone-sane.
+
+- name: Validate a backup target is configured
+  ansible.builtin.assert:
+    that:
+      - backup_rear_backup_url | length > 0
+    fail_msg: "backup_rear_backup_url must be set so the server action knows which target to prepare"
+
+- name: Resolve the backup URL scheme
+  ansible.builtin.set_fact:
+    _rear_url_scheme: >-
+      {{ (backup_rear_backup_url | regex_search('^([a-z]+)://', '\1') | first)
+         if (backup_rear_backup_url | regex_search('^([a-z]+)://'))
+         else 'file' }}
+
+- name: Ensure the local storage directory exists for a file-scheme target
+  ansible.builtin.file:
+    path: "{{ backup_rear_server_local_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+  become: true
+  when:
+    - _rear_url_scheme == 'file'
+    - backup_rear_server_local_dir | length > 0
+
+- name: Report the prepared target
+  ansible.builtin.debug:
+    msg: >-
+      ReaR storage target prepared — scheme={{ _rear_url_scheme }},
+      url={{ backup_rear_backup_url }}. For non-file schemes ensure the export
+      (NFS/rsync/CIFS) is provisioned and reachable by a dedicated storage role.

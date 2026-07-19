@@ -1,0 +1,38 @@
+---
+- name: Verify standalone variable contract
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Load role defaults
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../../defaults/main.yml"
+      delegate_to: localhost
+
+    - name: Assert shared interface defaults resolve for standalone use
+      ansible.builtin.assert:
+        that:
+          - action == 'present'
+          - mail_execute | bool
+          - mail_tls_enabled | bool
+          # Antispam chain defaults OFF — EPEL-only on EL, sourcing deferred
+          # (owner decision 2026-07-14; FPS FR-018..020).
+          - not (mail_dkim_enabled | bool)
+          - not (mail_spamassassin_enabled | bool)
+          - not (mail_clamav_enabled | bool)
+          # Manage gates default true (BUG-117 class; labs set false).
+          - mail_manage_service | bool
+          - mail_manage_firewall | bool
+          - mail_manage_packages | bool
+          - mail_mynetworks | length > 0
+          - "'imaps' in mail_dovecot_protocols"
+          - mail_dkim_key_size | int == 2048
+          - "'postfix' in _mail_full_packages"
+          - "'dovecot' in _mail_full_packages"
+          - "'dovecot-pigeonhole' in _mail_full_packages"
+        fail_msg: "mail_full defaults did not resolve to the expected standalone contract"
+      delegate_to: localhost
+
+    - name: Report verification passed
+      ansible.builtin.debug:
+        msg: "PASS — mail_full standalone contract verified"
+      delegate_to: localhost

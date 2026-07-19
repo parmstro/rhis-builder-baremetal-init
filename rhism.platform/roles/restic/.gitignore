@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+CLAUDE.md
+!roles/*/CLAUDE.md
+# Ansible
+*.retry
+.ansible/
+fact_cache/
+
+# Molecule
+.molecule/
+roles/*/molecule/*/.molecule/
+
+# Local secrets / env overrides (never commit real creds)
+*_passwords.yml
+.env
+
+# Test logs (written by pre-commit hook)
+logs/
+
+# Editor artifacts
+*.swp
+*.swo
+*~
+
+.local-*
+
+# Netverse generated output
+output/
+
+# Build artifacts
+*.tar.gz
+

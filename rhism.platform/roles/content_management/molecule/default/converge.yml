@@ -1,0 +1,82 @@
+---
+- name: Converge — Foreman baseline no-op (dispatcher + var loading)
+  hosts: all
+  gather_facts: false
+  vars:
+    content_action: baseline
+    content_type: foreman
+    content_organization: "Test Org"
+    content_location: "Test Location"
+  roles:
+    - role: rhism.platform.content_management
+
+- name: Converge — Satellite baseline no-op (dispatcher + var loading)
+  hosts: all
+  gather_facts: false
+  vars:
+    content_action: baseline
+    content_type: satellite
+    content_organization: "Test Org"
+    content_location: "Test Location"
+    content_rhsm_skip_registration: true
+  roles:
+    - role: rhism.platform.content_management
+
+- name: Converge — Foreman install dry-run (content_install_execute false)
+  hosts: all
+  gather_facts: false
+  vars:
+    content_action: install
+    content_type: foreman
+    content_organization: "Test Org"
+    content_location: "Test Location"
+    content_install_execute: false
+  roles:
+    - role: rhism.platform.content_management
+
+- name: Converge — Satellite install dry-run (content_install_execute false)
+  hosts: all
+  gather_facts: false
+  vars:
+    content_action: install
+    content_type: satellite
+    content_organization: "Test Org"
+    content_location: "Test Location"
+    content_install_execute: false
+    content_rhsm_skip_registration: true
+  roles:
+    - role: rhism.platform.content_management
+
+- name: Converge — negative test (bogus action)
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Attempt bogus content_action (must fail)
+      block:
+        - name: Call role with invalid action
+          ansible.builtin.include_role:
+            name: content_management
+          vars:
+            content_action: bogus_action
+            content_type: foreman
+      rescue:
+        - name: Confirm expected failure was caught
+          ansible.builtin.debug:
+            msg: "PASS — bogus content_action correctly rejected"
+
+- name: Converge — negative test (bogus type)
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Attempt bogus content_type (must fail)
+      block:
+        - name: Call role with invalid type
+          ansible.builtin.include_role:
+            name: content_management
+          vars:
+            content_action: baseline
+            content_type: bogus_type
+      rescue:
+        - name: Confirm expected failure was caught
+          ansible.builtin.debug:
+            msg: "PASS — bogus content_type correctly rejected"

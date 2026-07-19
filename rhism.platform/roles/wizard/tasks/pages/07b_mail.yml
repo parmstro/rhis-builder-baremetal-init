@@ -1,0 +1,62 @@
+---
+- name: Select mail service
+  ansible.builtin.command:
+    cmd: >-
+      {{ wizard_tui_backend }} --title "{{ wizard_tui_title }}"
+      --radiolist "Select mail service:" {{ wizard_tui_height }} {{ wizard_tui_width }} 3
+      "relay"  "Relay only (Postfix outbound — for alerts and notifications)" ON
+      "full"   "Full stack (Postfix + Dovecot + ClamAV + SpamAssassin + DKIM)" OFF
+      "none"   "None      — use existing mail relay"                           OFF
+      3>&1 1>&2 2>&3
+  register: _wizard_mail_result
+  changed_when: false
+  failed_when: _wizard_mail_result.rc not in [0, 1]
+  tags: infra_wizard
+
+- name: Handle mail cancel
+  ansible.builtin.fail:
+    msg: "Wizard cancelled by user at mail service selection."
+  when: _wizard_mail_result.rc == 1
+  tags: infra_wizard
+
+- name: Record mail service choice
+  ansible.builtin.set_fact:
+    wizard_components: >-
+      {{ wizard_components | combine({
+        'mail': {
+          'enabled': (_wizard_mail_result.stdout | trim) != 'none',
+          'type': _wizard_mail_result.stdout | trim
+        }
+      }) }}
+  tags: infra_wizard
+
+- name: Collect mail relay host (when mail type is full)
+  when: (_wizard_mail_result.stdout | trim) == 'full'
+  block:
+    - name: Collect smart relay host
+      ansible.builtin.command:
+        cmd: >-
+          {{ wizard_tui_backend }} --title "{{ wizard_tui_title }}"
+          --inputbox "Enter upstream SMTP relay host (leave blank if direct delivery):"
+          8 {{ wizard_tui_width }} ""
+          3>&1 1>&2 2>&3
+      register: _wizard_relay_result
+      changed_when: false
+      failed_when: _wizard_relay_result.rc not in [0, 1]
+      tags: infra_wizard
+
+    - name: Handle relay host cancel
+      ansible.builtin.fail:
+        msg: "Wizard cancelled by user at relay host entry."
+      when: _wizard_relay_result.rc == 1
+      tags: infra_wizard
+
+    - name: Record relay host
+      ansible.builtin.set_fact:
+        wizard_components: >-
+          {{ wizard_components | combine({
+            'mail': wizard_components.mail | combine({
+              'relay_host': _wizard_relay_result.stdout | trim
+            })
+          }) }}
+      tags: infra_wizard

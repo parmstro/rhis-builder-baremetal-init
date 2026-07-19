@@ -1,0 +1,72 @@
+---
+# ---------------------------------------------------------------------------
+# Bareos product role — action-driven dispatch.
+#
+# Standalone-first: runnable on its own in a playbook (roles: [bareos]) and also
+# selectable by the backup_management dispatcher (backup_type: bareos), which passes
+# the action via include_role vars: {action: "..."}.
+#
+# The action + variable interface is validated by meta/argument_specs.yml — ansible-core
+# runs the validation at role entry, so no manual assert is needed here.
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Dispatch — package and service actions use consolidated files (state param).
+# All other actions get their own file.
+# ---------------------------------------------------------------------------
+
+- name: Include server tasks
+  ansible.builtin.include_tasks: server.yml
+  when: action == 'server'
+
+- name: Include client tasks
+  ansible.builtin.include_tasks: client.yml
+  when: action == 'client'
+
+- name: Include schedule tasks
+  ansible.builtin.include_tasks: schedule.yml
+  when: action == 'schedule'
+
+- name: Include present/absent tasks
+  ansible.builtin.include_tasks: present.yml
+  when: action in ['present', 'absent']
+
+- name: Include service tasks
+  ansible.builtin.include_tasks: service.yml
+  when: action in ['started', 'stopped', 'restarted']
+
+- name: Include configure tasks
+  ansible.builtin.include_tasks: configure.yml
+  when: action == 'configure'
+
+- name: Include add_client tasks
+  ansible.builtin.include_tasks: add_client.yml
+  when: action == 'add_client'
+
+- name: Include add_job tasks
+  ansible.builtin.include_tasks: add_job.yml
+  when: action == 'add_job'
+
+- name: Include run_job tasks
+  ansible.builtin.include_tasks: run_job.yml
+  when: action == 'run_job'
+
+- name: Include restore tasks
+  ansible.builtin.include_tasks: restore.yml
+  when: action == 'restore'
+
+- name: Include verify tasks
+  ansible.builtin.include_tasks: verify.yml
+  when: action == 'verify'
+
+- name: Include prune tasks
+  ansible.builtin.include_tasks: prune.yml
+  when: action == 'prune'
+
+- name: Include purge tasks
+  ansible.builtin.include_tasks: purge.yml
+  when: action == 'purge'
+
+- name: Include status tasks
+  ansible.builtin.include_tasks: status.yml
+  when: action == 'status'

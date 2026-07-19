@@ -1,0 +1,7 @@
+# Managed by Ansible — rhism mail_server (full)
+required_score {{ mail_spamassassin_required_score }}
+{% if mail_spamassassin_rewrite_subject %}
+rewrite_header Subject [SPAM]
+{% endif %}
+use_bayes 1
+bayes_auto_learn 1

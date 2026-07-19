@@ -1,0 +1,13 @@
+---
+# ---------------------------------------------------------------------------
+# gitlab_ce — shared: run gitlab-ctl reconfigure
+#
+# Used by: configure.yml (when no template provided), reconfigure action,
+#          restore.yml (post-restore), upgrade.yml (post-upgrade)
+# ---------------------------------------------------------------------------
+
+- name: Run gitlab-ctl reconfigure
+  ansible.builtin.command:
+    cmd: "{{ _scm_ctl_cmd }} reconfigure"
+  become: true
+  changed_when: true

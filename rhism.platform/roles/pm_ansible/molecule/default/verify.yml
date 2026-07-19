@@ -1,0 +1,50 @@
+---
+- name: Verify — pm_ansible post-lifecycle state
+  hosts: all
+  gather_facts: false
+
+  tasks:
+    - name: Check test_db_user credential removed
+      ansible.builtin.stat:
+        path: /tmp/pm_test_creds/test_db_user.cred
+      register: _deleted_cred
+      delegate_to: localhost
+
+    - name: Assert deleted credential is gone
+      ansible.builtin.assert:
+        that: not _deleted_cred.stat.exists
+        fail_msg: "Credential file still present after delete"
+
+    - name: Check test_svc_account credential still exists (isolation)
+      ansible.builtin.stat:
+        path: /tmp/pm_test_creds/test_svc_account.cred
+      register: _surviving_cred
+      delegate_to: localhost
+
+    - name: Assert surviving credential untouched
+      ansible.builtin.assert:
+        that:
+          - _surviving_cred.stat.exists
+          - _surviving_cred.stat.mode == '0600'
+        fail_msg: "test_svc_account credential missing or wrong mode — delete affected wrong target"
+
+    - name: Read surviving credential metadata
+      ansible.builtin.slurp:
+        src: /tmp/pm_test_creds/test_svc_account.meta.yml
+      register: _meta_raw
+      delegate_to: localhost
+
+    - name: Parse metadata
+      ansible.builtin.set_fact:
+        _meta: "{{ _meta_raw.content | b64decode | from_yaml }}"
+
+    - name: Assert ISM metadata fields present
+      ansible.builtin.assert:
+        that:
+          - _meta.target is defined
+          - _meta.service is defined
+          - _meta.created_at is defined
+          - _meta.expiry_days is defined
+          - _meta.length is defined
+          - _meta.length | int >= 20
+        fail_msg: "ISM metadata incomplete: {{ _meta }}"

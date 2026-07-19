@@ -1,0 +1,20 @@
+---
+galaxy_info:
+  role_name: wizard
+  namespace: rhism
+  author: rhism
+  description: >-
+    Interactive TUI wizard that collects rhism estate deployment choices
+    and writes a deployment manifest consumed by rhism.platform.builder.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: EL
+      versions:
+        - "9"
+  galaxy_tags:
+    - wizard
+    - infrastructure
+    - platform
+
+dependencies: []

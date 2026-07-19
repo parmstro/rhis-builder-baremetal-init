@@ -1,0 +1,21 @@
+---
+# add_systems — bulk-register a list of PXE systems (rhism alignment Phase C
+# item 2, the light/no-Satellite path). Loops the EXISTING add_system.yml
+# logic per entry — no new registration mechanism, just bulk input, matching
+# the same per-host shape roles/satellite's content_hosts action uses for
+# the heavy/Satellite path (name, profile, mac, ip, hostname).
+#
+# Dedicated loop_var (not the bare default "item") per the documented
+# gotcha: lazily-templated vars referencing the play's own item get
+# shadowed by an inner task's own loop otherwise (playbooks/test_xray_reports.yml
+# finding, CLAUDE.md).
+
+- name: Bulk-register systems
+  ansible.builtin.include_tasks: add_system.yml
+  loop: "{{ prov_cobbler_systems }}"
+  loop_control:
+    loop_var: _prov_cobbler_bulk_system
+    label: "{{ _prov_cobbler_bulk_system.name | default('system') }}"
+  vars:
+    prov_cobbler_system: "{{ _prov_cobbler_bulk_system }}"
+  when: prov_cobbler_systems | length > 0

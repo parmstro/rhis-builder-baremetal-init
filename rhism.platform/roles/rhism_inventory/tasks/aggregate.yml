@@ -1,0 +1,133 @@
+---
+# ---------------------------------------------------------------------------
+# aggregate — merge the selected bundles into the flat, deduplicated Satellite
+# list shapes (upstream soe_bundle_model §3.2) and write ONE include_vars-ready
+# YAML file. Emits:
+#   content_soe_bundles          — one satellite-role bundle per activation key,
+#                                  loadable straight into the satellite role's
+#                                  soe_bundles action (its flatter per-AK shape)
+#   content_cdn_repository_sets  — satellite's own flat variable names,
+#   content_products               deduplicated by object name
+#   content_lifecycle_environments
+#   content_views
+#   content_activation_keys
+#   content_hostgroups           — no satellite consumer variable exists today;
+#                                  hostgroups are reference metadata (see the
+#                                  satellite role's soe_bundles.yml header)
+#   content_presync_sources      — the sync gate (§2.2): every content section
+#                                  across all bundles in one pre-sync list
+#
+# generate reuses this file via include_tasks, overriding the destination with
+# _rhism_inventory_aggregate_dest (include params outrank facts, so the
+# override always wins).
+# ---------------------------------------------------------------------------
+
+- name: Reset the satellite-bundle accumulator
+  # Explicit reset — set_fact results persist across plays in one run (BUG-060).
+  ansible.builtin.set_fact:
+    _rhism_inventory_soe_bundles: []
+
+- name: Derive one satellite-role SOE bundle per activation key
+  ansible.builtin.set_fact:
+    _rhism_inventory_soe_bundles: >-
+      {{ _rhism_inventory_soe_bundles + [_rhism_inventory_bundle] }}
+  vars:
+    _rhism_inventory_ak: "{{ item.1 }}"
+    _rhism_inventory_cv_name: "{{ _rhism_inventory_ak.content_view | default(item.0.name) }}"
+    _rhism_inventory_entry_les: >-
+      {{ (item.0.lifecycle | default({})).lifecycle_environments | default([])
+         | map(attribute='name') | list }}
+    _rhism_inventory_prior: >-
+      {{ _rhism_inventory_entry_les[_rhism_inventory_entry_les.index(_rhism_inventory_ak.lifecycle_environment) - 1]
+         if (_rhism_inventory_ak.lifecycle_environment | default('') in _rhism_inventory_entry_les
+             and _rhism_inventory_entry_les.index(_rhism_inventory_ak.lifecycle_environment) > 0)
+         else 'Library' }}
+    _rhism_inventory_cv_match: >-
+      {{ (item.0.content | default({})).content_views | default([])
+         | selectattr('name', 'equalto', _rhism_inventory_cv_name) | list }}
+    _rhism_inventory_bundle: >-
+      {{ {'name': _rhism_inventory_ak.name,
+          'lifecycle_environment': _rhism_inventory_ak.lifecycle_environment,
+          'lifecycle_environment_prior': _rhism_inventory_prior,
+          'content_view': _rhism_inventory_cv_name}
+         | combine({'repositories': _rhism_inventory_cv_match[0].repositories}
+              if (_rhism_inventory_cv_match | length > 0
+                  and _rhism_inventory_cv_match[0].repositories is defined) else {}) }}
+  loop: "{{ _rhism_inventory_selected | subelements('lifecycle.activation_keys', skip_missing=True) }}"
+  loop_control:
+    label: "{{ item.0.name | default('(unnamed entry)') }} / {{ item.1.name | default('(unnamed key)') }}"
+
+- name: Merge bundle sections into flat deduplicated Satellite lists
+  # Dedup by object name: dict(names zip items) keeps one value per name.
+  ansible.builtin.set_fact:
+    _rhism_inventory_repository_sets: >-
+      {{ dict(_rhism_inventory_rs | map(attribute='name') | zip(_rhism_inventory_rs)).values() | list }}
+    _rhism_inventory_products: >-
+      {{ dict(_rhism_inventory_cp | map(attribute='name') | zip(_rhism_inventory_cp)).values() | list }}
+    _rhism_inventory_content_views: >-
+      {{ dict(_rhism_inventory_cv | map(attribute='name') | zip(_rhism_inventory_cv)).values() | list }}
+    _rhism_inventory_lifecycle_environments: >-
+      {{ dict(_rhism_inventory_le | map(attribute='name') | zip(_rhism_inventory_le)).values() | list }}
+    _rhism_inventory_activation_keys: >-
+      {{ dict(_rhism_inventory_ak_all | map(attribute='name') | zip(_rhism_inventory_ak_all)).values() | list }}
+    _rhism_inventory_hostgroups: >-
+      {{ dict(_rhism_inventory_hg | map(attribute='name') | zip(_rhism_inventory_hg)).values() | list }}
+  vars:
+    _rhism_inventory_rs: >-
+      {{ _rhism_inventory_selected | map(attribute='content.repository_sets', default=[]) | flatten(levels=1) }}
+    _rhism_inventory_cp: >-
+      {{ _rhism_inventory_selected | map(attribute='content.custom_products', default=[]) | flatten(levels=1) }}
+    _rhism_inventory_cv: >-
+      {{ _rhism_inventory_selected | map(attribute='content.content_views', default=[]) | flatten(levels=1) }}
+    _rhism_inventory_le: >-
+      {{ _rhism_inventory_selected | map(attribute='lifecycle.lifecycle_environments', default=[]) | flatten(levels=1) }}
+    _rhism_inventory_ak_all: >-
+      {{ _rhism_inventory_selected | map(attribute='lifecycle.activation_keys', default=[]) | flatten(levels=1) }}
+    _rhism_inventory_hg: >-
+      {{ _rhism_inventory_selected | map(attribute='lifecycle.hostgroups', default=[]) | flatten(levels=1) }}
+
+- name: Ensure the aggregate output directory exists
+  ansible.builtin.file:
+    path: "{{ _rhism_inventory_dest | dirname }}"
+    state: directory
+    mode: "0755"
+  vars:
+    _rhism_inventory_dest: >-
+      {{ _rhism_inventory_aggregate_dest
+         | default(rhism_inventory_output_dir ~ '/aggregated_soe.yml') }}
+
+- name: Write the aggregated SOE chain
+  ansible.builtin.copy:
+    dest: "{{ _rhism_inventory_dest }}"
+    mode: "0644"
+    content: |
+      ---
+      # Aggregated SOE chain — generated by rhism.platform.rhism_inventory (aggregate).
+      # Source catalogue: {{ _rhism_inventory_catalog_dir }}
+      # Bundles: {{ _rhism_inventory_selected | map(attribute='name') | list | join(', ') }}
+      # include_vars this file straight into a rhism.platform.satellite role call.
+      {{ _rhism_inventory_aggregated | to_nice_yaml(indent=2) }}
+  vars:
+    _rhism_inventory_dest: >-
+      {{ _rhism_inventory_aggregate_dest
+         | default(rhism_inventory_output_dir ~ '/aggregated_soe.yml') }}
+    _rhism_inventory_aggregated:
+      content_soe_bundles: "{{ _rhism_inventory_soe_bundles }}"
+      content_cdn_repository_sets: "{{ _rhism_inventory_repository_sets }}"
+      content_products: "{{ _rhism_inventory_products }}"
+      content_lifecycle_environments: "{{ _rhism_inventory_lifecycle_environments }}"
+      content_views: "{{ _rhism_inventory_content_views }}"
+      content_activation_keys: "{{ _rhism_inventory_activation_keys }}"
+      content_hostgroups: "{{ _rhism_inventory_hostgroups }}"
+      content_presync_sources: >-
+        {{ _rhism_inventory_repository_sets
+           + _rhism_inventory_products
+           + _rhism_inventory_content_views }}
+
+- name: Report the aggregate summary
+  ansible.builtin.debug:
+    msg: >-
+      aggregated {{ _rhism_inventory_selected | length }} bundles into
+      {{ _rhism_inventory_soe_bundles | length }} satellite SOE bundles
+      ({{ _rhism_inventory_aggregate_dest
+          | default(rhism_inventory_output_dir ~ '/aggregated_soe.yml') }})

@@ -1,0 +1,31 @@
+---
+argument_specs:
+  main:
+    short_description: Linux security orchestrator for EL 8/9/10.
+    options:
+      linux_security_apply_packages:
+        type: bool
+        default: true
+        description: Whether to apply the linux_packages role.
+      linux_security_apply_hardening:
+        type: bool
+        default: true
+        description: Whether to apply the linux_hardening role.
+      linux_security_apply_firewall:
+        type: bool
+        default: true
+        description: >-
+          Whether to apply the firewall role (vendored in this collection
+          as rhism.platform.firewall).
+      linux_security_apply_auditing:
+        type: bool
+        default: true
+        description: Whether to apply the linux_auditing role.
+      linux_security_apply_users:
+        type: bool
+        default: true
+        description: Whether to apply the linux_users role.
+      linux_security_apply_selinux:
+        type: bool
+        default: true
+        description: Whether to apply the linux_selinux role.

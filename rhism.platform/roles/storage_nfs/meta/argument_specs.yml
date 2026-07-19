@@ -1,0 +1,58 @@
+---
+argument_specs:
+  main:
+    short_description: Deploy the NFS subdir external provisioner on Kubernetes.
+    description: >-
+      Standalone-first storage backend for container_platform. Deploys the NFS subdir external
+      provisioner via Helm against an existing NFS export and optionally sets its StorageClass
+      as the default. Consumes the shared storage-backend interface (action, cp_* vars) so the
+      container_platform dispatcher can select any backend with identical code.
+    options:
+      action:
+        description: >-
+          Lifecycle action, shared across all storage backends. 'storage' (and its alias
+          'present') deploy the NFS provisioner; 'absent' removes it.
+        type: str
+        default: storage
+        choices:
+          - storage
+          - present
+          - absent
+      cp_kubeconfig_path:
+        description: Path to the cluster kubeconfig. Shared storage-interface var.
+        type: str
+        default: /etc/rancher/k3s/k3s.yaml
+      cp_storage_make_default:
+        description: Make the NFS StorageClass the default. Shared storage-interface var.
+        type: bool
+        default: false
+      cp_storage_execute:
+        description: >-
+          Dry-run gate honoured by every storage backend. false validates action dispatch and
+          variable resolution without changing the node or cluster (used by molecule).
+        type: bool
+        default: true
+      cp_storage_nfs_server:
+        description: >-
+          NFS server hostname or IP. Required for a real deploy (asserted non-empty when
+          cp_storage_execute is true); empty default lets the role load standalone.
+        type: str
+        default: ""
+      cp_storage_nfs_path:
+        description: >-
+          Exported NFS path on the server. Required for a real deploy (asserted non-empty when
+          cp_storage_execute is true); empty default lets the role load standalone.
+        type: str
+        default: ""
+      cp_storage_class_name:
+        description: Name of the StorageClass created by the provisioner.
+        type: str
+        default: nfs-client
+      cp_storage_nfs_reclaim_policy:
+        description: PV reclaim policy for the NFS StorageClass.
+        type: str
+        default: Delete
+      cp_storage_nfs_archive_on_delete:
+        description: Archive released PV data instead of deleting it.
+        type: bool
+        default: false

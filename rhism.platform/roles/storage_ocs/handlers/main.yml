@@ -1,0 +1,9 @@
+---
+- name: storage_ocs - configure storage
+  ansible.builtin.debug:
+    msg: >-
+      ODF operator subscription created in openshift-storage namespace.
+      StorageCluster ocs-storagecluster will provision OCS storage classes.
+      Size per device set: {{ cp_storage_ocs_size | default('500Gi') }}.
+      Underlying storage class: {{ cp_storage_ocs_storage_class | default('gp2') }}.
+  listen: storage_ocs - configure storage

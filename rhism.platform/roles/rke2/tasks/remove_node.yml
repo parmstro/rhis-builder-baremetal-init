@@ -1,0 +1,16 @@
+---
+# ── Remove node from rke2 cluster ────────────────────────────────────────────
+
+- name: Drain and delete node from cluster
+  ansible.builtin.include_tasks: cluster_kubectl.yml
+  vars:
+    _kubectl_commands:
+      - "{{ _cp_kubectl_cmd }} drain {{ inventory_hostname }} --ignore-daemonsets --delete-emptydir-data --force"
+      - "{{ _cp_kubectl_cmd }} delete node {{ inventory_hostname }}"
+
+- name: Run rke2-agent-uninstall.sh on the node
+  ansible.builtin.command:
+    cmd: /usr/local/bin/rke2-agent-uninstall.sh
+    removes: "{{ _cp_binary }}"
+  become: true
+  changed_when: true

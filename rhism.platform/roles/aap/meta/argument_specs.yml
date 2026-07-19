@@ -1,0 +1,336 @@
+---
+argument_specs:
+  main:
+    short_description: >-
+      Red Hat Ansible Automation Platform full-lifecycle role (install →
+      configure → day-2), version-aware across AAP 2.4/2.5/2.6/2.7.
+    description: >-
+      Product role, standalone-first, and FULLY SELF-CONTAINED (owner decision
+      2026-07-15 — no include_role of awx_config or awx; the duplication with
+      the OSS awx role's config engine is traded for product independence).
+      Deploys AAP using RED HAT'S OWN installer (never reimplemented): the role
+      renders the containerized installer inventory or the OpenShift operator
+      custom resource from these variables and invokes the installer.
+      Configuration-as-code is the role's OWN engine (tasks/config_*.yml over
+      the awx.awx API client; the certified infra.aap_configuration / gateway
+      collections are the recorded future path). RHSM entitlement is delegated
+      to the rhel_subscription role. Distinct from the OSS `awx` role
+      (supported-vs-OSS, the freeipa/rh_idm parallel) and from
+      `aap_config_as_code` (a separate extract/transform/import migration
+      role). The argument spec enforces the action/version/method choices at
+      role entry, so no hand-written asserts.
+    options:
+      action:
+        description: >-
+          Lifecycle action to run. install (version-aware deploy), configure
+          (the role's own config-as-code engine), baseline (install then
+          configure), backup, restore, upgrade (day-2, all gated by
+          aap_execute), status (read-only controller health check).
+        type: str
+        default: install
+        choices:
+          - install
+          - configure
+          - baseline
+          - backup
+          - restore
+          - upgrade
+          - status
+      aap_version:
+        description: >-
+          Target AAP version. Selects the version profile
+          (vars/versions/<aap_version>.yml): the installer group model, API base
+          paths, and OpenShift CR kind/apiVersion. 2.4 is pre-gateway;
+          2.5 introduces the platform gateway (unified CR + automationgateway
+          group).
+        type: str
+        default: "2.5"
+        choices:
+          - "2.4"
+          - "2.5"
+          - "2.6"
+          - "2.7"
+      aap_install_method:
+        description: >-
+          How AAP is deployed. containerized uses Red Hat's podman-based
+          containerized installer; openshift uses the AAP Operator +
+          AnsibleAutomationPlatform CR. (The RPM/bundle setup.sh path is
+          intentionally not supported — RPM install is being obsoleted.)
+        type: str
+        default: containerized
+        choices:
+          - containerized
+          - openshift
+      aap_execute:
+        description: >-
+          Dry-run gate. When false (default), install/backup/restore/upgrade
+          render the installer inventory / operator CR and validate the contract
+          but do NOT invoke the real installer. Set true on an entitled host to
+          run for real.
+        type: bool
+        default: false
+      aap_manage_subscription:
+        description: >-
+          Register target hosts with RHSM (via the rhel_subscription role) before
+          install. Set false if hosts are already entitled.
+        type: bool
+        default: true
+      aap_manifest_path:
+        description: >-
+          Path to the subscription manifest for the controller. Sensitive —
+          handled no_log where consumed.
+        type: str
+        default: ""
+      aap_controller_hosts:
+        description: Hosts for the installer automationcontroller group.
+        type: list
+        elements: str
+        default: []
+      aap_hub_hosts:
+        description: Hosts for the installer automationhub group.
+        type: list
+        elements: str
+        default: []
+      aap_eda_hosts:
+        description: Hosts for the installer automationeda group.
+        type: list
+        elements: str
+        default: []
+      aap_gateway_hosts:
+        description: Hosts for the installer automationgateway group (2.5+ only).
+        type: list
+        elements: str
+        default: []
+      aap_database_host:
+        description: Host for the installer database group (single host).
+        type: str
+        default: ""
+      aap_admin_password:
+        description: >-
+          AAP platform/controller admin password. Sensitive — consumed no_log;
+          rendered as a placeholder token in the installer inventory (never
+          written to disk in clear). Also the API password for the
+          configure/status actions.
+        type: str
+        default: ""
+        no_log: true
+      aap_pg_username:
+        description: PostgreSQL admin username (postgresql_admin_username).
+        type: str
+        default: "admin"
+      aap_pg_password:
+        description: >-
+          PostgreSQL admin password (postgresql_admin_password). Sensitive —
+          consumed no_log.
+        type: str
+        default: ""
+        no_log: true
+      aap_pg_port:
+        description: PostgreSQL port.
+        type: int
+        default: 5432
+      aap_registry_host:
+        description: Container registry for AAP images (containerized method).
+        type: str
+        default: "registry.redhat.io"
+      aap_registry_username:
+        description: Registry username for image pull. Sensitive — consumed no_log.
+        type: str
+        default: ""
+      aap_registry_password:
+        description: Registry password for image pull. Sensitive — consumed no_log.
+        type: str
+        default: ""
+        no_log: true
+      aap_openshift_namespace:
+        description: OpenShift namespace for the AAP operator + CR (openshift method).
+        type: str
+        default: "aap"
+      aap_operator_channel:
+        description: >-
+          Operator subscription channel. Empty string uses the version profile's
+          default channel.
+        type: str
+        default: ""
+      aap_openshift_cr_name:
+        description: metadata.name of the AAP custom resource.
+        type: str
+        default: "aap"
+      aap_controller_host:
+        description: >-
+          Controller URL (https://controller.example.com) for the configure and
+          status actions.
+        type: str
+        default: ""
+      aap_admin_user:
+        description: Controller admin username for the configure/status API calls.
+        type: str
+        default: "admin"
+      aap_configure_action:
+        description: >-
+          Config-as-code section to run for the configure action — a single
+          section, or baseline for all enabled sections (honouring the
+          aap_apply_* toggles) in dependency order.
+        type: str
+        default: baseline
+        choices:
+          - organization
+          - credentials
+          - projects
+          - inventories
+          - templates
+          - workflows
+          - schedules
+          - baseline
+      aap_validate_certs:
+        description: Validate TLS certificates on API / operator calls.
+        type: bool
+        default: true
+      aap_api_timeout:
+        description: API request timeout (seconds) for configure/status.
+        type: int
+        default: 60
+      aap_work_dir:
+        description: >-
+          Directory where the installer inventory / operator CR is rendered.
+          Repo-confined by default (output/ is gitignored).
+        type: str
+        default: "{{ playbook_dir }}/../output/aap"
+      # ------------------------------------------------------------------
+      # Config-as-code (the role's OWN engine — internalised 2026-07-15;
+      # awx.awx is the API client, not a role dependency)
+      # ------------------------------------------------------------------
+      aap_apply_organization:
+        description: Baseline toggle — apply the organization section.
+        type: bool
+        default: true
+      aap_apply_credentials:
+        description: Baseline toggle — apply the credentials section.
+        type: bool
+        default: true
+      aap_apply_projects:
+        description: Baseline toggle — apply the projects section.
+        type: bool
+        default: true
+      aap_apply_inventories:
+        description: Baseline toggle — apply the inventories section.
+        type: bool
+        default: true
+      aap_apply_templates:
+        description: Baseline toggle — apply the job-templates section.
+        type: bool
+        default: true
+      aap_apply_workflows:
+        description: Baseline toggle — apply the workflow-templates section.
+        type: bool
+        default: true
+      aap_apply_schedules:
+        description: Baseline toggle — apply the schedules section.
+        type: bool
+        default: true
+      aap_organization:
+        description: Organization to create and to own all configured objects.
+        type: str
+        default: rhism
+      aap_organization_description:
+        description: Description of the organization.
+        type: str
+        default: rhism automation platform
+      aap_teams:
+        description: Teams to create in the organization (name, description).
+        type: list
+        elements: dict
+      aap_credential_types:
+        description: >-
+          Custom credential types beyond the controller built-ins (name, kind,
+          inputs, injectors).
+        type: list
+        elements: dict
+      aap_credentials:
+        description: >-
+          Credential instances to create (name, credential_type, inputs,
+          description). Sensitive — the create task runs no_log.
+        type: list
+        elements: dict
+        no_log: true
+      aap_scm_ssh_key:
+        description: SSH private key for the GitLab SCM credential. Sensitive — from vault.
+        type: str
+        default: ""
+        no_log: true
+      aap_linux_user:
+        description: Username for the Linux Machine credential.
+        type: str
+        default: ansible
+      aap_linux_ssh_key:
+        description: SSH private key for the Linux Machine credential. Sensitive — from vault.
+        type: str
+        default: ""
+        no_log: true
+      aap_windows_user:
+        description: Username for the Windows Machine credential.
+        type: str
+        default: ansible
+      aap_windows_password:
+        description: Password for the Windows Machine credential. Sensitive — from vault.
+        type: str
+        default: ""
+        no_log: true
+      aap_vault_password:
+        description: Ansible Vault password for the Vault credential. Sensitive — from vault.
+        type: str
+        default: ""
+        no_log: true
+      aap_scm_url_base:
+        description: Base git URL prepended to each project's repo path.
+        type: str
+        default: "git@gitlab.example.com:platform"
+      aap_scm_branch:
+        description: Default SCM branch for projects (per-project override supported).
+        type: str
+        default: main
+      aap_scm_credential:
+        description: Name of the SCM credential projects clone with.
+        type: str
+        default: GitLab SCM
+      aap_project_sync_timeout:
+        description: Seconds to wait for each project's initial SCM sync.
+        type: int
+        default: 120
+      aap_projects:
+        description: SCM projects to create (name, description, scm_url, scm_branch).
+        type: list
+        elements: dict
+      aap_inventories:
+        description: Inventories to create (name, description, variables).
+        type: list
+        elements: dict
+      aap_inventory_sources:
+        description: >-
+          Inventory sources to create (name, inventory, source, source_project,
+          source_path, overwrite, update_on_launch).
+        type: list
+        elements: dict
+      aap_execution_environment:
+        description: Default execution environment assigned to job templates.
+        type: str
+        default: Default execution environment
+      aap_job_templates:
+        description: >-
+          Job templates to create (name, project, playbook, inventory,
+          credentials, extra_vars, ask_* toggles, verbosity).
+        type: list
+        elements: dict
+      aap_workflow_templates:
+        description: >-
+          Workflow job templates to create, each with its nodes (identifier,
+          unified_job_template, success_nodes, all_parents_must_converge,
+          extra_data).
+        type: list
+        elements: dict
+      aap_schedules:
+        description: >-
+          Schedules to create (name, unified_job_template, rrule, enabled,
+          extra_data).
+        type: list
+        elements: dict

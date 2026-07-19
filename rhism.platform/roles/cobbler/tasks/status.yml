@@ -1,0 +1,12 @@
+---
+- name: Query cobbler status
+  ansible.builtin.command:
+    cmd: cobbler status
+  become: true
+  changed_when: false
+  register: _cobbler_status
+  failed_when: false
+
+- name: Display cobbler status
+  ansible.builtin.debug:
+    msg: "{{ _cobbler_status.stdout_lines | default([_cobbler_status.stderr]) }}"

@@ -1,0 +1,35 @@
+# Managed by Ansible — rhism bareos role ( Storage)
+
+Storage {
+  Name = bareos-sd
+  SDPort = {{ backup_bareos_storage_port }}
+  WorkingDirectory = "/var/lib/bareos"
+}
+
+Director {
+  Name = bareos-dir
+  Password = "{{ backup_bareos_storage_password }}"
+}
+
+Autochanger {
+  Name = FileChgr1
+  Device = FileChgr1-Dev1
+  Changer Command = ""
+  Changer Device = /dev/null
+}
+
+Device {
+  Name = FileChgr1-Dev1
+  Media Type = File
+  Archive Device = {{ backup_bareos_storage_device }}
+  LabelMedia = yes
+  Random Access = yes
+  AutomaticMount = yes
+  RemovableMedia = no
+  AlwaysOpen = no
+}
+
+Messages {
+  Name = Standard
+  director = bareos-dir = all
+}

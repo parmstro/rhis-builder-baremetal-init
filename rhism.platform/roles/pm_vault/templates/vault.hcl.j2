@@ -1,0 +1,32 @@
+# Vault server configuration — managed by roles/pm_vault
+# Changes require a service restart: systemctl restart vault
+
+ui = {{ pm_vault_ui_enabled | lower }}
+log_level = "{{ pm_vault_log_level }}"
+
+{% if pm_vault_storage_type == 'raft' %}
+storage "raft" {
+  path    = "{{ pm_vault_data_dir }}"
+  node_id = "{{ pm_vault_raft_node_id }}"
+}
+{% elif pm_vault_storage_type == 'consul' %}
+storage "consul" {
+  address = "{{ pm_vault_consul_address }}"
+  path    = "{{ pm_vault_consul_path }}"
+}
+{% endif %}
+
+listener "tcp" {
+  address       = "{{ pm_vault_listener_address }}"
+  cluster_address = "{{ pm_vault_cluster_address }}"
+{% if pm_vault_tls_enabled | bool %}
+  tls_cert_file = "{{ pm_vault_tls_cert_file }}"
+  tls_key_file  = "{{ pm_vault_tls_key_file }}"
+  tls_min_version = "{{ pm_vault_tls_min_version }}"
+{% else %}
+  tls_disable = true
+{% endif %}
+}
+
+api_addr     = "{{ 'https' if pm_vault_tls_enabled | bool else 'http' }}://{{ ansible_default_ipv4.address | default('127.0.0.1') }}:8200"
+cluster_addr = "{{ 'https' if pm_vault_tls_enabled | bool else 'http' }}://{{ ansible_default_ipv4.address | default('127.0.0.1') }}:8201"

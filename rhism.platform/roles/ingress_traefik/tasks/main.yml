@@ -1,0 +1,106 @@
+---
+# Action + variable interface are validated by meta/argument_specs.yml (ansible-core
+# runs the validation automatically at role entry — no manual assert needed).
+
+# k3s: Traefik is built-in — configure via HelmChartConfig
+- name: Configure k3s built-in Traefik (HelmChartConfig)
+  kubernetes.core.k8s:
+    kubeconfig: "{{ cp_kubeconfig_path }}"
+    state: present
+    definition:
+      apiVersion: helm.cattle.io/v1
+      kind: HelmChartConfig
+      metadata:
+        name: traefik
+        namespace: kube-system
+      spec:
+        valuesContent: |
+          deployment:
+            replicas: {{ cp_ingress_replicas }}
+          ingressRoute:
+            dashboard:
+              enabled: false
+          additionalArguments:
+            - "--providers.kubernetesingress.ingressendpointpublishedservice=kube-system/traefik"
+          globalArguments:
+            - "--global.sendanonymoususage=false"
+  become: true
+  when:
+    - action in ['ingress', 'present']
+    - cp_type == 'k3s'
+    - cp_ingress_execute | bool
+  notify: ingress_traefik - restart ingress
+
+# Non-k3s: deploy Traefik via Helm
+- name: Deploy Traefik ingress controller (non-k3s)
+  when:
+    - action in ['ingress', 'present']
+    - cp_type != 'k3s'
+    - cp_ingress_execute | bool
+  block:
+    - name: Add Traefik Helm repository
+      kubernetes.core.helm_repository:
+        name: traefik
+        repo_url: https://helm.traefik.io/traefik
+
+    - name: Deploy Traefik ingress controller via Helm
+      kubernetes.core.helm:
+        kubeconfig: "{{ cp_kubeconfig_path }}"
+        name: traefik
+        chart_ref: traefik/traefik
+        release_namespace: traefik
+        create_namespace: true
+        wait: true
+        values:
+          deployment:
+            replicas: "{{ cp_ingress_replicas }}"
+          ingressClass:
+            enabled: true
+            isDefaultClass: true
+          providers:
+            kubernetesCRD:
+              enabled: true
+            kubernetesIngress:
+              enabled: true
+              publishedService:
+                enabled: true
+          globalArguments:
+            - "--global.sendanonymoususage=false"
+      notify: ingress_traefik - restart ingress
+
+# absent: remove HelmChartConfig (k3s) or Helm release (non-k3s)
+- name: Remove k3s Traefik HelmChartConfig
+  kubernetes.core.k8s:
+    kubeconfig: "{{ cp_kubeconfig_path }}"
+    api_version: helm.cattle.io/v1
+    kind: HelmChartConfig
+    name: traefik
+    namespace: kube-system
+    state: absent
+  become: true
+  when:
+    - action == 'absent'
+    - cp_type == 'k3s'
+    - cp_ingress_execute | bool
+
+- name: Remove Traefik ingress controller (non-k3s)
+  when:
+    - action == 'absent'
+    - cp_type != 'k3s'
+    - cp_ingress_execute | bool
+  block:
+    - name: Remove Traefik Helm release
+      kubernetes.core.helm:
+        kubeconfig: "{{ cp_kubeconfig_path }}"
+        name: traefik
+        release_namespace: traefik
+        state: absent
+        wait: true
+
+    - name: Remove Traefik namespace
+      kubernetes.core.k8s:
+        kubeconfig: "{{ cp_kubeconfig_path }}"
+        api_version: v1
+        kind: Namespace
+        name: traefik
+        state: absent

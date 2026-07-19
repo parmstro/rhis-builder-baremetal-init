@@ -1,0 +1,6 @@
+---
+- name: Configure ingress controller ({{ cp_ingress_type }})
+  ansible.builtin.include_role:
+    name: "ingress_{{ cp_ingress_type }}"
+  vars:
+    action: ingress

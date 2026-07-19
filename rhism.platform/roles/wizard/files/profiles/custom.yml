@@ -1,0 +1,9 @@
+---
+profile_name: Custom
+profile_description: >-
+  All choices deferred to the interactive wizard.
+  This profile is a placeholder — it triggers full interactive mode.
+profile_license_required: false
+
+components: {}
+sizing_defaults: {}

@@ -1,0 +1,126 @@
+---
+# tasks/configure.yml — Postfix + Dovecot configuration, virtual domains/users maps.
+
+- name: Configure full mail stack
+  become: true
+  when: mail_execute | bool
+  block:
+    - name: Deploy /etc/postfix/main.cf
+      ansible.builtin.template:
+        src: main.cf.j2
+        dest: /etc/postfix/main.cf
+        owner: root
+        group: root
+        mode: "0644"
+      notify: mail_full - restart postfix
+
+    - name: Deploy /etc/postfix/master.cf
+      ansible.builtin.template:
+        src: master.cf.j2
+        dest: /etc/postfix/master.cf
+        owner: root
+        group: root
+        mode: "0644"
+      notify: mail_full - restart postfix
+
+    - name: Ensure Dovecot conf.d directory exists
+      ansible.builtin.file:
+        path: /etc/dovecot/conf.d
+        state: directory
+        owner: root
+        group: dovecot
+        mode: "0750"
+
+    - name: Deploy dovecot.conf
+      ansible.builtin.template:
+        src: dovecot.conf.j2
+        dest: /etc/dovecot/dovecot.conf
+        owner: root
+        group: dovecot
+        mode: "0640"
+      notify: mail_full - restart dovecot
+
+    # vmail account ordering matters: group before user before the owned
+    # directory (the historical order was exactly reversed and could not
+    # converge on a clean host).
+    - name: Ensure vmail system group exists
+      ansible.builtin.group:
+        name: "{{ mail_vmail_user }}"
+        gid: "{{ mail_vmail_gid }}"
+        system: true
+      when: mail_virtual_domains | length > 0
+
+    - name: Ensure vmail system user exists
+      ansible.builtin.user:
+        name: "{{ mail_vmail_user }}"
+        uid: "{{ mail_vmail_uid }}"
+        group: "{{ mail_vmail_user }}"
+        system: true
+        shell: /sbin/nologin
+        home: "{{ mail_virtual_mailbox_base }}"
+        create_home: false
+      when: mail_virtual_domains | length > 0
+
+    - name: Ensure virtual mailbox base directory exists
+      ansible.builtin.file:
+        path: "{{ mail_virtual_mailbox_base }}"
+        state: directory
+        owner: "{{ mail_vmail_user }}"
+        group: "{{ mail_vmail_user }}"
+        mode: "0750"
+      when: mail_virtual_domains | length > 0
+
+    # The virtual maps are referenced from main.cf whenever virtual domains
+    # are configured, so ALL of them must exist (as postmap'd tables) even
+    # with zero users yet — smtpd fatals on a missing map at lookup time.
+    - name: Deploy virtual domains map
+      ansible.builtin.template:
+        src: virtual_domains.j2
+        dest: /etc/postfix/virtual_domains
+        owner: root
+        group: root
+        mode: "0644"
+      when: mail_virtual_domains | length > 0
+
+    - name: Deploy virtual mailbox map
+      ansible.builtin.template:
+        src: vmailbox.j2
+        dest: /etc/postfix/vmailbox
+        owner: root
+        group: root
+        mode: "0644"
+      when: mail_virtual_domains | length > 0
+      notify: mail_full - postmap vmailbox
+
+    - name: Deploy virtual alias map
+      ansible.builtin.template:
+        src: virtual.j2
+        dest: /etc/postfix/virtual
+        owner: root
+        group: root
+        mode: "0644"
+      when: mail_virtual_domains | length > 0
+      notify: mail_full - postmap virtual
+
+    - name: Run postmap on virtual domains map
+      ansible.builtin.command:
+        cmd: postmap {{ mail_db_type }}:/etc/postfix/virtual_domains
+      changed_when: false
+      when: mail_virtual_domains | length > 0
+
+    - name: Run postmap on virtual mailbox map
+      ansible.builtin.command:
+        cmd: postmap {{ mail_db_type }}:/etc/postfix/vmailbox
+      changed_when: false
+      when: mail_virtual_domains | length > 0
+
+    - name: Run postmap on virtual alias map
+      ansible.builtin.command:
+        cmd: postmap {{ mail_db_type }}:/etc/postfix/virtual
+      changed_when: false
+      when: mail_virtual_domains | length > 0
+
+    - name: Rebuild aliases database
+      ansible.builtin.command:
+        cmd: newaliases
+      changed_when: false

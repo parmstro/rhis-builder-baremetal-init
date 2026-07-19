@@ -1,0 +1,32 @@
+---
+# status — health check against a running rhism-ui's own /healthz
+# endpoint. Gated by rhism_ui_deploy_execute — the same shared dry-run gate
+# as install (a real health check needs a real reachable instance).
+
+- name: Report dry-run status
+  ansible.builtin.debug:
+    msg: >-
+      {{ 'CHECKING health for real against ' ~ rhism_ui_base_url
+         if (rhism_ui_deploy_execute | bool)
+         else 'DRY-RUN (rhism_ui_deploy_execute=false): validating variable contract only, no HTTP call made' }}
+
+- name: Real health check
+  when: rhism_ui_deploy_execute | bool
+  block:
+    - name: Query rhism-ui's own health endpoint
+      ansible.builtin.uri:
+        url: "{{ rhism_ui_base_url }}/healthz"
+        method: GET
+        status_code:
+          - 200
+      register: _rhism_ui_health
+
+    - name: Assert rhism-ui reports itself healthy
+      ansible.builtin.assert:
+        that:
+          - _rhism_ui_health.json.status == 'ok'
+          - _rhism_ui_health.json.service == 'rhis-builder-ui'
+        fail_msg: >-
+          rhism-ui at {{ rhism_ui_base_url }} did not report a
+          healthy status: {{ _rhism_ui_health.json | default({}) }}
+        success_msg: "PASS — rhism-ui at {{ rhism_ui_base_url }} reports healthy"

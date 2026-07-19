@@ -1,0 +1,21 @@
+---
+- name: backup_management - restart bareos-dir
+  ansible.builtin.service:
+    name: bareos-dir
+    state: restarted
+  become: true
+  listen: backup_management - restart bareos-dir
+
+- name: backup_management - restart bareos-sd
+  ansible.builtin.service:
+    name: bareos-sd
+    state: restarted
+  become: true
+  listen: backup_management - restart bareos-sd
+
+- name: backup_management - restart bareos-fd
+  ansible.builtin.service:
+    name: bareos-fd
+    state: restarted
+  become: true
+  listen: backup_management - restart bareos-fd

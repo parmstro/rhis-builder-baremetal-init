@@ -1,0 +1,13 @@
+# Managed by Ansible — rhism bareos role (console)
+#
+# BUG-119: the role never deployed bconsole.conf, so every bconsole-driven
+# action (add_client, run_job, restore, verify, prune, purge, status) ran
+# against the PACKAGED config whose install-time random password can never
+# match a role-managed director. Name must match the Director resource name
+# in bareos-dir.conf (TLS-PSK identity = name + password).
+Director {
+  Name = bareos-dir
+  DIRport = {{ backup_bareos_director_port }}
+  address = {{ backup_bareos_console_address }}
+  Password = "{{ backup_bareos_director_password }}"
+}

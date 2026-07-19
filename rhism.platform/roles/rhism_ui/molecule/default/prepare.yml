@@ -1,0 +1,40 @@
+---
+# prepare — pre-role environment setup on the real target host: the
+# directories that get bind-mounted into the container as
+# CATALOG_PATH/DEPLOYMENT_PATH. Kept separate from converge.yml so converge
+# only exercises this role itself.
+- name: Prepare — real target host filesystem for the container mounts
+  hosts: all
+  gather_facts: false
+
+  tasks:
+    - name: Ensure the test catalog directory exists
+      ansible.builtin.file:
+        path: /tmp/rhism_ui_catalog
+        state: directory
+        mode: "0755"
+
+    - name: Ensure the test deployment directory exists
+      ansible.builtin.file:
+        path: /tmp/rhism_ui_deployment
+        state: directory
+        mode: "0755"
+
+    # BUG-168: converge.yml's `hosts: all` targets the nested-podman test
+    # platform (builder-ui-el9), not the EE/control node — every task inside
+    # the role's own include_role calls (including a `command: realpath`)
+    # therefore executes ON THAT REMOTE TARGET by default, where the
+    # collection's source tree obviously doesn't exist (it only lives on the
+    # EE's /workspace mount). `ansible.builtin.copy`'s `src` is the one
+    # exception: it is ALWAYS resolved on the CONTROLLER regardless of which
+    # host the task's connection targets, so a plain (non-delegated) copy is
+    # the correct way to stage local files onto a remote target — this is
+    # the first real exercise of roles/podman's `build` action against a
+    # remote target in this platform's whole molecule suite (every existing
+    # usage in roles/podman's own converge.yml is commented out), so this
+    # staging step didn't exist anywhere to copy from.
+    - name: Stage the build context onto the remote target (real Tier-2 build needs it there)
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../../files/rhism_ui/"
+        dest: /tmp/rhism_ui_src/
+        mode: preserve

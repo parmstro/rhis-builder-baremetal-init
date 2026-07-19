@@ -1,0 +1,43 @@
+# mail_full — full mail stack substrate for the rhism.platform.mail_full role
+# (image-factory entitled wave, 2026-07-14). Thin INSTALL-ONLY image: all mail
+# configuration is the ROLE's job at converge (thin-install + role-at-provision;
+# config is never duplicated here).
+#
+# PROVENANCE (reputable-sources rule; FPS: roles/mail_full/FPS.md):
+# - postfix: UBI AppStream (UBI-stream pinning — base digest + SBOM NVRs;
+#   Wave-I proven 3.5.8 el8 / 3.5.25 el9 / 3.8.5 el10).
+# - dovecot + dovecot-pigeonhole: NOT in UBI repos (probed 2026-07-14) —
+#   installed from the entitled rhel-N AppStream via a SINGLE-LAYER
+#   secret-mounted subscription-manager register -> install -> unregister ->
+#   clean. The activation key/org live ONLY in the untracked ./activation-key
+#   file passed as a build secret; no credential material, consumer identity,
+#   or entitlement cert persists in any layer (verified at P4).
+#   Versions are the entitled stream's current (2.3.16 el8/el9, 2.3.21 el10);
+#   exact NVRs recorded in the FPS per-base table + SBOM at build time.
+# - Antispam chain (spamassassin/clamav/amavisd/opendkim): EPEL-only —
+#   DEFERRED by owner decision 2026-07-14 (FPS FR-018..020 record the gap).
+ARG UBI_SECURE_BASE=localhost/ubi9-secure:latest
+FROM ${UBI_SECURE_BASE}
+ARG EL_VERSION=9
+
+# postfix from plain UBI AppStream
+RUN dnf -y install postfix && dnf clean all
+
+# dovecot + pigeonhole from the entitled repos — one layer, zero residue.
+# rc is captured so a failed install still unregisters, then fails the build.
+RUN --mount=type=secret,id=rhsm,target=/tmp/.rhsm-secret \
+    command -v subscription-manager >/dev/null || dnf -y install subscription-manager; \
+    key=$(awk '$1 ~ /^(keuy:|key:)$/ {print $2}' /tmp/.rhsm-secret); \
+    org=$(awk '$1 == "org:" {print $2}' /tmp/.rhsm-secret); \
+    subscription-manager register --org "${org}" --activationkey "${key}" && \
+    dnf -y install dovecot dovecot-pigeonhole; rc=$?; \
+    subscription-manager unregister; subscription-manager clean; \
+    rm -rf /etc/pki/consumer /etc/pki/entitlement; \
+    dnf clean all; exit ${rc}
+
+# Explicit converge marker (image-factory standard): an unconverged container
+# idles for the role; only a converged one starts real daemons.
+COPY entrypoint.sh /usr/local/bin/entrypoint
+RUN chmod 0755 /usr/local/bin/entrypoint
+EXPOSE 25 587 143 993 110 995 4190
+ENTRYPOINT ["/usr/local/bin/entrypoint"]

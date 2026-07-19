@@ -1,0 +1,43 @@
+---
+- name: Bug detection event response
+  hosts: all
+  sources:
+    - ansible.eda.webhook:
+        host: 0.0.0.0
+        port: {{ mon_eda_webhook_port + 3 }}
+  rules:
+    - name: Blocker or high severity bug detected
+      condition: >-
+        event.payload.source == "cmdb_bug_detect" and
+        event.payload.severity in ["blocker", "high"]
+      action:
+        run_playbook:
+          name: {{ mon_eda_response_playbooks.bug_detection.playbook }}
+          extra_vars:
+            event_action: {{ mon_eda_response_playbooks.bug_detection.extra_vars.event_action }}
+            event_source: "{% raw %}{{ event.payload.source }}{% endraw %}"
+            event_host: "{% raw %}{{ event.payload.pattern_name | default('unknown') }}{% endraw %}"
+            event_detail: "{% raw %}{{ event.payload | to_json }}{% endraw %}"
+            event_cmdb_enabled: false
+            event_bug_detection_id: "{% raw %}{{ event.payload.detection_id }}{% endraw %}"
+            event_bug_severity: "{% raw %}{{ event.payload.severity }}{% endraw %}"
+            event_bug_pattern_name: "{% raw %}{{ event.payload.pattern_name }}{% endraw %}"
+            event_bug_file_path: "{% raw %}{{ event.payload.file_path }}{% endraw %}"
+
+    - name: Medium severity bug detected — log only
+      condition: >-
+        event.payload.source == "cmdb_bug_detect" and
+        event.payload.severity == "medium"
+      action:
+        run_playbook:
+          name: {{ mon_eda_response_playbooks.bug_detection.playbook }}
+          extra_vars:
+            event_action: {{ mon_eda_response_playbooks.bug_detection.extra_vars.event_action }}
+            event_source: "{% raw %}{{ event.payload.source }}{% endraw %}"
+            event_host: "{% raw %}{{ event.payload.pattern_name | default('unknown') }}{% endraw %}"
+            event_detail: "{% raw %}{{ event.payload | to_json }}{% endraw %}"
+            event_cmdb_enabled: false
+            event_bug_detection_id: "{% raw %}{{ event.payload.detection_id }}{% endraw %}"
+            event_bug_severity: "medium"
+            event_bug_pattern_name: "{% raw %}{{ event.payload.pattern_name }}{% endraw %}"
+            event_bug_file_path: "{% raw %}{{ event.payload.file_path }}{% endraw %}"

@@ -1,0 +1,47 @@
+---
+# pm_vault — remove action.
+# Stops the service, removes the Vault package, and optionally purges data.
+# Data purge is IRREVERSIBLE — all secrets are permanently lost if pm_vault_purge_data is true.
+
+- name: Stop Vault service before removal
+  ansible.builtin.service:
+    name: vault
+    state: stopped
+    enabled: false
+  become: true
+  failed_when: false
+
+- name: Remove Vault package
+  ansible.builtin.package:
+    name: "{{ pm_vault_package }}"
+    state: absent
+  become: true
+
+- name: Remove HashiCorp YUM repository (RHEL/EL)
+  ansible.builtin.yum_repository:
+    name: hashicorp
+    state: absent
+  become: true
+  when: ansible_os_family == 'RedHat'
+
+- name: Remove HashiCorp APT repository (Debian/Ubuntu)
+  ansible.builtin.apt_repository:
+    repo: >-
+      deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg]
+      https://apt.releases.hashicorp.com {{ ansible_distribution_release }} main
+    state: absent
+  become: true
+  when: ansible_os_family == 'Debian'
+
+- name: Purge Vault data and config (IRREVERSIBLE — all secrets permanently lost)
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ pm_vault_data_dir }}"
+    - "{{ pm_vault_config_dir }}"
+    - "{{ pm_vault_tls_dir }}"
+    - "{{ pm_vault_log_dir }}"
+    - "{{ pm_vault_init_output_path }}"
+  become: true
+  when: pm_vault_purge_data | default(false) | bool

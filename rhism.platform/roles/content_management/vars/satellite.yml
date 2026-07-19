@@ -1,0 +1,9 @@
+---
+_content_collection: redhat.satellite
+_content_installer_cmd: satellite-installer
+_content_installer_packages:
+  - satellite
+_content_rhsm_required: true
+_content_service_name: satellite
+_content_installer_scenario: satellite
+_content_cdn_supported: true

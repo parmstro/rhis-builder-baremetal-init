@@ -1,0 +1,39 @@
+---
+argument_specs:
+  main:
+    short_description: SELinux policy management for EL 8/9/10.
+    options:
+      linux_selinux_action:
+        type: str
+        required: true
+        choices:
+          - enforce
+          - booleans
+          - fcontexts
+          - all
+        description: >-
+          Selects which task file(s) to run. 'all' runs enforce, booleans,
+          and fcontexts in sequence. All tasks skip gracefully when SELinux
+          is disabled (ansible_selinux.status == 'disabled').
+      linux_selinux_state:
+        type: str
+        default: enforcing
+        description: Desired SELinux enforcement state — enforcing, permissive, or disabled.
+      linux_selinux_policy:
+        type: str
+        default: targeted
+        description: SELinux policy type to apply.
+      linux_selinux_booleans:
+        type: list
+        elements: dict
+        default: []
+        description: >-
+          List of {name, state, persistent} dicts for community.general.seboolean.
+          Example: [{name: httpd_can_network_connect, state: "on", persistent: true}]
+      linux_selinux_fcontexts:
+        type: list
+        elements: dict
+        default: []
+        description: >-
+          List of {target, setype} dicts for community.general.sefcontext.
+          restorecon is run on each target after context assignment.

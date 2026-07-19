@@ -1,0 +1,51 @@
+---
+# satellite_proxy — standalone-first defaults over the SHARED provisioning-services interface.
+#
+# Every provisioning backend (dnsmasq / cobbler / foreman_proxy / satellite_proxy) consumes
+# the SAME variable names (bare `action` + prov_* vars), so the provisioning_services
+# dispatcher selects any of them with one identical `include_role` call and never needs
+# per-backend code. Standalone callers set these same vars directly; the defaults below make
+# the role runnable on its own.
+
+# Shared action across every provisioning backend. satellite_proxy actions:
+#   present | absent            — install / remove packages + firewall
+#   started | stopped | restarted — service state
+#   configure                   — deploy the smart proxy configuration
+#   register                    — register the proxy with a Satellite server
+#   status                      — query proxy registration via the Satellite API
+# The dispatcher passes `action` via include_role vars; this default covers standalone use.
+action: configure
+
+# Shared dry-run gate honoured by every provisioning backend — false validates action
+# dispatch + variable resolution without installing packages or writing node config
+# (used by the molecule scenario). Mirrors cp_storage_execute in the storage family.
+prov_execute: true
+
+# ── Smart proxy registration ────────────────────────────────────────────────
+prov_smartproxy_url: ""             # this proxy's URL, e.g. https://proxy.example.com:8443
+prov_smartproxy_dns: true
+prov_smartproxy_dhcp: true
+prov_smartproxy_tftp: true
+prov_smartproxy_realm: false
+
+# ── Satellite server connection (register / status) ─────────────────────────
+prov_content_server_url: ""         # Satellite server URL, e.g. https://satellite.example.com
+prov_content_username: admin
+prov_content_password: ""           # supply via vault
+prov_content_validate_certs: true
+prov_content_organization: "Default Organization"
+prov_content_location: "Default Location"
+
+# ── Role-internal (not part of the standalone interface; mirrors vars/satellite_proxy.yml) ──
+_prov_packages:
+  - foreman-proxy
+_prov_service_name: foreman-proxy
+_prov_config_dir: /etc/foreman-proxy
+_prov_config_file: /etc/foreman-proxy/settings.yml
+_prov_firewall_services:
+  - dns
+  - dhcp
+  - tftp
+_prov_has_smartproxy: true
+_prov_content_collection: redhat.satellite
+_prov_smartproxy_module: redhat.satellite.smart_proxy

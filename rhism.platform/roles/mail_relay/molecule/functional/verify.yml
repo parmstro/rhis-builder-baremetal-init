@@ -1,0 +1,29 @@
+---
+- name: Verify — mail_relay goal (Postfix running, listening, relay configured)
+  hosts: all
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Postfix master is running
+      ansible.builtin.command: postfix status
+      register: _st
+      changed_when: false
+
+    - name: Postfix is listening on SMTP port 25
+      ansible.builtin.command: ss -H -ltn sport = :25
+      register: _port
+      changed_when: false
+
+    - name: Effective relay host (via postconf, authoritative)
+      ansible.builtin.command: postconf -h relayhost
+      register: _rh
+      changed_when: false
+
+    - name: Assert mail_relay functional goal is met
+      ansible.builtin.assert:
+        that:
+          - _st.rc == 0
+          - "':25' in _port.stdout"
+          - "'smtp.example.test' in _rh.stdout"
+        fail_msg: "mail_relay goal not met (postfix status rc={{ _st.rc }}, listening='{{ _port.stdout }}', relayhost='{{ _rh.stdout }}')"
+        success_msg: "PASS — Postfix relay running, listening on :25, with the configured relayhost in main.cf"

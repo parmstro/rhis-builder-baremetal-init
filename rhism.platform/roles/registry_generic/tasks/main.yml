@@ -1,0 +1,134 @@
+---
+# Action + variable interface are validated by meta/argument_specs.yml (ansible-core
+# runs the validation automatically at role entry — no manual assert needed).
+
+- name: Validate registry URL is defined
+  ansible.builtin.assert:
+    that:
+      - cp_registry_url | default('') | length > 0
+    fail_msg: "cp_registry_url is required for the registry_generic role"
+  when:
+    - action in ['present', 'registry']
+    - cp_registry_execute | bool
+
+# present / registry: create pull secret and configure cluster image registry
+- name: Create pull secret in cluster
+  kubernetes.core.k8s:
+    kubeconfig: "{{ cp_kubeconfig_path | default('/etc/rancher/k3s/k3s.yaml') }}"
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: "{{ cp_registry_secret_name | default('registry-pull-secret') }}"
+        namespace: default
+      type: kubernetes.io/dockerconfigjson
+      data:
+        .dockerconfigjson: >-
+          {{
+            {
+              'auths': {
+                cp_registry_url: {
+                  'username': cp_registry_username | default(''),
+                  'password': cp_registry_password | default(''),
+                  'auth': (
+                    (cp_registry_username | default('')) + ':' +
+                    (cp_registry_password | default(''))
+                  ) | b64encode
+                }
+              }
+            } | to_json | b64encode
+          }}
+  become: true
+  no_log: true
+  when:
+    - action in ['present', 'registry']
+    - cp_registry_execute | bool
+  notify: registry_generic - configure registry
+
+# Configure cluster-level image registry trust (OCP/OKD)
+- name: Add external registry to cluster image config (OCP/OKD)
+  kubernetes.core.k8s:
+    kubeconfig: "{{ cp_kubeconfig_path | default('/usr/local/bin/oc') }}"
+    state: present
+    definition:
+      apiVersion: config.openshift.io/v1
+      kind: Image
+      metadata:
+        name: cluster
+      spec:
+        registrySources:
+          allowedRegistries:
+            - "{{ cp_registry_url }}"
+            - docker.io
+            - quay.io
+            - registry.access.redhat.com
+            - registry.redhat.io
+  become: true
+  when:
+    - action in ['present', 'registry']
+    - cp_registry_execute | bool
+    - cp_registry_trust_cluster | default(false) | bool
+    - cp_type | default('k3s') in ['ocp', 'okd']
+
+# Configure containerd registry mirror (k3s / rke2)
+- name: Ensure k3s/rke2 config directory exists
+  ansible.builtin.file:
+    path: "{{ cp_registry_config_dir | default('/etc/rancher/k3s') }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+  when:
+    - action in ['present', 'registry']
+    - cp_registry_execute | bool
+    - cp_type | default('k3s') in ['k3s', 'rke2']
+
+- name: Configure containerd registry mirror (k3s/rke2)
+  ansible.builtin.copy:
+    dest: "{{ cp_registry_config_dir | default('/etc/rancher/k3s') }}/registries.yaml"
+    owner: root
+    group: root
+    mode: "0600"
+    content: |
+      mirrors:
+        "{{ cp_registry_url }}":
+          endpoint:
+            - "https://{{ cp_registry_url }}"
+      configs:
+        "{{ cp_registry_url }}":
+          auth:
+            username: "{{ cp_registry_username | default('') }}"
+            password: "{{ cp_registry_password | default('') }}"
+  become: true
+  no_log: true
+  when:
+    - action in ['present', 'registry']
+    - cp_registry_execute | bool
+    - cp_type | default('k3s') in ['k3s', 'rke2']
+  notify: registry_generic - configure registry
+
+# absent: remove pull secret and registry mirror config
+- name: Remove cluster pull secret
+  kubernetes.core.k8s:
+    kubeconfig: "{{ cp_kubeconfig_path | default('/etc/rancher/k3s/k3s.yaml') }}"
+    api_version: v1
+    kind: Secret
+    name: "{{ cp_registry_secret_name | default('registry-pull-secret') }}"
+    namespace: default
+    state: absent
+  become: true
+  when:
+    - action == 'absent'
+    - cp_registry_execute | bool
+
+- name: Remove containerd registry mirror config (k3s/rke2)
+  ansible.builtin.file:
+    path: "{{ cp_registry_config_dir | default('/etc/rancher/k3s') }}/registries.yaml"
+    state: absent
+  become: true
+  when:
+    - action == 'absent'
+    - cp_registry_execute | bool
+    - cp_type | default('k3s') in ['k3s', 'rke2']

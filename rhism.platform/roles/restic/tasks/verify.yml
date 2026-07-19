@@ -1,0 +1,92 @@
+---
+# verify: integrity of the repository — three escalating levels, so "verify"
+# means more than "the backup job exited 0":
+#   1. structure     — `restic check` (metadata/tree consistency; always run)
+#   2. checksum      — `restic check --read-data-subset=<spec>` re-reads pack
+#                      data and verifies its checksums (opt-in; full re-read is
+#                      expensive, so a subset like "5%" or "1/10" is the default
+#                      spec — set backup_restic_verify_read_data_subset to "100%"
+#                      for a full data verify)
+#   3. restore-test  — actually restore the latest snapshot to a scratch dir and
+#                      confirm files come back, then clean up (opt-in). This is
+#                      the only check that proves the backup is RESTORABLE, not
+#                      merely internally consistent.
+
+- name: Include restic environment
+  ansible.builtin.include_tasks: env.yml
+
+# ---- 1. structure ----
+- name: Run restic check (repository structure)
+  ansible.builtin.command:
+    cmd: restic check
+  environment: "{{ _restic_env }}"
+  become: true
+  no_log: true
+  register: _restic_check
+  changed_when: false
+
+- name: Report structure-check result
+  ansible.builtin.debug:
+    msg: "{{ _restic_check.stdout_lines | default([]) }}"
+
+# ---- 2. checksum (opt-in) ----
+- name: Run restic check with data-read (checksum verification)
+  ansible.builtin.command:
+    cmd: "restic check --read-data-subset={{ backup_restic_verify_read_data_subset }}"
+  environment: "{{ _restic_env }}"
+  become: true
+  no_log: true
+  register: _restic_check_data
+  changed_when: false
+  when: backup_restic_verify_read_data | bool
+
+- name: Report checksum-verification result
+  ansible.builtin.debug:
+    msg: >-
+      Data checksum verify ({{ backup_restic_verify_read_data_subset }}):
+      {{ _restic_check_data.stdout_lines | default(['(skipped — backup_restic_verify_read_data is false)']) }}
+
+# ---- 3. restore-test (opt-in) — proves the backup is actually RESTORABLE ----
+- name: Restore-test block
+  when: backup_restic_verify_restore_test | bool
+  become: true
+  block:
+    - name: Create a clean scratch dir for the restore-test
+      ansible.builtin.file:
+        path: "{{ backup_restic_verify_restore_test_path }}"
+        state: "{{ item }}"
+        mode: "0700"
+      loop: [absent, directory]
+
+    - name: Restore the latest snapshot into the scratch dir
+      ansible.builtin.command:
+        cmd: >-
+          restic restore {{ backup_restic_verify_restore_test_snapshot }}
+          --target {{ backup_restic_verify_restore_test_path }}
+      environment: "{{ _restic_env }}"
+      no_log: true
+      register: _restic_restore_test
+      changed_when: false
+
+    - name: Count restored entries
+      ansible.builtin.find:
+        paths: "{{ backup_restic_verify_restore_test_path }}"
+        recurse: true
+        file_type: any
+      register: _restic_restore_found
+
+    - name: Assert the restore-test actually returned data
+      ansible.builtin.assert:
+        that: _restic_restore_found.matched | int > 0
+        fail_msg: >-
+          Restore-test restored ZERO entries from snapshot
+          '{{ backup_restic_verify_restore_test_snapshot }}' — the backup is NOT
+          restorable even though the repository structure is valid.
+        success_msg: >-
+          Restore-test PASSED — {{ _restic_restore_found.matched }} entries
+          restored from '{{ backup_restic_verify_restore_test_snapshot }}'.
+  always:
+    - name: Clean up the restore-test scratch dir
+      ansible.builtin.file:
+        path: "{{ backup_restic_verify_restore_test_path }}"
+        state: absent

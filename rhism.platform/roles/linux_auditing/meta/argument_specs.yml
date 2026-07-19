@@ -1,0 +1,39 @@
+---
+argument_specs:
+  main:
+    short_description: Auditd configuration for EL 8/9/10.
+    options:
+      linux_auditing_action:
+        type: str
+        required: true
+        choices:
+          - configure
+          - verify
+          - report
+          - baseline
+        description: >-
+          Selects which task file to run. 'configure' deploys audit rules and
+          auditd.conf settings; 'verify' checks rules and service state;
+          'report' generates an audit event report; 'baseline' runs
+          configure then verify then report.
+      linux_auditing_log_size:
+        type: int
+        default: 8192
+        description: Maximum audit log file size in KB before rotation.
+      linux_auditing_num_logs:
+        type: int
+        default: 5
+        description: Number of audit log files to retain.
+      linux_auditing_space_left_action:
+        type: str
+        default: SYSLOG
+        description: >-
+          Action when disk space for logs is low. One of:
+          ROTATE, SYSLOG, SUSPEND, SINGLE, HALT.
+      linux_auditing_rules_extra:
+        type: list
+        elements: str
+        default: []
+        description: >-
+          Extra raw audit rule strings appended after the baseline ruleset.
+          Each string must be a valid auditctl rule line.

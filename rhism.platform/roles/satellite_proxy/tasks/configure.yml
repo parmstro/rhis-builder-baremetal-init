@@ -1,0 +1,13 @@
+---
+# Action: configure
+# Deploy satellite smart proxy configuration.
+
+- name: Deploy foreman-proxy settings
+  ansible.builtin.template:
+    src: foreman_proxy_settings.yml.j2
+    dest: "{{ _prov_config_file }}"
+    owner: foreman-proxy
+    group: foreman-proxy
+    mode: "0640"
+  become: true
+  notify: satellite_proxy - restart foreman-proxy

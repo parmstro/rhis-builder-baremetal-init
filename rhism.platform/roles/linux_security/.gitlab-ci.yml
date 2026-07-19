@@ -1,0 +1,33 @@
+---
+# GitLab CI for rhism.platform.linux_security role.
+#
+# Runs on a self-hosted runner (Podman on the Fedora host) — zero compute
+# credits. Disable "Instance runners" on this project (Settings -> CI/CD ->
+# Runners) to guarantee jobs never reach a paid runner.
+#
+# Runner requirements: podman, git. See docs/ci-runner-setup.md in the
+# platform orchestration repo (ansible_galaxy) for runner setup instructions.
+
+stages:
+  - test
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS == null
+
+variables:
+  GIT_DEPTH: "1"
+
+test:
+  stage: test
+  variables:
+    DOCKER_HOST: "unix:///var/run/docker.sock"
+  script:
+    - git clone --depth=1 "https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_ROOT_NAMESPACE}/ansible_galaxy.git" /tmp/ansible_galaxy
+    - rm -rf /tmp/ansible_galaxy/roles/linux_security
+    - cp -r . /tmp/ansible_galaxy/roles/linux_security
+    - cd /tmp/ansible_galaxy
+    - bash bin/linux-security-ci.sh
+  after_script:
+    - rm -rf /tmp/ansible_galaxy

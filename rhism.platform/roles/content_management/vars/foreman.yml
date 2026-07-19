@@ -1,0 +1,10 @@
+---
+_content_collection: theforeman.foreman
+_content_installer_cmd: foreman-installer
+_content_installer_packages:
+  - foreman
+  - foreman-installer
+_content_rhsm_required: false
+_content_service_name: foreman
+_content_installer_scenario: foreman
+_content_cdn_supported: false

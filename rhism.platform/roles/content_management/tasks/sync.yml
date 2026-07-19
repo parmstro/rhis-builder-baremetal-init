@@ -1,0 +1,6 @@
+---
+- name: Manage sync plans ({{ content_type }})
+  ansible.builtin.include_role:
+    name: "{{ content_type }}"
+  vars:
+    action: sync

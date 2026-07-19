@@ -1,0 +1,246 @@
+---
+argument_specs:
+  main:
+    short_description: Install and operate a Bareos backup director, storage, and file daemon.
+    description: >-
+      Standalone-first backup product role. Installs and configures the Bareos Director,
+      Storage Daemon, and File Daemon, manages client/job resources via bconsole, and runs the
+      backup lifecycle (schedule, run_job, restore, verify, prune, purge, status). Consumes the
+      shared backup family interface (backup_bareos_* vars), the SAME names the
+      backup_management dispatcher exposes, so the dispatcher selects this product with one
+      call passing only `action` and every value flows straight through. The argument spec
+      enforces the action + variable contract at role entry, so no hand-written assert is
+      needed.
+    options:
+      action:
+        description: >-
+          Lifecycle action (bare shared var). server installs director+storage+fd; client
+          installs the file daemon; present/absent manage packages; started/stopped/restarted
+          manage services; configure re-renders configs; schedule updates the director config;
+          add_client / add_job / run_job / restore / verify / prune / purge / status drive
+          bconsole.
+        type: str
+        default: server
+        choices:
+          - server
+          - client
+          - schedule
+          - present
+          - absent
+          - started
+          - stopped
+          - restarted
+          - configure
+          - add_client
+          - add_job
+          - run_job
+          - restore
+          - verify
+          - prune
+          - purge
+          - status
+      backup_bareos_director_host:
+        description: Address the director advertises / clients connect to.
+        type: str
+        default: localhost
+      backup_bareos_director_port:
+        description: Director listen port.
+        type: int
+        default: 9101
+      backup_bareos_director_password:
+        description: Director console password (vault-backed).
+        type: str
+        default: ""
+      backup_bareos_storage_host:
+        description: Storage daemon address referenced by the director.
+        type: str
+        default: localhost
+      backup_bareos_storage_port:
+        description: Storage daemon listen port.
+        type: int
+        default: 9103
+      backup_bareos_storage_password:
+        description: Storage daemon password (vault-backed).
+        type: str
+        default: ""
+      backup_bareos_storage_device:
+        description: On-disk storage archive directory.
+        type: str
+        default: /var/lib/bareos/storage
+      backup_bareos_file_daemon_port:
+        description: File daemon listen port.
+        type: int
+        default: 9102
+      backup_bareos_file_daemon_password:
+        description: File daemon password (vault-backed).
+        type: str
+        default: ""
+      backup_bareos_monitor_password:
+        description: Monitor console password (vault-backed); dispatcher-exposed.
+        type: str
+        default: ""
+      backup_bareos_max_concurrent_jobs:
+        description: Director maximum concurrent jobs.
+        type: int
+        default: 20
+      backup_bareos_message_retention:
+        description: Message retention window (dispatcher-exposed).
+        type: str
+        default: "180 days"
+      backup_bareos_job_retention:
+        description: Job retention window (dispatcher-exposed).
+        type: str
+        default: "12 months"
+      backup_bareos_volume_retention:
+        description: Volume retention window (dispatcher-exposed).
+        type: str
+        default: "365 days"
+      backup_bareos_client_name:
+        description: Client (file daemon) resource name for add_client.
+        type: str
+        default: localhost-fd
+      backup_bareos_client_address:
+        description: Client address for add_client.
+        type: str
+        default: 127.0.0.1
+      backup_bareos_client_password:
+        description: Client password for add_client (vault-backed).
+        type: str
+        default: ""
+      backup_bareos_client_fd_port:
+        description: File daemon port used when registering a client.
+        type: int
+        default: 9102
+      backup_bareos_job_name:
+        description: Job base name for add_job (also names the FileSet). Role-only.
+        type: str
+        default: ""
+      backup_bareos_job_client:
+        description: Client the add_job job runs against. Role-only.
+        type: str
+        default: ""
+      backup_bareos_job_fileset_include:
+        description: Paths included in the add_job FileSet. Role-only.
+        type: list
+        elements: str
+        default: []
+      backup_bareos_job_exclude:
+        description: Paths excluded from the add_job FileSet. Role-only.
+        type: list
+        elements: str
+        default:
+          - /proc
+          - /sys
+          - /dev
+          - /run
+      backup_bareos_job_schedule_name:
+        description: Schedule name defined/referenced by add_job. Role-only.
+        type: str
+        default: WeeklyCycle
+      backup_bareos_job_pool:
+        description: Pool the add_job job writes to. Role-only.
+        type: str
+        default: Default
+      backup_bareos_run_job_name:
+        description: Job name to trigger for run_job. Role-only.
+        type: str
+        default: ""
+      backup_bareos_restore_client:
+        description: Client to restore for the restore action. Role-only.
+        type: str
+        default: localhost-fd
+      backup_bareos_restore_where:
+        description: Target directory for restored files. Role-only.
+        type: str
+        default: /var/restore
+      backup_bareos_verify_job_name:
+        description: Job name to verify for the verify action. Role-only.
+        type: str
+        default: ""
+      backup_bareos_verify_level:
+        description: Verify level (e.g. InitCatalog, Catalog, VolumeToCatalog). Role-only.
+        type: str
+        default: InitCatalog
+      backup_bareos_purge_volume:
+        description: Specific volume to purge; empty purges all expired jobs. Role-only.
+        type: str
+        default: ""
+      backup_bareos_pools:
+        description: Pool resource definitions rendered into bareos-dir.conf.
+        type: list
+        elements: dict
+        default: []
+      backup_bareos_filesets:
+        description: FileSet resource definitions rendered into bareos-dir.conf.
+        type: list
+        elements: dict
+        default: []
+      backup_bareos_schedules:
+        description: Schedule resource definitions rendered into bareos-dir.conf.
+        type: list
+        elements: dict
+        default: []
+      backup_bareos_jobs:
+        description: Job resource definitions rendered into bareos-dir.conf.
+        type: list
+        elements: dict
+        default: []
+      backup_bareos_manage_firewall:
+        description: >-
+          Manage firewalld openings for the daemon ports. Set false on
+          containers/minimal targets without firewalld (BUG-117).
+        type: bool
+        default: true
+      backup_bareos_manage_service:
+        description: >-
+          Manage (start/enable/restart) the systemd services. Set false on
+          containers where an entrypoint runs the daemons (BUG-117); also
+          guards the restart handlers.
+        type: bool
+        default: true
+      backup_bareos_catalog_db_name:
+        description: Catalog database name (BUG-116 — previously hard-coded).
+        type: str
+        default: bareos
+      backup_bareos_catalog_db_user:
+        description: Catalog database user.
+        type: str
+        default: bareos
+      backup_bareos_catalog_db_password:
+        description: Catalog database password (vault-backed).
+        type: str
+        default: ""
+      backup_bareos_catalog_db_address:
+        description: >-
+          Catalog database host. Empty (default) = local UNIX socket; set to
+          a hostname/IP for a remote catalog (renders DbAddress/DbPort into
+          the director's Catalog resource).
+        type: str
+        default: ""
+      backup_bareos_catalog_db_port:
+        description: Catalog database port (used when an address is set).
+        type: int
+        default: 5432
+      backup_bareos_initialize_catalog:
+        description: >-
+          On the server action, create the catalog database/tables/privileges
+          via the Bareos-shipped scripts when the schema is absent (BUG-116 —
+          previously never initialized).
+        type: bool
+        default: true
+      backup_bareos_catalog_admin_user:
+        description: PostgreSQL admin user for remote catalog initialization.
+        type: str
+        default: postgres
+      backup_bareos_catalog_admin_password:
+        description: PostgreSQL admin password (vault-backed; remote catalog only).
+        type: str
+        default: ""
+      backup_bareos_console_address:
+        description: >-
+          Director address written into the managed bconsole.conf (BUG-119 —
+          previously the packaged bconsole.conf with its install-time random
+          password was left in place, so every bconsole-driven action failed
+          against a role-managed director).
+        type: str
+        default: localhost

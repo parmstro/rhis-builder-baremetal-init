@@ -1,0 +1,73 @@
+---
+# Lifecycle action (bare shared var). Standalone default installs + configures a restic
+# client; the backup_management dispatcher overrides this via include_role vars. Full choice
+# list and typed defaults are declared and validated in meta/argument_specs.yml.
+action: client
+
+# Standalone-first defaults over the SHARED backup family interface (backup_restic_*).
+# These are the SAME variable names the backup_management dispatcher exposes, so the
+# dispatcher selects this product with one call passing only `action`, and every backup_restic_*
+# value flows straight through. Standalone callers set these same names directly.
+
+# Repository — local path, sftp, s3, b2, rest server, rclone, etc.
+# Examples:
+#   /backups/myhost
+#   sftp:user@host:/backups/myhost
+#   s3:s3.amazonaws.com/mybucket/myhost
+#   b2:mybucket:myhost
+backup_restic_repository: ""
+backup_restic_password: ""      # vault-backed; encrypts the entire repository
+
+# Backup paths and excludes
+backup_restic_paths:
+  - /etc
+  - /home
+  - /root
+  - /var/log
+
+backup_restic_exclude_patterns:
+  - /proc
+  - /sys
+  - /dev
+  - /run
+  - "*.sock"
+  - "*.pid"
+
+# Extra args appended to the backup command (role-only; not exposed by the dispatcher).
+backup_restic_extra_args: ""
+
+# Retention policy (forget action)
+backup_restic_retention_daily: 7
+backup_restic_retention_weekly: 4
+backup_restic_retention_monthly: 12
+backup_restic_retention_yearly: 1
+
+# Restore
+backup_restic_restore_snapshot: latest
+backup_restic_restore_path: /var/restore
+
+# Verify depth (verify action). Structure check (`restic check`) always runs.
+# read_data adds checksum verification of pack data — a SUBSET by default since
+# a full re-read is expensive (spec: "N%" or "N/M"; "100%" for everything).
+# restore_test actually restores a snapshot to a scratch dir and asserts data
+# came back — the only check that proves the backup is RESTORABLE.
+backup_restic_verify_read_data: false
+backup_restic_verify_read_data_subset: "5%"
+backup_restic_verify_restore_test: false
+backup_restic_verify_restore_test_snapshot: latest
+backup_restic_verify_restore_test_path: /var/restore-verify
+
+# Extra environment variables for cloud backends
+# AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, B2_ACCOUNT_ID, B2_ACCOUNT_KEY, etc.
+backup_restic_env: {}
+
+# Schedule (cron)
+backup_restic_cron_enabled: true
+backup_restic_cron_hour: "2"
+backup_restic_cron_minute: "0"
+backup_restic_cron_user: root
+backup_restic_script_dir: /usr/local/bin
+
+# Internal package list
+_restic_packages:
+  - restic

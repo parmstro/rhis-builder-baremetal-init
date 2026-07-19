@@ -1,0 +1,7 @@
+---
+- name: registry_generic - configure registry
+  ansible.builtin.debug:
+    msg: >-
+      External registry '{{ cp_registry_url | default('not set') }}' configured.
+      Pull secret '{{ cp_registry_secret_name | default('registry-pull-secret') }}' applied to default namespace.
+  listen: registry_generic - configure registry

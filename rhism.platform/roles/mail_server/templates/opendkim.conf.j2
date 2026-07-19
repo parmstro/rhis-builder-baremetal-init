@@ -1,0 +1,14 @@
+# Managed by Ansible — rhism mail_server (full)
+Mode          sv
+PidFile       /run/opendkim/opendkim.pid
+Syslog        yes
+SyslogSuccess yes
+LogWhy        yes
+Canonicalization relaxed/simple
+Domain        {{ mail_domain }}
+Selector      {{ mail_dkim_selector }}
+MinimumKeyBits {{ mail_dkim_key_size }}
+KeyTable      refile:/etc/opendkim/KeyTable
+SigningTable  refile:/etc/opendkim/SigningTable
+InternalHosts refile:/etc/opendkim/TrustedHosts
+Socket        inet:8891@localhost

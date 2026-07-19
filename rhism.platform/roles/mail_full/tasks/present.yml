@@ -1,0 +1,63 @@
+---
+# tasks/present.yml — Package management + firewall for present/absent actions.
+# Consolidated: present and absent differ only by state param, so one file handles both.
+# Node-changing tasks are gated on mail_execute (false = dry-run); package and
+# firewall tasks additionally on mail_manage_packages / mail_manage_firewall
+# (BUG-117 class — containers have no firewalld; substrates pre-bake packages).
+
+- name: Manage full mail stack packages
+  ansible.builtin.package:
+    name: "{{ _mail_full_packages }}"
+    state: "{{ action }}"
+  become: true
+  when:
+    - mail_execute | bool
+    - mail_manage_packages | bool
+
+- name: Manage SMTP firewall port (25)
+  ansible.posix.firewalld:
+    port: "25/tcp"
+    state: "{{ 'enabled' if action == 'present' else 'disabled' }}"
+    permanent: true
+    immediate: true
+  become: true
+  when:
+    - mail_execute | bool
+    - mail_manage_firewall | bool
+    - mail_open_smtp | bool
+
+- name: Manage submission firewall port (587)
+  ansible.posix.firewalld:
+    port: "587/tcp"
+    state: "{{ 'enabled' if action == 'present' else 'disabled' }}"
+    permanent: true
+    immediate: true
+  become: true
+  when:
+    - mail_execute | bool
+    - mail_manage_firewall | bool
+    - mail_open_submission | bool
+
+- name: Manage IMAP firewall port
+  ansible.posix.firewalld:
+    port: "{{ mail_imap_port }}/tcp"
+    state: "{{ 'enabled' if action == 'present' else 'disabled' }}"
+    permanent: true
+    immediate: true
+  become: true
+  when:
+    - mail_execute | bool
+    - mail_manage_firewall | bool
+    - "'imap' in mail_dovecot_protocols"
+
+- name: Manage IMAPS firewall port
+  ansible.posix.firewalld:
+    port: "{{ mail_imaps_port }}/tcp"
+    state: "{{ 'enabled' if action == 'present' else 'disabled' }}"
+    permanent: true
+    immediate: true
+  become: true
+  when:
+    - mail_execute | bool
+    - mail_manage_firewall | bool
+    - "'imaps' in mail_dovecot_protocols"

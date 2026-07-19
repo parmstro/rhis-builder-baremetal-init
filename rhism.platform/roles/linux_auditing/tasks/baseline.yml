@@ -1,0 +1,9 @@
+---
+- name: Baseline — configure auditd and deploy rules
+  ansible.builtin.include_tasks: configure.yml
+
+- name: Baseline — verify rules and service state
+  ansible.builtin.include_tasks: verify.yml
+
+- name: Baseline — generate initial report
+  ansible.builtin.include_tasks: report.yml

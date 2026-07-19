@@ -1,0 +1,185 @@
+---
+# Functional requirements — rhism_inventory (requirements→test-case layer,
+# owner rule 2026-07-12; user-story schema, owner rule 2026-07-16). Renderer
+# contract: see roles/cmdb/templates/requirements_traceability.md.j2 — a
+# register verifier takes status from the platform test register; a molecule
+# verifier is checked on disk; a lab verifier is checked against a
+# repo-relative playbook path; a requirement with no live verifier renders
+# UNCOVERED.
+functional_requirements:
+  - req_id: RHISMINV-FR-001
+    persona: administrator
+    capability: >-
+      a machine-validated catalogue of standard-operating-environment (SOE)
+      build definitions, checked against a published schema before any
+      downstream use
+    benefit: >-
+      malformed or incomplete SOE definitions are caught at authoring time
+      with a clear reason, instead of failing (or half-applying) mid-way
+      through a content-server configuration run
+    acceptance:
+      - given: a catalogue directory containing SOE build definition files
+        when: the catalogue is validated
+        then: >-
+          every well-formed definition is reported accepted, and any
+          definition missing its identity or carrying an unknown
+          infrastructure reference is rejected with a message naming the
+          offending file and field
+    statement: >-
+      As an administrator, I want a machine-validated catalogue of SOE build
+      definitions, checked against a published schema before any downstream
+      use, so that malformed definitions are caught at authoring time with a
+      clear reason instead of failing mid-way through a configuration run.
+    tier: 2
+    verified_by:
+      - molecule: default
+
+  - req_id: RHISMINV-FR-002
+    persona: administrator
+    capability: >-
+      lifecycle states on catalogue entries (active, deprecated,
+      experimental) with deprecated builds excluded from every downstream
+      use by default while remaining in the catalogue
+    benefit: >-
+      a retired OS build cannot silently re-enter new deployments, and the
+      catalogue keeps its history instead of losing retired definitions to
+      deletion
+    acceptance:
+      - given: a catalogue containing an entry marked deprecated
+        when: any action consumes the catalogue with default settings
+        then: >-
+          the deprecated entry is absent from validation reports, aggregated
+          output, generated deployment content, and the published catalogue
+    statement: >-
+      As an administrator, I want lifecycle states on catalogue entries with
+      deprecated builds excluded from every downstream use by default, so
+      that a retired OS build cannot silently re-enter new deployments while
+      the catalogue keeps its history.
+    tier: 2
+    verified_by:
+      - molecule: default
+
+  - req_id: RHISMINV-FR-003
+    persona: integrator
+    capability: >-
+      merging any selection of SOE build definitions into the single flat
+      input set a content-management server consumes, with objects shared
+      between builds appearing exactly once
+    benefit: >-
+      an estate running many OS builds configures its content server in one
+      pass, without hand-merging per-build lists or creating duplicate
+      content objects
+    acceptance:
+      - given: two SOE build definitions that both reference the same content object
+        when: both builds are aggregated
+        then: >-
+          the merged output contains that shared object exactly once, and
+          every build-specific object from both builds is present
+    statement: >-
+      As an integrator, I want any selection of SOE build definitions merged
+      into the single flat input set a content-management server consumes,
+      with shared objects appearing exactly once, so that a many-build
+      estate configures its content server in one pass without duplicates.
+    tier: 2
+    verified_by:
+      - molecule: default
+
+  - req_id: RHISMINV-FR-004
+    persona: integrator
+    capability: >-
+      one aggregate pre-synchronisation content list spanning every selected
+      SOE build, produced ahead of any build-specific configuration
+    benefit: >-
+      all required content is synchronised once, up front, avoiding
+      partial-content failures surfacing midway through per-build
+      configuration
+    acceptance:
+      - given: several SOE build definitions with overlapping and distinct content
+        when: the builds are aggregated
+        then: >-
+          a single deduplicated list of every content source needed by any
+          selected build exists in the output, separate from the per-build
+          configuration data
+    statement: >-
+      As an integrator, I want one aggregate pre-synchronisation content
+      list spanning every selected SOE build, so that all required content
+      syncs once up front instead of failing partially midway through
+      per-build configuration.
+    tier: 2
+    verified_by:
+      - molecule: default
+
+  - req_id: RHISMINV-FR-005
+    persona: operator
+    capability: >-
+      estate network and identity settings (name-server and gateway
+      addresses, reverse-lookup zones, authentication realm) derived
+      correctly from the estate's actual network definition, whatever its
+      subnet size
+    benefit: >-
+      estates on networks other than a /24 get correct addressing and
+      reverse-lookup zones, avoiding the silently-wrong values classful
+      derivation produces on such networks
+    acceptance:
+      - given: an estate definition whose network is not a /24 (for example a /22)
+        when: deployment content is generated
+        then: >-
+          the derived name-server and gateway addresses fall inside the
+          defined network at their configured offsets, and the derived
+          reverse-lookup zones cover exactly the defined network — not the
+          zone a classful assumption would produce
+    statement: >-
+      As an operator, I want estate network and identity settings derived
+      correctly from the estate's actual network definition whatever its
+      subnet size, so that non-/24 estates get correct addressing instead of
+      the silently-wrong values classful derivation produces.
+    tier: 2
+    verified_by:
+      - molecule: default
+
+  - req_id: RHISMINV-FR-006
+    persona: auditor
+    capability: >-
+      generated deployment content that includes a restrictive-permission
+      secrets location and never contains a secret value
+    benefit: >-
+      secrets travel outside generated artifacts by construction, so
+      generated trees are safe to store, review, and share
+    acceptance:
+      - given: an estate definition
+        when: deployment content is generated
+        then: >-
+          the output tree contains a secrets directory readable by its owner
+          only, holding no secret material, and no secret value appears
+          anywhere else in the generated content
+    statement: >-
+      As an auditor, I want generated deployment content to include a
+      restrictive-permission secrets location and never contain a secret
+      value, so that generated trees are safe to store, review, and share.
+    tier: 2
+    verified_by:
+      - molecule: default
+
+  - req_id: RHISMINV-FR-007
+    persona: integrator
+    capability: >-
+      publishing the validated catalogue to the directory the estate's web
+      catalogue browser serves, one entry per file
+    benefit: >-
+      non-CLI users browse the same single source of truth the automation
+      consumes, with no second copy to drift
+    acceptance:
+      - given: a validated catalogue
+        when: the catalogue is published
+        then: >-
+          the served directory contains one parseable file per non-retired
+          catalogue entry, and entries excluded by lifecycle state are
+          absent
+    statement: >-
+      As an integrator, I want the validated catalogue published to the
+      directory the estate's web catalogue browser serves, one entry per
+      file, so that non-CLI users browse the same single source of truth
+      the automation consumes.
+    tier: 2
+    verified_by:
+      - molecule: default

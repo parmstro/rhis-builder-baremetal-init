@@ -1,0 +1,34 @@
+---
+# roles/pm_thycotic/tasks/main.yml
+# Standalone dispatcher — validates inputs and routes to action task file.
+# Can be called directly or via roles/password_management.
+
+- name: Resolve effective action
+  ansible.builtin.set_fact:
+    _pm_thycotic_action: "{{ pm_thycotic_action if pm_thycotic_action | length > 0 else (action | default('')) }}"
+
+# Shared family dry-run gate (pm_ansible/pm_vault also honour pm_execute) — maps
+# onto this role's existing pm_thycotic_skip_api mechanism rather than adding a
+# second toggle. Used by rhism.platform.builder's Phase 3.5 secrets dry-run.
+- name: Force-skip real TSS API calls when pm_execute is false
+  ansible.builtin.set_fact:
+    pm_thycotic_skip_api: true
+  when: not (pm_execute | default(true) | bool)
+
+- name: Validate required Thycotic variables (skipped when pm_thycotic_skip_api is true)
+  ansible.builtin.assert:
+    that:
+      - _pm_thycotic_action | length > 0
+      - _pm_thycotic_action in ['create', 'delete', 'audit', 'rotate']
+      - pm_target | length > 0
+      - pm_thycotic_server_url | length > 0
+      - pm_thycotic_username | length > 0
+      - pm_thycotic_password | length > 0
+    fail_msg: >-
+      pm_thycotic_action must be one of: create, delete, audit, rotate.
+      pm_target, pm_thycotic_server_url, pm_thycotic_username, pm_thycotic_password are all required.
+      Got action='{{ _pm_thycotic_action }}' target='{{ pm_target | default("undefined") }}'
+  when: not pm_thycotic_skip_api | bool
+
+- name: "pm_thycotic — {{ _pm_thycotic_action }} for {{ pm_target }}"
+  ansible.builtin.include_tasks: "{{ _pm_thycotic_action }}.yml"

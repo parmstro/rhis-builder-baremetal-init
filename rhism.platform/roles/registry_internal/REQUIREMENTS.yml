@@ -1,0 +1,75 @@
+---
+# Functional requirements — registry_internal (requirements->test-case layer +
+# Tier-3 elevation, owner rules 2026-07-12). Product role in the container_platform
+# registry family (a user picks exactly one of registry_generic/registry_internal).
+# DISTINCT PURPOSE: enables and exposes the platform's BUILT-IN container registry
+# — on OCP/OKD it turns on the OpenShift image-registry operator, exposes its
+# default route, and provisions a push/pull service account; on k3s/rke2 (which
+# have no built-in registry) it defers to registry_generic. Product capability
+# fact-checked against the official OpenShift image-registry operator docs
+# (docs.openshift.com — configuring the registry operator, managementState
+# Managed, exposing the default route, registry-editor RBAC). Curated against
+# README + meta/argument_specs.yml action set + tasks/main.yml. OCP/OKD behaviour
+# needs a real OpenShift cluster (absent here) — exercised via the family lab.
+# Family lab: playbooks/container_platform.yml (cp_registry_type: internal).
+functional_requirements:
+  - req_id: REGISTRY_INTERNAL-FR-001
+    statement: >-
+      The role SHALL consume the shared container_platform registry interface
+      (bare action + cp_registry_* + cp_kubeconfig_path + cp_type) and pass its
+      contract scenario — argument-spec validation, standalone default
+      (action=registry), dispatch for registry/present/absent, negative bad-action
+      rejection, and the cp_registry_execute dry-run gate — without a cluster.
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: REGISTRY_INTERNAL-FR-002
+    statement: >-
+      On ocp/okd the role SHALL enable the OpenShift image-registry operator with
+      managementState Managed and defaultRoute true.
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#registry-internal
+
+  - req_id: REGISTRY_INTERNAL-FR-003
+    statement: >-
+      The role SHALL wait for the image-registry default Route to become available
+      in the openshift-image-registry namespace.
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#registry-internal
+
+  - req_id: REGISTRY_INTERNAL-FR-004
+    statement: >-
+      The role SHALL provision a registry-sa ServiceAccount and bind it via a
+      ClusterRoleBinding to the registry-editor ClusterRole for registry push/pull.
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#registry-internal
+
+  - req_id: REGISTRY_INTERNAL-FR-005
+    statement: >-
+      The role SHALL report the exposed registry route host and the registry-sa
+      service-account token so the registry can be used for pushes.
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#registry-internal
+
+  - req_id: REGISTRY_INTERNAL-FR-006
+    statement: >-
+      On k3s/rke2 (which have no built-in registry) the role SHALL make no
+      built-in-registry change and direct the operator to use registry_generic
+      instead.
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#registry-internal
+
+  - req_id: REGISTRY_INTERNAL-FR-007
+    statement: >-
+      On action absent (ocp/okd) the role SHALL disable the built-in registry
+      (managementState Removed, defaultRoute false) and remove the registry-sa
+      ServiceAccount and its ClusterRoleBinding.
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#registry-internal

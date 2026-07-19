@@ -1,0 +1,8 @@
+---
+- name: kvm_platform - restart libvirtd
+  ansible.builtin.service:
+    name: "{{ kvm_platform_libvirt_service }}"
+    state: restarted
+  become: true
+  listen: kvm_platform - restart libvirtd
+  when: kvm_platform_manage_service | bool

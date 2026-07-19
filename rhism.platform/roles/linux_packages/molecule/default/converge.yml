@@ -1,0 +1,21 @@
+---
+- name: Converge — remove insecure packages
+  hosts: all
+  gather_facts: true
+  vars:
+    linux_packages_action: remove
+    linux_packages_remove:
+      - telnet
+  roles:
+    - role: rhism.platform.linux_packages
+
+- name: Converge — install security tooling
+  hosts: all
+  gather_facts: true
+  vars:
+    linux_packages_action: install
+    linux_packages_enable_epel: true
+    linux_packages_install:
+      - audit
+  roles:
+    - role: rhism.platform.linux_packages

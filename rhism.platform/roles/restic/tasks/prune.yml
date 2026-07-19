@@ -1,0 +1,18 @@
+---
+# prune: remove unreferenced data from the repository
+
+- name: Include restic environment
+  ansible.builtin.include_tasks: env.yml
+
+- name: Run restic prune
+  ansible.builtin.command:
+    cmd: restic prune
+  environment: "{{ _restic_env }}"
+  become: true
+  no_log: true
+  register: _restic_prune
+  changed_when: "'removed' in _restic_prune.stdout | lower"
+
+- name: Report prune result
+  ansible.builtin.debug:
+    msg: "{{ _restic_prune.stdout_lines | default([]) }}"

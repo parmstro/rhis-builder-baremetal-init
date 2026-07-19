@@ -1,0 +1,21 @@
+---
+# ---------------------------------------------------------------------------
+# gitlab_ce — shared: firewall rule management
+#
+# Used by: present.yml, absent.yml
+# Expects: _gitlab_ce_firewall_state (enabled | disabled)
+# ---------------------------------------------------------------------------
+
+- name: Manage GitLab CE firewall rules
+  ansible.posix.firewalld:
+    service: "{{ item }}"
+    state: "{{ _gitlab_ce_firewall_state }}"
+    permanent: true
+    immediate: true
+  become: true
+  loop: >-
+    {{
+      (['http']  if (scm_open_http  | default(true))  else []) +
+      (['https'] if (scm_open_https | default(true)) else []) +
+      (['ssh']   if (scm_open_ssh   | default(true))  else [])
+    }}

@@ -1,0 +1,14 @@
+---
+- name: content_management - restart foreman
+  ansible.builtin.service:
+    name: foreman
+    state: restarted
+  become: true
+  listen: content_management - restart foreman
+
+- name: content_management - restart satellite
+  ansible.builtin.service:
+    name: satellite
+    state: restarted
+  become: true
+  listen: content_management - restart satellite

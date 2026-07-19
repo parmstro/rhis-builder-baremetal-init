@@ -1,0 +1,75 @@
+---
+- name: Verify — pm_vault install produced expected files and directories
+  hosts: all
+  gather_facts: false
+
+  tasks:
+    - name: Check vault binary installed
+      ansible.builtin.stat:
+        path: /usr/bin/vault
+      register: _vault_bin
+
+    - name: Assert vault binary is present
+      ansible.builtin.assert:
+        that:
+          - _vault_bin.stat.exists
+          - _vault_bin.stat.executable
+        fail_msg: "vault binary missing or not executable at /usr/bin/vault"
+
+    - name: Check vault config directory
+      ansible.builtin.stat:
+        path: /etc/vault.d
+      register: _config_dir
+
+    - name: Assert config directory exists with correct mode
+      ansible.builtin.assert:
+        that:
+          - _config_dir.stat.exists
+          - _config_dir.stat.isdir
+        fail_msg: "/etc/vault.d not created by install action"
+
+    - name: Check vault.hcl rendered
+      ansible.builtin.stat:
+        path: /etc/vault.d/vault.hcl
+      register: _vault_hcl
+
+    - name: Assert config file was rendered
+      ansible.builtin.assert:
+        that:
+          - _vault_hcl.stat.exists
+          - _vault_hcl.stat.mode == '0640'
+        fail_msg: "vault.hcl missing or wrong permissions"
+
+    - name: Check data directory
+      ansible.builtin.stat:
+        path: /opt/vault/data
+      register: _data_dir
+
+    - name: Assert data directory created with correct mode
+      ansible.builtin.assert:
+        that:
+          - _data_dir.stat.exists
+          - _data_dir.stat.mode == '0750'
+        fail_msg: "/opt/vault/data missing or wrong permissions"
+
+    - name: Check log directory
+      ansible.builtin.stat:
+        path: /var/log/vault
+      register: _log_dir
+
+    - name: Assert log directory created
+      ansible.builtin.assert:
+        that: _log_dir.stat.exists
+        fail_msg: "/var/log/vault not created"
+
+    - name: Read rendered vault.hcl to confirm Raft storage block
+      ansible.builtin.slurp:
+        src: /etc/vault.d/vault.hcl
+      register: _hcl_raw
+
+    - name: Assert Raft storage and listener present in config
+      ansible.builtin.assert:
+        that:
+          - "'storage' in (_hcl_raw.content | b64decode)"
+          - "'listener' in (_hcl_raw.content | b64decode)"
+        fail_msg: "vault.hcl missing storage or listener block"

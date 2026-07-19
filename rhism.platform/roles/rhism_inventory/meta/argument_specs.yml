@@ -1,0 +1,117 @@
+---
+argument_specs:
+  main:
+    short_description: Own the SOE catalogue — validate, aggregate, generate, publish.
+    description: >-
+      Standalone capability role that owns the SOE (Standard Operating
+      Environment) catalogue as platform data. It validates catalogue entries
+      against the SOE bundle model, aggregates selected bundles into the flat
+      deduplicated Satellite list shapes the satellite role consumes, generates
+      the high-signal deployment inventory content (group_vars derivations,
+      vault skeleton, aggregated SOE chain) from a wizard estate manifest, and
+      publishes the catalogue to the directory the rhism_ui web UI serves.
+      Every action runs entirely on the control node. Network derivations use
+      ansible.utils filters on the full CIDR, fixing the upstream generator's
+      classful /24-only octet-split behavior. The argument spec enforces the
+      action and variable contract at role entry; defaults are duplicated in
+      defaults/main.yml, which is the file that actually injects them.
+    options:
+      rhism_inventory_action:
+        description: >-
+          Action to run. validate is a read-only schema check of every selected
+          catalogue entry; aggregate merges selected bundles into flat
+          deduplicated Satellite list shapes and writes one include_vars-ready
+          file; generate derives the deployment inventory content (group_vars
+          derivations, vault skeleton, aggregated SOE chain) from an estate
+          manifest or direct vars; publish copies the selected entries as
+          individual files into the rhism_ui-served catalogue directory.
+        type: str
+        default: validate
+        choices:
+          - validate
+          - aggregate
+          - generate
+          - publish
+      rhism_inventory_catalog_dir:
+        description: >-
+          Directory of SOE catalogue entry files, one YAML file per entry.
+          Empty means the role's bundled reference catalogue (files/catalog
+          inside the role) is used.
+        type: str
+        default: ""
+      rhism_inventory_bundles:
+        description: >-
+          Catalogue entry names to select. An empty list selects every
+          catalogue entry.
+        type: list
+        elements: str
+        default: []
+      rhism_inventory_lifecycle_filter:
+        description: >-
+          Drop catalogue entries whose lifecycle_state is deprecated before
+          any action runs.
+        type: bool
+        default: true
+      rhism_inventory_manifest_path:
+        description: >-
+          Optional path to a wizard deployment manifest consumed by the
+          generate action. When set, the estate domain and network are read
+          from the manifest's network section (domain, subnet, optional
+          realm) — the same keys the wizard role writes.
+        type: str
+        default: ""
+      rhism_inventory_domain:
+        description: >-
+          Standalone fallback estate domain for generate when no manifest is
+          given. Both this and the network CIDR must then be set.
+        type: str
+        default: ""
+      rhism_inventory_network_cidr:
+        description: >-
+          Standalone fallback estate network in CIDR notation for generate
+          when no manifest is given, for example a full prefix like
+          10.20.0.0/22. Derivations are computed on the full CIDR, any prefix
+          length.
+        type: str
+        default: ""
+      rhism_inventory_dns_host_offset:
+        description: >-
+          Host offset (from the network address) of the estate DNS server,
+          applied as nthhost(offset) on the full CIDR. The default keeps
+          parity with the upstream generator's next_nth_usable(10).
+        type: int
+        default: 10
+      rhism_inventory_gateway_offset:
+        description: >-
+          Host offset (from the network address) of the default gateway,
+          applied as nthhost(offset) on the full CIDR.
+        type: int
+        default: 1
+      rhism_inventory_time_servers:
+        description: >-
+          Optional NTP server names passed through into the generated
+          derivations file.
+        type: list
+        elements: str
+        default: []
+      rhism_inventory_output_dir:
+        description: >-
+          Directory where aggregate and generate write their output (the
+          aggregated SOE chain file and the deployment tree). The default
+          resolves to an output/rhism_inventory directory next to the calling
+          playbook's directory.
+        type: str
+        default: "{{ playbook_dir }}/../output/rhism_inventory"
+      rhism_inventory_publish_dir:
+        description: >-
+          Flat directory the publish action copies catalogue entries into,
+          one entry per file — the layout the rhism_ui backend serves. The
+          default is a soe_catalog subdirectory of the output directory.
+        type: str
+        default: "{{ rhism_inventory_output_dir }}/soe_catalog"
+      rhism_inventory_vault_dir_mode:
+        description: >-
+          File mode of the generated vault skeleton directory. Secrets are
+          never generated; the directory ships restrictive from birth.
+        type: str
+        default: "0700"

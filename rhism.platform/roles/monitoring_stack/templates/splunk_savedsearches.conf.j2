@@ -1,0 +1,16 @@
+{% for alert in mon_splunk_alerts %}
+[{{ alert.name }}]
+search = {{ alert.search }}
+cron_schedule = {{ alert.cron }}
+is_scheduled = 1
+alert.severity = {{ {'info': 1, 'low': 2, 'medium': 3, 'high': 4, 'critical': 5}[alert.severity] | default(3) }}
+alert.suppress = 1
+alert.suppress.period = 10m
+{% if alert.action_webhook | default(false) and mon_splunk_eda_webhook_enabled %}
+action.webhook = 1
+action.webhook.param.url = {{ mon_splunk_eda_webhook_url }}
+{% endif %}
+dispatch.earliest_time = -5m
+dispatch.latest_time = now
+
+{% endfor %}

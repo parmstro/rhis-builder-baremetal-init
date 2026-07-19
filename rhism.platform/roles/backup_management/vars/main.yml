@@ -1,0 +1,14 @@
+---
+_backup_valid_actions:
+  - server
+  - client
+  - schedule
+  - restore
+  - verify
+  - baseline
+
+_backup_valid_types:
+  - restic
+  - bareos
+  - rear
+  - oadp

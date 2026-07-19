@@ -1,0 +1,11 @@
+---
+_prov_valid_actions:
+  - install
+  - configure
+  - baseline
+
+_prov_valid_types:
+  - dnsmasq
+  - cobbler
+  - satellite_proxy
+  - foreman_proxy

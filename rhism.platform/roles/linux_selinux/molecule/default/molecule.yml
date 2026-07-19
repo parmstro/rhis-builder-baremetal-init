@@ -1,0 +1,61 @@
+---
+# Collection-hosted scenario: molecule's collection-under-test auto-install
+# (prerun) would try to ansible-galaxy-install this collection into the
+# workspace collections path, clobbering the loader symlink at
+# collections/ansible_collections/rhism/<name> ("Cannot call rmtree on
+# a symbolic link"). Disabled — local collection checkouts already resolve
+# via ANSIBLE_COLLECTIONS_PATH.
+prerun: false
+
+dependency:
+  name: galaxy
+  enabled: false
+
+driver:
+  name: docker
+
+# EL8 excluded: ansible-core 2.15+ AnsiballZ wrappers use `from __future__ import annotations`
+# (Python 3.7+ required) but EL8's only Python with dnf bindings is Python 3.6.
+# Real EL8 deployments have proper Python 3.8+ from AppStream; the minimal Docker
+# image is not representative. EL8 reached end of standard support May 2024.
+platforms:
+  - name: sel-el9
+    image: docker.io/almalinux:9
+    command: /sbin/init
+    privileged: true
+    pre_build_image: true
+    tmpfs:
+      - /run
+      - /tmp
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
+
+  - name: sel-el10
+    image: docker.io/almalinux:10
+    command: /sbin/init
+    privileged: true
+    pre_build_image: true
+    tmpfs:
+      - /run
+      - /tmp
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
+
+provisioner:
+  name: ansible
+  inventory:
+    group_vars:
+      all:
+        ansible_python_interpreter: /usr/bin/python3
+        ansible_remote_tmp: /tmp
+
+scenario:
+  test_sequence:
+    - dependency
+    - destroy
+    - syntax
+    - create
+    - converge
+    - converge
+    - verify
+    - destroy

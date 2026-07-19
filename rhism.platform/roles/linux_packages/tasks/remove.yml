@@ -1,0 +1,5 @@
+---
+- name: Remove insecure legacy packages
+  ansible.builtin.package:
+    name: "{{ linux_packages_remove }}"
+    state: absent

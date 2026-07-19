@@ -1,0 +1,66 @@
+---
+# config_workflows — workflow job templates, nodes, and success edges (aap's
+# own config-as-code engine; awx.awx is the API client, not a role dependency).
+
+- name: Create workflow job templates
+  awx.awx.workflow_job_template:
+    name: "{{ item.name }}"
+    description: "{{ item.description | default(omit) }}"
+    organization: "{{ aap_organization }}"
+    # The workflow's run-level defaults (sizing tier, execute gate, product
+    # solution types) live in item.extra_vars — without writing them here they
+    # were silently dropped, so every launch fell back to the builder's own
+    # role defaults instead of the estate's intended run choices (BUG-189).
+    extra_vars: "{{ item.extra_vars | default(omit) }}"
+    ask_variables_on_launch: "{{ item.ask_variables_on_launch | default(false) }}"
+    ask_inventory_on_launch: "{{ item.ask_inventory_on_launch | default(false) }}"
+    state: present
+    controller_host: "{{ aap_controller_host }}"
+    controller_username: "{{ aap_admin_user }}"
+    controller_password: "{{ aap_admin_password }}"
+    validate_certs: "{{ aap_validate_certs }}"
+    request_timeout: "{{ aap_api_timeout }}"
+  loop: "{{ aap_workflow_templates }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Configure workflow nodes
+  awx.awx.workflow_job_template_node:
+    identifier: "{{ node.identifier }}"
+    workflow_job_template: "{{ workflow.name }}"
+    organization: "{{ aap_organization }}"
+    unified_job_template: "{{ node.unified_job_template }}"
+    extra_data: "{{ node.extra_data | default(omit) }}"
+    all_parents_must_converge: "{{ node.all_parents_must_converge | default(false) }}"
+    state: present
+    controller_host: "{{ aap_controller_host }}"
+    controller_username: "{{ aap_admin_user }}"
+    controller_password: "{{ aap_admin_password }}"
+    validate_certs: "{{ aap_validate_certs }}"
+    request_timeout: "{{ aap_api_timeout }}"
+  loop: "{{ aap_workflow_templates | subelements('nodes') }}"
+  loop_control:
+    label: "{{ workflow.name }} / {{ node.identifier }}"
+  vars:
+    workflow: "{{ item.0 }}"
+    node: "{{ item.1 }}"
+
+- name: Wire workflow node success edges
+  awx.awx.workflow_job_template_node:
+    identifier: "{{ node.identifier }}"
+    workflow_job_template: "{{ workflow.name }}"
+    organization: "{{ aap_organization }}"
+    success_nodes: "{{ node.success_nodes | default([]) }}"
+    state: present
+    controller_host: "{{ aap_controller_host }}"
+    controller_username: "{{ aap_admin_user }}"
+    controller_password: "{{ aap_admin_password }}"
+    validate_certs: "{{ aap_validate_certs }}"
+    request_timeout: "{{ aap_api_timeout }}"
+  loop: "{{ aap_workflow_templates | subelements('nodes') }}"
+  loop_control:
+    label: "{{ workflow.name }} / {{ node.identifier }}"
+  vars:
+    workflow: "{{ item.0 }}"
+    node: "{{ item.1 }}"
+  when: node.success_nodes is defined and node.success_nodes | length > 0

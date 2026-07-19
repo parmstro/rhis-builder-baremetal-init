@@ -1,0 +1,171 @@
+---
+# ── Elasticsearch repo and install ───────────────────────────────────
+- name: Add Elasticsearch GPG key
+  ansible.builtin.rpm_key:
+    key: https://artifacts.elastic.co/GPG-KEY-elasticsearch
+    state: present
+  become: true
+
+- name: Add Elasticsearch repo
+  ansible.builtin.yum_repository:
+    name: elasticsearch
+    description: Elasticsearch repository for {{ mon_elastic_version }}.x
+    baseurl: "https://artifacts.elastic.co/packages/{{ mon_elastic_version }}/yum"
+    gpgcheck: true
+    gpgkey: https://artifacts.elastic.co/GPG-KEY-elasticsearch
+    enabled: true
+  become: true
+
+- name: Install Elasticsearch
+  ansible.builtin.package:
+    name: elasticsearch
+    state: present
+  become: true
+
+# ── Configure Elasticsearch ──────────────────────────────────────────
+- name: Deploy Elasticsearch configuration
+  ansible.builtin.template:
+    src: elasticsearch.yml.j2
+    dest: /etc/elasticsearch/elasticsearch.yml
+    owner: root
+    group: elasticsearch
+    mode: "0660"
+  become: true
+  notify: monitoring_stack - restart elasticsearch
+
+- name: Configure JVM heap size
+  ansible.builtin.template:
+    src: elasticsearch_jvm.options.j2
+    dest: /etc/elasticsearch/jvm.options.d/heap.options
+    owner: root
+    group: elasticsearch
+    mode: "0660"
+  become: true
+  notify: monitoring_stack - restart elasticsearch
+
+- name: Enable and start Elasticsearch
+  ansible.builtin.service:
+    name: elasticsearch
+    state: started
+    enabled: true
+  become: true
+
+- name: Wait for Elasticsearch to be ready
+  ansible.builtin.uri:
+    url: "https://localhost:{{ mon_elastic_http_port }}/_cluster/health"
+    method: GET
+    user: elastic
+    password: "{{ mon_elastic_password }}"
+    validate_certs: false
+    status_code: 200
+    timeout: 10
+  register: es_health
+  retries: 30
+  delay: 5
+  until: es_health.status == 200
+  when: mon_elastic_password | length > 0
+
+# ── ILM policies ────────────────────────────────────────────────────
+- name: Create ILM policies
+  ansible.builtin.uri:
+    url: "https://localhost:{{ mon_elastic_http_port }}/_ilm/policy/{{ item.name }}"
+    method: PUT
+    user: elastic
+    password: "{{ mon_elastic_password }}"
+    validate_certs: false
+    body_format: json
+    body:
+      policy:
+        phases:
+          hot:
+            actions:
+              rollover:
+                max_primary_shard_size: "{{ item.hot_max_size }}"
+                max_age: "{{ item.hot_max_age }}"
+          warm:
+            min_age: "{{ item.warm_min_age }}"
+            actions:
+              shrink:
+                number_of_shards: 1
+              forcemerge:
+                max_num_segments: 1
+          cold:
+            min_age: "{{ item.cold_min_age }}"
+            actions:
+              freeze: {}
+          delete:
+            min_age: "{{ item.delete_min_age }}"
+            actions:
+              delete: {}
+    status_code:
+      - 200
+      - 201
+  loop: "{{ mon_elastic_ilm_policies }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: mon_elastic_password | length > 0
+
+# ── Index templates ──────────────────────────────────────────────────
+- name: Create index templates
+  ansible.builtin.uri:
+    url: "https://localhost:{{ mon_elastic_http_port }}/_index_template/{{ item.name }}"
+    method: PUT
+    user: elastic
+    password: "{{ mon_elastic_password }}"
+    validate_certs: false
+    body_format: json
+    body:
+      index_patterns:
+        - "{{ item.pattern }}"
+      template:
+        settings:
+          number_of_shards: "{{ item.shards }}"
+          number_of_replicas: "{{ item.replicas }}"
+          index.lifecycle.name: "{{ item.ilm_policy }}"
+    status_code:
+      - 200
+      - 201
+  loop: "{{ mon_elastic_index_templates }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: mon_elastic_password | length > 0
+
+# ── Kibana ───────────────────────────────────────────────────────────
+- name: Install Kibana
+  ansible.builtin.package:
+    name: kibana
+    state: present
+  become: true
+  when: mon_kibana_enabled
+
+- name: Deploy Kibana configuration
+  ansible.builtin.template:
+    src: kibana.yml.j2
+    dest: /etc/kibana/kibana.yml
+    owner: root
+    group: kibana
+    mode: "0660"
+  become: true
+  notify: monitoring_stack - restart kibana
+  when: mon_kibana_enabled
+
+- name: Enable and start Kibana
+  ansible.builtin.service:
+    name: kibana
+    state: started
+    enabled: true
+  become: true
+  when: mon_kibana_enabled
+
+# ── Firewall ─────────────────────────────────────────────────────────
+- name: Open Elasticsearch firewall ports
+  ansible.posix.firewalld:
+    port: "{{ item }}/tcp"
+    permanent: true
+    immediate: true
+    state: enabled
+  loop:
+    - "{{ mon_elastic_http_port }}"
+    - "{{ mon_kibana_port }}"
+  become: true
+  failed_when: false

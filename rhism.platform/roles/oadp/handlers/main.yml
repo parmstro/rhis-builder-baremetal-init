@@ -1,0 +1,22 @@
+---
+# OADP applies CRs into the cluster; there are no host services to restart. The one
+# meaningful handler waits for the Velero Deployment the operator rolls out after the
+# DataProtectionApplication is (re)applied.
+
+- name: oadp - wait for velero rollout
+  kubernetes.core.k8s_info:
+    kubeconfig: "{{ backup_oadp_kubeconfig | default(omit) }}"
+    api_version: apps/v1
+    kind: Deployment
+    name: velero
+    namespace: "{{ backup_oadp_namespace }}"
+  register: _oadp_velero_deploy
+  retries: "{{ (backup_oadp_wait_timeout | int / 10) | int }}"
+  delay: 10
+  until: >-
+    _oadp_velero_deploy['resources'] | default([])
+    | selectattr('status.availableReplicas', 'defined')
+    | selectattr('status.availableReplicas', 'ge', 1)
+    | list | length > 0
+  when: backup_oadp_wait | bool
+  listen: oadp - wait for velero rollout

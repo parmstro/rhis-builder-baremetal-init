@@ -1,0 +1,4 @@
+---
+- name: ocp - restart api
+  ansible.builtin.debug:
+    msg: "OCP API restart is managed by the OpenShift control plane; no direct service restart available."

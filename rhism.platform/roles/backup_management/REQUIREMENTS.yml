@@ -1,0 +1,22 @@
+---
+# Functional requirements — backup_management dispatcher (requirements→
+# test-case layer, owner rule 2026-07-12).
+functional_requirements:
+  - req_id: BACKUP-FR-001
+    statement: >-
+      The dispatcher SHALL validate backup_type and action, selecting any
+      product (bareos/restic) via one identical parameterised include_role
+      with the shared backup_* family interface (sameness — BUG-040 class
+      namespace mismatches are the failure this guards against).
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: BACKUP-FR-002
+    statement: >-
+      Every product's verify action SHALL assert backup INTEGRITY, not just
+      completion: checksum verification plus an actual restore-test (restore
+      to scratch, assert data returns) — see docs/backup-integrity.md.
+    tier: 2
+    verified_by:
+      - molecule: restic/functional

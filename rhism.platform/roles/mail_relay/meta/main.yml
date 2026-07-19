@@ -1,0 +1,22 @@
+---
+galaxy_info:
+  namespace: rhism
+  role_name: mail_relay
+  author: rhism
+  description: >-
+    Configure Postfix as an outbound SMTP relay (smarthost) with TLS and SASL
+    authentication, plus mail-queue management. Standalone-first product role, also
+    selectable by the mail_server dispatcher (mail_type: relay).
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: EL
+      versions:
+        - "9"
+  galaxy_tags:
+    - mail
+    - postfix
+    - smtp
+    - relay
+    - smarthost
+dependencies: []

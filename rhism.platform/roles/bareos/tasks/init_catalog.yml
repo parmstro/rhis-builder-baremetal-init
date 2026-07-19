@@ -1,0 +1,60 @@
+---
+# init_catalog.yml — idempotent catalog schema initialization (BUG-116: the
+# server action previously deployed configs but NEVER created the catalog —
+# the director could not start on any host without a pre-seeded database).
+#
+# Uses the Bareos-shipped scripts, which read the deployed director config
+# for dbname/dbuser/dbpassword and export PGHOST from its DbAddress — so the
+# same path serves a local-socket catalog and a remote one. For a remote
+# catalog the scripts connect with the admin credentials below (libpq env).
+
+- name: Check whether the catalog schema exists
+  ansible.builtin.command:
+    cmd: psql -tAc "SELECT 1 FROM pg_tables WHERE tablename = 'version'"
+  environment:
+    PGHOST: "{{ backup_bareos_catalog_db_address | default('', true) }}"
+    PGPORT: "{{ backup_bareos_catalog_db_port }}"
+    PGUSER: "{{ backup_bareos_catalog_admin_user }}"
+    PGPASSWORD: "{{ backup_bareos_catalog_admin_password }}"
+    PGDATABASE: "{{ backup_bareos_catalog_db_name }}"
+  become: true
+  register: _bareos_catalog_check
+  changed_when: false
+  failed_when: false
+  no_log: true
+
+- name: Initialize the catalog (create database, tables, privileges)
+  ansible.builtin.command:
+    cmd: "{{ item }}"
+  loop:
+    - /usr/lib/bareos/scripts/create_bareos_database
+    - /usr/lib/bareos/scripts/make_bareos_tables
+    - /usr/lib/bareos/scripts/grant_bareos_privileges
+  environment:
+    PGHOST: "{{ backup_bareos_catalog_db_address | default('', true) }}"
+    PGPORT: "{{ backup_bareos_catalog_db_port }}"
+    PGUSER: "{{ backup_bareos_catalog_admin_user }}"
+    PGPASSWORD: "{{ backup_bareos_catalog_admin_password }}"
+  become: true
+  when: "'1' not in (_bareos_catalog_check.stdout | default(''))"
+  changed_when: true
+  no_log: true
+
+# The shipped scripts create the catalog role WITHOUT a password; a remote
+# catalog authenticating over the network (md5/scram) needs one.
+- name: Set the catalog user password (remote catalog)
+  ansible.builtin.command:
+    cmd: >-
+      psql -c "ALTER ROLE {{ backup_bareos_catalog_db_user }}
+      WITH PASSWORD '{{ backup_bareos_catalog_db_password }}'"
+  environment:
+    PGHOST: "{{ backup_bareos_catalog_db_address }}"
+    PGPORT: "{{ backup_bareos_catalog_db_port }}"
+    PGUSER: "{{ backup_bareos_catalog_admin_user }}"
+    PGPASSWORD: "{{ backup_bareos_catalog_admin_password }}"
+  become: true
+  when:
+    - backup_bareos_catalog_db_address | length > 0
+    - backup_bareos_catalog_db_password | length > 0
+  changed_when: true
+  no_log: true

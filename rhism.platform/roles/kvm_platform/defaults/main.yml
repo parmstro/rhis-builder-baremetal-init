@@ -1,0 +1,81 @@
+---
+# kvm_platform — KVM/libvirt HOST/PLATFORM lifecycle: install, configure, upgrade, remove.
+#
+# Product role: manages the hypervisor HOST itself (packages, libvirtd service, default
+# storage pool + network). It does NOT manage VM guests — that is roles/vm_provisioning's
+# job (vm_action: create_vm | destroy_vm | gold_build | gold_patch | cloud_init |
+# network_persist), which runs against an already-installed KVM host produced by this role.
+# See README.md "Description" for the full scope boundary and the two roles' hand-off point.
+
+# --- Action dispatcher ---
+# install:   install qemu-kvm/libvirt packages, enable+start libvirtd (idempotent, the
+#            safest of the four actions — the default).
+# configure: default storage pool + default network (community.libvirt.virt_pool/virt_net),
+#            plus informational nested-virtualization sanity checks (no auto-fix).
+# upgrade:   package upgrade (state: latest) for the same package set installed by
+#            `install`; restarts libvirtd via handler if packages changed.
+# remove:    stop+disable libvirtd, optionally purge the default pool/network, remove
+#            packages. Destructive — gated behind kvm_platform_confirm_delete.
+kvm_platform_action: install
+
+# Safety/dry-run gate wrapping every real state-changing task. false validates action
+# dispatch + the variable contract without touching packages/services/libvirt objects.
+# Molecule sets this false: nested virtualization inside a container is unreliable (see
+# docs/k3s-rootless-podman-research.md for the flavor of constraint; docs/kvm_platform.md
+# for why this specifically can't be exercised in CI). A real functional scenario needs a
+# bare-metal-ish test host with /dev/kvm exposed.
+kvm_platform_execute: true
+
+# --- Connection ---
+# qemu:///system = host-wide libvirtd, requires root/polkit (the normal case).
+# qemu:///session = unprivileged per-user libvirtd instance.
+kvm_platform_uri: "qemu:///system"
+
+# --- Packages ---
+# Empty list = auto-select the right package set for ansible_facts['os_family'] from the
+# internal map in vars/main.yml (RedHat/Debian covered). Override to pin an explicit list
+# (e.g. to add libguestfs-tools variants or drop a package this host already provides
+# another way).
+kvm_platform_packages: []
+
+# Manage (enable/start/restart) the libvirtd service. Set false in containers with no
+# systemd, or when libvirtd is managed by something else on this host.
+kvm_platform_manage_service: true
+kvm_platform_libvirt_service: libvirtd
+
+# --- Host network bridging (optional; off by default) ---
+# bridge-utils is legacy on EL9+ — NetworkManager/nmcli is the current, supported way to
+# create a Linux bridge. This role does NOT install bridge-utils by default. Set
+# kvm_platform_manage_bridge: true to have `install` create a host bridge via
+# community.general.nmcli instead; leave it false to rely solely on libvirt's own NAT
+# "default" network (virbr0) from the `configure` action, which needs no host bridge at all.
+kvm_platform_manage_bridge: false
+kvm_platform_bridge_name: br0
+kvm_platform_bridge_interface: ""   # physical NIC to enslave, e.g. eth1; "" = bridge only, no slave
+
+# --- Default storage pool (configure action) ---
+kvm_platform_pool_name: default
+kvm_platform_pool_type: dir
+kvm_platform_pool_path: /var/lib/libvirt/images
+kvm_platform_pool_autostart: true
+
+# --- Default network (configure action) ---
+kvm_platform_network_name: default
+kvm_platform_network_forward_mode: nat
+kvm_platform_network_bridge: virbr0
+kvm_platform_network_ip: 192.168.122.1
+kvm_platform_network_netmask: 255.255.255.0
+kvm_platform_network_dhcp_start: 192.168.122.2
+kvm_platform_network_dhcp_end: 192.168.122.254
+kvm_platform_network_autostart: true
+
+# --- Nested-virtualization sanity check (configure action) ---
+# Informational only — checks /dev/kvm and kvm_intel/kvm_amd, asserts, but never tries to
+# fix anything (BIOS/UEFI VT-x/AMD-V settings and host reboots are not Ansible's job).
+kvm_platform_check_nested_virt: true
+
+# --- Destructive-action safety gate (remove action) ---
+# Must be explicitly set true or `remove` refuses to run its state-changing block.
+kvm_platform_confirm_delete: false
+kvm_platform_purge_storage_pool: false
+kvm_platform_purge_network: false

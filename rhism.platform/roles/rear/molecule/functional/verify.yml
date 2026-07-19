@@ -1,0 +1,50 @@
+---
+- name: Verify — ReaR functional goal (installed, configured, real artifact produced)
+  hosts: all
+  become: true
+  gather_facts: false
+  vars:
+    _target: /tmp/rear-target
+  tasks:
+    - name: rear binary is installed
+      ansible.builtin.command: rear -V
+      register: _ver
+      changed_when: false
+
+    - name: /etc/rear/local.conf was rendered
+      ansible.builtin.stat:
+        path: /etc/rear/local.conf
+      register: _conf
+
+    - name: Local config declares the file:// backup target
+      ansible.builtin.slurp:
+        src: /etc/rear/local.conf
+      register: _conf_content
+
+    - name: Find any real recovery artifact produced under the target
+      ansible.builtin.find:
+        paths: "{{ _target }}"
+        patterns:
+          - "*.iso"
+          - "backup.tar.gz"
+          - "rear-*.iso"
+        recurse: true
+        file_type: file
+      register: _artifacts
+
+    - name: Assert ReaR functional goal is met
+      ansible.builtin.assert:
+        that:
+          - "'Relax-and-Recover' in _ver.stdout or 'rear' in _ver.stdout"
+          - _conf.stat.exists
+          - "'file:///tmp/rear-target' in (_conf_content.content | b64decode)"
+          # At least one REAL recovery artifact (rescue ISO and/or data backup archive).
+          - _artifacts.matched | int > 0
+        fail_msg: >-
+          rear functional goal not met — expected an installed rear, a rendered
+          local.conf pointing at the file:// target, and at least one real recovery
+          artifact (ISO or backup.tar.gz) under {{ _target }}.
+        success_msg: >-
+          PASS — rear installed, /etc/rear/local.conf rendered, and
+          {{ _artifacts.matched }} recovery artifact(s) produced under {{ _target }}
+          ({{ _artifacts.files | map(attribute='path') | list }}).

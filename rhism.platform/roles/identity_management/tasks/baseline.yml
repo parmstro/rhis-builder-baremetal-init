@@ -1,0 +1,31 @@
+---
+# Baseline orchestrator — same pattern as linux_security/tasks/main.yml.
+# Calls sub-actions in dependency order with boolean guards.
+
+- name: Deploy identity server
+  ansible.builtin.include_tasks: server.yml
+  when: idm_apply_server | bool
+
+- name: Configure DNS zones
+  ansible.builtin.include_tasks: dns.yml
+  when: idm_apply_dns | bool
+
+- name: Establish AD trust
+  ansible.builtin.include_tasks: trust.yml
+  when: idm_apply_trust | bool
+
+- name: Enroll client hosts
+  ansible.builtin.include_tasks: client.yml
+  when: idm_apply_client | bool
+
+- name: Configure OTP tokens
+  ansible.builtin.include_tasks: otp.yml
+  when: idm_apply_otp | bool
+
+- name: Configure smart card / PIV authentication
+  ansible.builtin.include_tasks: smart_card.yml
+  when: idm_apply_smart_card | bool
+
+- name: Configure RADIUS proxy for hardware token servers
+  ansible.builtin.include_tasks: radius_proxy.yml
+  when: idm_apply_radius_proxy | bool

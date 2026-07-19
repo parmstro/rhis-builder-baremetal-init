@@ -1,0 +1,50 @@
+---
+- name: Verify type vars loading
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Load k3s vars
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../../vars/k3s.yml"
+      delegate_to: localhost
+
+    - name: Assert k3s has no RHSM requirement and has builtin ingress
+      ansible.builtin.assert:
+        that:
+          - _cp_rhsm_required == false
+          - _cp_has_builtin_ingress == true
+          - _cp_service_name == 'k3s'
+        fail_msg: "k3s.yml did not load expected vars"
+      delegate_to: localhost
+
+    - name: Load ocp vars
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../../vars/ocp.yml"
+      delegate_to: localhost
+
+    - name: Assert ocp requires RHSM and has builtin registry
+      ansible.builtin.assert:
+        that:
+          - _cp_rhsm_required == true
+          - _cp_has_builtin_registry == true
+          - _cp_has_builtin_ingress == true
+        fail_msg: "ocp.yml did not load expected vars"
+      delegate_to: localhost
+
+    - name: Load rke2 vars
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../../vars/rke2.yml"
+      delegate_to: localhost
+
+    - name: Assert rke2 has no RHSM requirement
+      ansible.builtin.assert:
+        that:
+          - _cp_rhsm_required == false
+          - _cp_service_name == 'rke2-server'
+        fail_msg: "rke2.yml did not load expected vars"
+      delegate_to: localhost
+
+    - name: Report verification passed
+      ansible.builtin.debug:
+        msg: "PASS — container_platform type vars verified (k3s, ocp, rke2)"
+      delegate_to: localhost

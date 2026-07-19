@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Managed by Ansible — rhism restic role (restore)
+set -euo pipefail
+
+export RESTIC_REPOSITORY="{{ backup_restic_repository }}"
+export RESTIC_PASSWORD="{{ backup_restic_password }}"
+{% for key, value in backup_restic_env.items() %}
+export {{ key }}="{{ value }}"
+{% endfor %}
+
+SNAPSHOT="${1:-{{ backup_restic_restore_snapshot }}}"
+TARGET="{{ backup_restic_restore_path }}"
+
+echo "Restoring snapshot $SNAPSHOT to $TARGET"
+mkdir -p "$TARGET"
+
+restic restore "$SNAPSHOT" \
+  --target "$TARGET" \
+  --tag ansible-managed
+
+echo "Restore complete: $TARGET"

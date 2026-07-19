@@ -1,0 +1,24 @@
+{# Managed by Ansible — role mail_full. Do not edit by hand. #}
+# SpamAssassin local rules — managed by Ansible (mail_full role)
+# Do not edit manually; changes will be overwritten.
+
+# Score at or above which a message is tagged as spam.
+required_score          {{ mail_spamassassin_required_score }}
+
+# Rewrite the Subject: header of spam messages.
+{% if mail_spamassassin_rewrite_subject | bool %}
+rewrite_header Subject  [SPAM]
+{% endif %}
+
+# Use Bayesian classifier and auto-learning.
+use_bayes               1
+bayes_auto_learn        1
+
+# Network tests.
+skip_rbl_checks         0
+use_razor2              0
+use_pyzor               0
+
+# Report headers so downstream (amavis) can act on the verdict.
+add_header all Status   _YESNO_, score=_SCORE_ required=_REQD_ tests=_TESTS_
+report_safe             0

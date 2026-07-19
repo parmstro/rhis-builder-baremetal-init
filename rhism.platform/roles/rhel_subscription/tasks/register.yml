@@ -1,0 +1,19 @@
+---
+# Register with RHSM — unless registration is skipped (dry-run, or the host is
+# already registered). The real work (credential asserts + the
+# community.general.redhat_subscription calls) lives in register_rhsm.yml and is
+# pulled in via a DYNAMIC include gated on `not skip`. This is load-bearing, not
+# stylistic: module/action resolution happens when the task file is loaded, so a
+# module task carrying `when: not skip` still aborts the play at parse time on an
+# EE without community.general (e.g. awx-ee under a gated dry-run). Gating the
+# include keeps the skip path from ever loading — and thus resolving — that
+# module (BUG-191; parse-time-resolution class, cf. BUG-059/BUG-163).
+- name: Perform RHSM registration
+  ansible.builtin.include_tasks:
+    file: register_rhsm.yml
+  when: not (rhel_subscription_skip | bool)
+
+- name: Report skipped registration
+  ansible.builtin.debug:
+    msg: "rhel_subscription_skip is true — no RHSM registration attempted."
+  when: rhel_subscription_skip | bool

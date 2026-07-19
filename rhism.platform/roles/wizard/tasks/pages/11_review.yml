@@ -1,0 +1,35 @@
+---
+- name: Build summary text
+  ansible.builtin.set_fact:
+    _wizard_summary: |
+      Deployment Summary
+      ==================
+      Profile   : {{ wizard_profile | default('custom') }}
+      Domain    : {{ wizard_network.domain | default('not set') }}
+      Subnet    : {{ wizard_network.subnet | default('not set') }}
+
+      Components:
+      {% for key, val in wizard_components.items() %}
+        {{ '%-20s' | format(key) }}: {{ val.type | default('enabled') if val.enabled else 'DISABLED' }}
+      {% endfor %}
+
+      VM Sizing Tier: {{ wizard_sizing.tier | default('not set') }}
+  tags: infra_wizard
+
+- name: Display summary and request confirmation
+  ansible.builtin.command:
+    cmd: >-
+      {{ wizard_tui_backend }} --title "{{ wizard_tui_title }}"
+      --yesno "{{ _wizard_summary }}\n\nProceed with this deployment plan?"
+      {{ wizard_tui_height }} {{ wizard_tui_width }}
+      3>&1 1>&2 2>&3
+  register: _wizard_confirm_result
+  changed_when: false
+  failed_when: _wizard_confirm_result.rc not in [0, 1]
+  tags: infra_wizard
+
+- name: Handle user rejection of plan
+  ansible.builtin.fail:
+    msg: "Deployment cancelled by user at review screen. Re-run the wizard to start over."
+  when: _wizard_confirm_result.rc == 1
+  tags: infra_wizard

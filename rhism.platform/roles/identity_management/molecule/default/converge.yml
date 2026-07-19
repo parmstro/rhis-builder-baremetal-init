@@ -1,0 +1,118 @@
+---
+- name: Converge — freeipa type var loading and baseline no-op
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    idm_action: baseline
+    idm_type: freeipa
+    idm_domain: idm-test.local
+    idm_admin_password: TestAdminPassword123!
+    idm_ds_password: TestDsPassword123!
+    # All baseline toggles off — tests orchestrator logic without any installs
+    idm_apply_server: false
+    idm_apply_client: false
+    idm_apply_dns: false
+    idm_apply_trust: false
+    idm_apply_otp: false
+    idm_apply_smart_card: false
+    idm_apply_radius_proxy: false
+  roles:
+    - role: rhism.platform.identity_management
+
+- name: Converge — rh_idm type var loading
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    idm_action: baseline
+    idm_type: rh_idm
+    idm_domain: idm-test.local
+    idm_admin_password: TestAdminPassword123!
+    idm_ds_password: TestDsPassword123!
+    idm_apply_server: false
+    idm_apply_client: false
+    idm_apply_dns: false
+    idm_apply_trust: false
+    idm_apply_otp: false
+    idm_apply_smart_card: false
+    idm_apply_radius_proxy: false
+  roles:
+    - role: rhism.platform.identity_management
+
+- name: Converge — ad_integration type var loading and enroll dry-run
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    idm_action: enroll
+    idm_type: ad_integration
+    idm_domain: corp.example.com
+    idm_ad_admin_user: Administrator
+    idm_ad_admin_password: TestAdPassword123!
+    idm_ad_enroll_execute: false   # dry-run — no actual realm join
+  roles:
+    - role: rhism.platform.identity_management
+
+- name: Converge — server dry-run (freeipa, idm_server_install=false)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    idm_action: server
+    idm_type: freeipa
+    idm_domain: idm-test.local
+    idm_admin_password: TestAdminPassword123!
+    idm_ds_password: TestDsPassword123!
+    idm_server_install: false    # dry-run — validates tasks without installing
+    idm_setup_dns: true
+    idm_forwarders:
+      - 8.8.8.8
+  roles:
+    - role: rhism.platform.identity_management
+
+- name: Converge — negative test dispatcher rejects invalid action
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Attempt invalid idm_action
+      block:
+        - name: Run role with invalid idm_action
+          ansible.builtin.include_role:
+            name: rhism.platform.identity_management
+          vars:
+            idm_action: invalid_action
+            idm_type: freeipa
+            idm_domain: idm-test.local
+        - name: Fail if dispatcher did not reject
+          ansible.builtin.fail:
+            msg: "Dispatcher should have rejected 'invalid_action'"
+      rescue:
+        - name: Confirm dispatcher correctly rejected invalid_action
+          ansible.builtin.debug:
+            msg: "PASS — dispatcher correctly rejected invalid_action"
+
+- name: Converge — negative test server rejected for ad_integration
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Attempt server action with ad_integration type
+      block:
+        - name: Run server action on ad_integration
+          ansible.builtin.include_role:
+            name: rhism.platform.identity_management
+          vars:
+            idm_action: server
+            idm_type: ad_integration
+            idm_domain: corp.example.com
+            idm_admin_password: TestAdminPassword123!
+            idm_ds_password: TestDsPassword123!
+        - name: Fail if server was not rejected
+          ansible.builtin.fail:
+            msg: "server action should be rejected for ad_integration type"
+      rescue:
+        - name: Confirm server action rejected for ad_integration
+          ansible.builtin.debug:
+            msg: "PASS — server action correctly rejected for ad_integration"

@@ -1,0 +1,27 @@
+---
+# pm_vault — read action.
+# Retrieves a secret from Vault KV and registers it as pm_result.
+# Use no_log: true on tasks that reference pm_result.password.
+
+- name: Authenticate to Vault
+  ansible.builtin.include_tasks: connect.yml
+
+- name: Read secret from Vault KV
+  community.hashi_vault.vault_kv2_get:
+    url: "{{ pm_vault_url }}"
+    namespace: "{{ pm_vault_namespace | default(omit) }}"
+    token: "{{ _pm_vault_token }}"
+    engine_mount_point: "{{ pm_vault_kv_mount }}"
+    path: "{{ _pm_vault_kv_path }}"
+  register: _pm_vault_read
+  delegate_to: localhost
+  no_log: true
+
+- name: Expose result (no_log on callers)
+  ansible.builtin.set_fact:
+    pm_result:
+      password: "{{ _pm_vault_read.raw.data.data.password }}"
+      target: "{{ pm_target }}"
+      backend: vault
+      vault_path: "{{ pm_vault_kv_mount }}/{{ _pm_vault_kv_path }}"
+  no_log: true

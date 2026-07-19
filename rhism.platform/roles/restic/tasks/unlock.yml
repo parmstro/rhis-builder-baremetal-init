@@ -1,0 +1,18 @@
+---
+# unlock: remove stale repository locks
+
+- name: Include restic environment
+  ansible.builtin.include_tasks: env.yml
+
+- name: Run restic unlock
+  ansible.builtin.command:
+    cmd: restic unlock
+  environment: "{{ _restic_env }}"
+  become: true
+  no_log: true
+  register: _restic_unlock
+  changed_when: "'successfully removed' in _restic_unlock.stdout | lower"
+
+- name: Report unlock result
+  ansible.builtin.debug:
+    msg: "{{ _restic_unlock.stdout_lines | default([]) }}"

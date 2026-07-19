@@ -1,0 +1,7 @@
+---
+- name: storage_local_path - configure storage
+  ansible.builtin.debug:
+    msg: >-
+      local-path StorageClass configuration applied.
+      No service restart is required for StorageClass annotation changes.
+  listen: storage_local_path - configure storage

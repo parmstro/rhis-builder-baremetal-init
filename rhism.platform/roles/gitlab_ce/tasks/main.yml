@@ -1,0 +1,12 @@
+---
+# ---------------------------------------------------------------------------
+# gitlab_ce — product role entry point
+#
+# The action + variable interface is validated by meta/argument_specs.yml
+# (ansible-core runs argument-spec validation automatically at role entry, so
+# `action` is guaranteed to be one of the declared choices — no manual assert).
+# Dispatches to the per-action task file for the selected action.
+# ---------------------------------------------------------------------------
+
+- name: "Dispatch to action: {{ action }}"
+  ansible.builtin.include_tasks: "{{ _gitlab_ce_action_map[action] }}"

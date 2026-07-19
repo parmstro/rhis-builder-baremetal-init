@@ -1,0 +1,137 @@
+---
+# mail_full — standalone-first defaults over the SHARED mail-server interface.
+#
+# Both mail product roles (mail_relay / mail_full) consume the SAME variable names,
+# so the mail_server dispatcher selects either with one identical call —
+# `include_role: name="mail_{{ mail_type }}"` — and never needs per-product code.
+# Standalone callers set these same vars directly; the defaults below make the role
+# runnable on its own.
+
+# Shared action (both products). Full-stack lifecycle:
+# present | absent | configure | secure | antispam | add_domain | add_user |
+# test | status | started | stopped | restarted.
+# The dispatcher passes `action` via include_role vars; this default covers standalone use.
+action: present
+
+# Shared dry-run gate honoured by both mail products — false validates dispatch +
+# variable resolution without touching the node (used by the molecule scenario).
+mail_execute: true
+
+# Identity (shared interface).
+mail_domain: "{{ ansible_domain | default('example.local') }}"
+mail_hostname: "{{ ansible_fqdn | default('mail.example.local') }}"
+
+# Upstream SMTP smarthost (optional even for the full stack).
+mail_relay_host: ""
+mail_relay_port: 587
+mail_relay_user: ""
+mail_relay_password: ""        # vault-backed (no_log)
+
+# TLS (shared interface).
+mail_tls_enabled: true
+mail_tls_cert_file: ""
+mail_tls_key_file: ""
+mail_tls_security_level: may   # may | encrypt | dane | dane-only | verify
+
+# Postfix tuning (shared interface).
+mail_inet_interfaces: all
+mail_inet_protocols: ipv4
+mail_message_size_limit: 10485760   # 10 MB
+mail_mailbox_size_limit: 0
+
+# Firewall ports (shared interface).
+mail_open_smtp: true
+mail_open_submission: true
+mail_open_smtps: false
+
+# Dovecot / virtual mail (full stack).
+mail_dovecot_protocols:
+  - imap
+  - imaps
+mail_dovecot_mail_location: "maildir:~/Maildir"
+mail_dovecot_ssl: required
+# Dovecot listen addresses. Containers/labs without IPv6 set "*" —
+# dovecot exits fatally when it cannot bind "::".
+mail_dovecot_listen: "*, ::"
+# Dovecot passwd-file backing the virtual users (add_user appends here).
+mail_dovecot_passwd_file: /etc/dovecot/passwd.db
+# Dovecot listener ports (no hard-coded environment facts in templates).
+mail_imap_port: 143
+mail_imaps_port: 993
+mail_pop3_port: 110
+mail_pop3s_port: 995
+mail_virtual_domains: []
+mail_virtual_users: []
+# Virtual mailbox tree + owning system account (postfix virtual(8) delivery
+# agent and dovecot userdb/mail_uid both derive from these).
+mail_virtual_mailbox_base: /var/mail/vhosts
+mail_vmail_user: vmail
+mail_vmail_uid: 5000
+mail_vmail_gid: 5000
+
+# DKIM (full stack). Default false: opendkim is EPEL-only on EL (no RHEL/UBI
+# repo — antispam-chain sourcing deferred by owner decision 2026-07-14); a
+# default-run converge must not depend on unsourced packages.
+mail_dkim_enabled: false
+mail_dkim_selector: mail
+mail_dkim_key_size: 2048
+
+# SpamAssassin (full stack). Default false: removed from RHEL 10 (EPEL-only
+# there) and unproven in the UBI repo subset on EL8/EL9 — same deferred
+# sourcing decision as DKIM/ClamAV.
+mail_spamassassin_enabled: false
+mail_spamassassin_required_score: 5.0
+mail_spamassassin_rewrite_subject: false
+
+# ClamAV (full stack). Default false: clamav/clamav-update/amavisd-new are in
+# NO RHEL repo (EPEL-only, all three bases) — deferred sourcing decision.
+mail_clamav_enabled: false
+
+# Test action.
+mail_test_recipient: "admin@localhost"
+
+# Domain / user management actions.
+mail_new_domain: ""
+mail_new_user: ""
+mail_new_user_password_hash: ""
+
+# Service management toggle (BUG-117 class — containers have no systemd);
+# guards services.yml, the status action's systemctl leg and the
+# restart/reload handlers. Labs/scenarios set false. Same name as mail_relay
+# (shared mail-family interface).
+mail_manage_service: true
+
+# Firewall management toggle (BUG-117 class — containers have no firewalld);
+# guards every firewalld task in present.yml. Labs/scenarios set false.
+mail_manage_firewall: true
+
+# Package management toggle — false skips the dnf/package tasks entirely
+# (image-factory substrates pre-bake the packages; EL8's ansible interpreter
+# is python3.11 which has no dnf bindings — BUG-018 class).
+mail_manage_packages: true
+
+# Postfix lookup-table type (BUG-122 — EL10/postfix 3.8 unbundles hash: into
+# the deprecated postfix-hash subpackage; lmdb is the EL10 default). EL-aware.
+# Same expression as mail_relay (shared mail-family interface).
+mail_db_type: "{{ 'lmdb' if (ansible_distribution_major_version | default('9')) | int >= 10 else 'hash' }}"
+
+# Networks permitted to relay (BUG-124; drives mynetworks +
+# smtpd_relay_restrictions = permit_mynetworks, reject_unauth_destination).
+# Same name as mail_relay (shared mail-family interface).
+mail_mynetworks:
+  - 127.0.0.0/8
+
+# Role-internal package/service constants (namespaced, not part of the shared interface).
+# EL-native core stack only: dovecot (the single EL RPM carries imap/pop3/lmtp;
+# dovecot-imapd is a Debian-ism), dovecot-pigeonhole (Sieve). The antispam
+# chain (opendkim/spamassassin/clamav/amavisd-new) is EPEL-only on EL and its
+# sourcing is deferred (owner decision 2026-07-14) — deliberately NOT in the
+# install set until that decision lands. mailx dropped: EL9+ ships s-nail
+# instead and no task in this role uses it (test.yml uses postfix sendmail).
+_mail_full_packages:
+  - postfix
+  - dovecot
+  - dovecot-pigeonhole
+_mail_full_services:
+  - postfix
+  - dovecot

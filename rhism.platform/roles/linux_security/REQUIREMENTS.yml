@@ -1,0 +1,35 @@
+---
+# Functional requirements — linux_security orchestrator (requirements→test-case
+# layer, owner rule 2026-07-12). Renderer contract: roles/cmdb
+# requirements_traceability.
+functional_requirements:
+  - req_id: LINSEC-FR-001
+    statement: >-
+      The orchestrator SHALL compose the six domain roles (packages,
+      hardening, firewall, auditing, users, selinux) solely via gated
+      include_role calls — a linux_security_apply_* toggle set false SHALL
+      run ZERO tasks from that domain (no meta dependencies — BUG-102).
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: LINSEC-FR-002
+    statement: >-
+      With all gates true on an EL host/container, the orchestrator SHALL
+      apply the full baseline (audit package, sshd_config, audit rules,
+      faillock, SELinux graceful-skip in containers) in one run.
+    tier: 2
+    verified_by:
+      - molecule: default
+
+  - req_id: LINSEC-FR-003
+    statement: >-
+      The same play SHALL harden BOTH a real host and a container base:
+      host-runtime domains auto-disable in containers
+      (ansible_virtualization_type detection) so a container base bakes
+      CONFIG hardening only (the ubiN-secure build path).
+    tier: 2
+    verified_by:
+      - manual: proven by the 2026-07-12 secure-base builds — see TESTS.md
+          in this repo (SECBASE-* cases); a register entry for the base
+          builds is a known gap

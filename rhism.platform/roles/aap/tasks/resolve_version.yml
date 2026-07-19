@@ -1,0 +1,19 @@
+---
+# Load the version profile (vars/versions/<aap_version>.yml) into
+# aap_version_profile, then validate the requested install method is one the
+# profile actually supports for this version. Shared by every action.
+
+- name: Load the AAP {{ aap_version }} version profile
+  ansible.builtin.include_vars:
+    file: "versions/{{ aap_version }}.yml"
+
+- name: Assert the requested install method is supported by this version
+  ansible.builtin.assert:
+    that:
+      - aap_install_method in aap_version_profile.install_methods
+    fail_msg: >-
+      aap_install_method '{{ aap_install_method }}' is not supported for AAP
+      {{ aap_version }} (supported: {{ aap_version_profile.install_methods | join(', ') }}).
+    success_msg: >-
+      AAP {{ aap_version }} profile loaded; install method '{{ aap_install_method }}'
+      is supported.

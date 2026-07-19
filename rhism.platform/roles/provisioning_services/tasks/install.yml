@@ -1,0 +1,6 @@
+---
+- name: Install provisioning services ({{ prov_type }})
+  ansible.builtin.include_role:
+    name: "{{ prov_type }}"
+  vars:
+    action: present

@@ -1,0 +1,77 @@
+---
+- name: Converge — pm_ansible full credential lifecycle
+  hosts: all
+  gather_facts: true
+
+  tasks:
+    - name: Create credential for test_db_user
+      ansible.builtin.include_role:
+        name: pm_ansible
+      vars:
+        pm_ansible_action: create
+        pm_target: test_db_user
+        pm_service: postgresql
+
+    - name: Verify credential file exists after create
+      ansible.builtin.stat:
+        path: /tmp/pm_test_creds/test_db_user.cred
+      register: _cred_after_create
+      delegate_to: localhost
+
+    - name: Assert credential was created
+      ansible.builtin.assert:
+        that:
+          - _cred_after_create.stat.exists
+          - _cred_after_create.stat.mode == '0600'
+        fail_msg: "Credential file missing or wrong permissions after create"
+
+    - name: Audit the credential
+      ansible.builtin.include_role:
+        name: pm_ansible
+      vars:
+        pm_ansible_action: audit
+        pm_target: test_db_user
+
+    - name: Verify audit report was written
+      ansible.builtin.stat:
+        path: /tmp/pm_ansible_audit_report.txt
+      register: _audit_report
+      delegate_to: localhost
+
+    - name: Assert audit report exists
+      ansible.builtin.assert:
+        that: _audit_report.stat.exists
+        fail_msg: "Audit report not written"
+
+    - name: Rotate the credential
+      ansible.builtin.include_role:
+        name: pm_ansible
+      vars:
+        pm_ansible_action: rotate
+        pm_target: test_db_user
+
+    - name: Verify history file exists after rotate (ISM-0408)
+      ansible.builtin.stat:
+        path: /tmp/pm_test_creds/test_db_user.history
+      register: _history_after_rotate
+      delegate_to: localhost
+
+    - name: Assert history file created
+      ansible.builtin.assert:
+        that: _history_after_rotate.stat.exists
+        fail_msg: "Password history file missing after rotate — ISM-0408 not enforced"
+
+    - name: Create a second credential to test isolation
+      ansible.builtin.include_role:
+        name: pm_ansible
+      vars:
+        pm_ansible_action: create
+        pm_target: test_svc_account
+        pm_service: webserver
+
+    - name: Delete test_db_user credential
+      ansible.builtin.include_role:
+        name: pm_ansible
+      vars:
+        pm_ansible_action: delete
+        pm_target: test_db_user

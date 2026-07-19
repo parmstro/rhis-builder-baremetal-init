@@ -1,0 +1,13 @@
+---
+_prov_packages:
+  - foreman-proxy
+_prov_service_name: foreman-proxy
+_prov_config_dir: /etc/foreman-proxy
+_prov_config_file: /etc/foreman-proxy/settings.yml
+_prov_firewall_services:
+  - dns
+  - dhcp
+  - tftp
+_prov_has_smartproxy: true
+_prov_content_collection: theforeman.foreman
+_prov_smartproxy_module: theforeman.foreman.smart_proxy

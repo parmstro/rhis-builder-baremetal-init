@@ -1,0 +1,54 @@
+---
+# action: client — enroll or unenroll host as IPA client
+
+- name: Configure Red Hat IDM client
+  become: true
+  block:
+    - name: Install Red Hat IDM client packages
+      ansible.builtin.package:
+        name: "{{ _idm_client_packages }}"
+        state: present
+
+    - name: Open firewall for IDM client services
+      ansible.posix.firewalld:
+        service: "{{ item }}"
+        permanent: true
+        state: enabled
+        immediate: true
+      loop:
+        - freeipa-ldap
+        - freeipa-ldaps
+        - kerberos
+        - kpasswd
+        - ntp
+
+    - name: Skip IDM client install (dry-run mode)
+      ansible.builtin.debug:
+        msg: >-
+          DRY RUN — idm_client_install=false.
+          Would enroll {{ inventory_hostname }} to IDM domain {{ idm_domain }}
+          using server {{ idm_server_hostname | default(idm_master_server) }}.
+      when: not (idm_client_install | bool)
+
+    - name: Install IPA client
+      freeipa.ansible_freeipa.ipaclient:
+        servers: "{{ idm_server_hostname | default(idm_master_server) }}"
+        domain: "{{ idm_domain }}"
+        realm: "{{ idm_realm }}"
+        principal: admin
+        password: "{{ idm_admin_password }}"
+        mkhomedir: "{{ idm_mkhomedir | bool }}"
+        state: present
+      no_log: true
+      when: idm_client_install | bool
+
+    - name: Unenroll IPA client
+      freeipa.ansible_freeipa.ipaclient:
+        servers: "{{ idm_server_hostname | default(idm_master_server) }}"
+        domain: "{{ idm_domain }}"
+        realm: "{{ idm_realm }}"
+        principal: admin
+        password: "{{ idm_admin_password }}"
+        state: absent
+      no_log: true
+      when: not (idm_client_install | bool)

@@ -1,0 +1,12 @@
+---
+# schedule: manage cron job for restic backup
+
+- name: Manage restic cron job
+  ansible.posix.cron:
+    name: restic-backup
+    user: "{{ backup_restic_cron_user }}"
+    hour: "{{ backup_restic_cron_hour }}"
+    minute: "{{ backup_restic_cron_minute }}"
+    job: "{{ backup_restic_script_dir }}/restic-backup.sh"
+    state: "{{ 'present' if backup_restic_cron_enabled else 'absent' }}"
+  become: true

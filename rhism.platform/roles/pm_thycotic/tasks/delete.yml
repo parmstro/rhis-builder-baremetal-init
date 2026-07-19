@@ -1,0 +1,15 @@
+---
+# pm_thycotic — delete action.
+# Retires (soft-deletes) the secret in Delinea Secret Server.
+# TSS does not hard-delete by default — retired secrets remain in the audit trail.
+
+- name: Validate secret ID is set
+  ansible.builtin.assert:
+    that:
+      - pm_thycotic_secret_id | length > 0
+    fail_msg: "pm_thycotic_secret_id must be set for the delete action."
+  when: not pm_thycotic_skip_api | bool
+
+- name: Retire secret in Thycotic Secret Server
+  ansible.builtin.include_tasks: tss_delete.yml
+  when: not pm_thycotic_skip_api | bool

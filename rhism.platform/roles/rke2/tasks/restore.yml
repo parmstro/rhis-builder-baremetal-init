@@ -1,0 +1,21 @@
+---
+# ── Restore rke2 etcd snapshot ───────────────────────────────────────────────
+
+- name: Stop rke2-server before restore
+  ansible.builtin.service:
+    name: "{{ _cp_service_name }}"
+    state: stopped
+  become: true
+
+- name: Run etcd snapshot restore
+  ansible.builtin.command:
+    cmd: "rke2 etcd-snapshot restore --name {{ cp_restore_snapshot_name }} --server-type server"
+  become: true
+  changed_when: true
+
+- name: Start rke2-server after restore
+  ansible.builtin.service:
+    name: "{{ _cp_service_name }}"
+    state: started
+    enabled: true
+  become: true

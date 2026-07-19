@@ -1,0 +1,9 @@
+---
+- name: storage_longhorn - configure storage
+  ansible.builtin.debug:
+    msg: >-
+      Longhorn storage deployed in {{ storage_longhorn_namespace }} namespace.
+      Replicas: {{ cp_storage_longhorn_replicas }}.
+      Data path: {{ cp_storage_longhorn_data_path }}.
+      Default StorageClass: {{ cp_storage_make_default }}.
+  listen: storage_longhorn - configure storage

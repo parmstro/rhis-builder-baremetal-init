@@ -1,0 +1,19 @@
+---
+# Red Hat IDM — same underlying packages as FreeIPA on RHEL, but requires
+# an active RHSM subscription and registers the host before installing.
+# Loaded dynamically when idm_type=rh_idm via include_vars in tasks/main.yml.
+
+_idm_server_packages:
+  - ipa-server
+  - ipa-server-dns
+  - ipa-server-trust-ad
+
+_idm_client_packages:
+  - ipa-client
+
+_idm_installer_cmd: ipa-server-install
+_idm_client_installer_cmd: ipa-client-install
+_idm_replica_installer_cmd: ipa-replica-install
+_idm_admin_cmd: ipa
+_idm_service_name: ipa
+_idm_rhsm_required: true

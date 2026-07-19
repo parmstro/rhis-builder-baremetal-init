@@ -1,0 +1,21 @@
+---
+# ── Add worker node to rke2 cluster ──────────────────────────────────────────
+
+- name: Prepare agent config directory
+  ansible.builtin.include_tasks: agent_config.yml
+
+- name: Install rke2 agent  # noqa: command-instead-of-module
+  ansible.builtin.shell:
+    cmd: >
+      curl -sfL {{ _cp_install_script_url }} |
+      INSTALL_RKE2_TYPE="agent"
+      sh -
+    creates: "{{ _cp_binary }}"
+  become: true
+
+- name: Enable and start rke2-agent service
+  ansible.builtin.service:
+    name: "{{ _cp_service_name_agent }}"
+    state: started
+    enabled: true
+  become: true

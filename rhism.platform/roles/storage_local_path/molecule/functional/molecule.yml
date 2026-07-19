@@ -1,0 +1,51 @@
+---
+# Functional scenario (Tier 2) — brings up a single-node k3s cluster, runs the role, and
+# asserts local-path is the default StorageClass.
+#
+# Runs under ROOTLESS podman with zero host security relaxation — same recipe as
+# roles/k3s/molecule/functional: private cgroup namespace, cpuset delegated to the rootless
+# user (`ensure_cgroup_delegation` in bin/ci-lib.sh), and the KubeletInUserNamespace feature
+# gate via INSTALL_K3S_EXEC in converge. Full experiment record:
+# docs/k3s-rootless-podman-research.md.
+# Collection-hosted scenario: molecule's collection-under-test auto-install
+# (prerun) would try to ansible-galaxy-install this collection into the
+# workspace collections path, clobbering the loader symlink at
+# collections/ansible_collections/rhism/<name> ("Cannot call rmtree on
+# a symbolic link"). Disabled — local collection checkouts already resolve
+# via ANSIBLE_COLLECTIONS_PATH.
+prerun: false
+
+dependency:
+  name: galaxy
+  enabled: false
+
+driver:
+  name: docker
+
+platforms:
+  - name: storage-local-path-func
+    image: docker.io/almalinux:9
+    command: /sbin/init
+    privileged: true
+    pre_build_image: true
+    tmpfs:
+      - /run
+
+provisioner:
+  name: ansible
+  inventory:
+    group_vars:
+      all:
+        ansible_python_interpreter: /usr/bin/python3
+        ansible_remote_tmp: /tmp
+
+scenario:
+  test_sequence:
+    - dependency
+    - destroy
+    - syntax
+    - create
+    - prepare
+    - converge
+    - verify
+    - destroy

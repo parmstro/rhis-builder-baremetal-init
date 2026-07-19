@@ -1,0 +1,384 @@
+---
+- name: Load deployment manifest
+  ansible.builtin.include_vars:
+    file: "{{ pb_manifest_path }}"
+    name: pb_manifest
+
+- name: Validate manifest
+  ansible.builtin.assert:
+    that:
+      - pb_manifest.components is defined
+      - pb_manifest.profile is defined
+    fail_msg: "Manifest missing required keys. Run: wizard_action=validate first."
+
+# Every component decision is resolved exactly once, here. An override var
+# (pb_enable_*/pb_*_type, non-empty) wins; otherwise the manifest speaks.
+# Each step below then gates on a short fact — never a repeated when-wall.
+- name: Resolve component enablement decisions
+  ansible.builtin.set_fact:
+    pb_enabled:
+      security: >-
+        {{ pb_enable_security | bool if pb_enable_security != ''
+           else pb_manifest.components.security.enabled | default(false) | bool }}
+      tang: "{{ pb_manifest.components.tang.enabled | default(false) | bool }}"
+      hypervisor: >-
+        {{ pb_enable_hypervisor | bool if pb_enable_hypervisor != ''
+           else pb_manifest.components.hypervisor.enabled | default(false) | bool }}
+      identity: >-
+        {{ pb_enable_identity | bool if pb_enable_identity != ''
+           else pb_manifest.components.identity.enabled | default(false) | bool }}
+      provisioning: >-
+        {{ pb_enable_provisioning | bool if pb_enable_provisioning != ''
+           else pb_manifest.components.provisioning.enabled | default(false) | bool }}
+      secrets: >-
+        {{ pb_enable_secrets | bool if pb_enable_secrets != ''
+           else pb_manifest.components.secrets.enabled | default(false) | bool }}
+      content: >-
+        {{ pb_enable_content | bool if pb_enable_content != ''
+           else pb_manifest.components.content.enabled | default(false) | bool }}
+      mail: >-
+        {{ pb_enable_mail | bool if pb_enable_mail != ''
+           else pb_manifest.components.mail.enabled | default(false) | bool }}
+      scm: >-
+        {{ pb_enable_scm | bool if pb_enable_scm != ''
+           else pb_manifest.components.scm.enabled | default(false) | bool }}
+      backup: >-
+        {{ pb_enable_backup | bool if pb_enable_backup != ''
+           else pb_manifest.components.backup.enabled | default(false) | bool }}
+      container_platform: >-
+        {{ pb_enable_container_platform | bool if pb_enable_container_platform != ''
+           else pb_manifest.components.container_platform.enabled | default(false) | bool }}
+      monitoring: >-
+        {{ pb_enable_monitoring | bool if pb_enable_monitoring != ''
+           else pb_manifest.components.monitoring.enabled | default(false) | bool }}
+      automation: >-
+        {{ pb_enable_automation | bool if pb_enable_automation != ''
+           else pb_manifest.components.automation.enabled | default(false) | bool }}
+
+- name: Resolve component type and input decisions
+  ansible.builtin.set_fact:
+    pb_type:
+      hypervisor: >-
+        {{ pb_hypervisor_type if pb_hypervisor_type | length > 0
+           else pb_manifest.components.hypervisor.type | default('kvm') }}
+      identity: >-
+        {{ pb_identity_type if pb_identity_type | length > 0
+           else pb_manifest.components.identity.type | default('freeipa') }}
+      provisioning: >-
+        {{ pb_provisioning_type if pb_provisioning_type | length > 0
+           else pb_manifest.components.provisioning.type | default('dnsmasq') }}
+      secrets: >-
+        {{ pb_pm_type if pb_pm_type | length > 0
+           else pb_manifest.components.secrets.type | default('ansible') }}
+      content: >-
+        {{ pb_content_type if pb_content_type | length > 0
+           else pb_manifest.components.content.type | default('foreman') }}
+      mail: >-
+        {{ pb_mail_type if pb_mail_type | length > 0
+           else pb_manifest.components.mail.type | default('relay') }}
+      scm: >-
+        {{ pb_scm_type if pb_scm_type | length > 0
+           else pb_manifest.components.scm.type | default('gitlab_ce') }}
+      backup: >-
+        {{ pb_backup_type if pb_backup_type | length > 0
+           else pb_manifest.components.backup.type | default('restic') }}
+      container_platform: >-
+        {{ pb_cp_type if pb_cp_type | length > 0
+           else pb_manifest.components.container_platform.type | default('k3s') }}
+      automation: >-
+        {{ pb_automation_type if pb_automation_type | length > 0
+           else pb_manifest.components.automation.type | default('aap') }}
+    pb_provisioning_hosts: "{{ pb_manifest.components.provisioning.hosts | default([]) }}"
+    pb_idm_trust: >-
+      {{ (pb_idm_apply_trust != '' and pb_idm_apply_trust | bool) or
+         (pb_idm_apply_trust == '' and
+          pb_manifest.components.identity.ad_trust.enabled | default(false) | bool) }}
+
+- name: Show resolved deployment decisions
+  ansible.builtin.debug:
+    msg:
+      - "Platform Builder deploy — profile: {{ pb_manifest.profile }}, execute: {{ pb_deploy_execute | bool }}"
+      - "Enabled: {{ pb_enabled }}"
+      - "Types: {{ pb_type }}"
+
+- name: Assert decisions resolved
+  ansible.builtin.assert:
+    that:
+      - pb_enabled is defined
+      - pb_type is defined
+      - pb_enabled.keys() | length == 13
+      - pb_type.keys() | length == 10
+    fail_msg: "Component decision facts failed to resolve — check manifest/overrides."
+
+# ── Step 1: Linux security baseline (vendored; sub-roles resolve in-collection) ──
+- name: Apply linux security baseline
+  ansible.builtin.include_role:
+    name: rhism.platform.linux_security
+  vars:
+    security_action: baseline
+    # BUG-194: same gating gap as the content block — a dry-run
+    # (pb_deploy_execute=false) must NOT run real, root-requiring hardening
+    # (e.g. "Remove insecure legacy packages" fails "must be run under root"
+    # in an unprivileged runner). Gate every apply sub-role on pb_deploy_execute;
+    # real hardening stays Tier-3 (matches the kvm-configure/tang gating).
+    linux_security_apply_packages: "{{ pb_deploy_execute | bool }}"
+    linux_security_apply_hardening: "{{ pb_deploy_execute | bool }}"
+    linux_security_apply_firewall: "{{ pb_deploy_execute | bool }}"
+    linux_security_apply_auditing: "{{ pb_deploy_execute | bool }}"
+    linux_security_apply_users: "{{ pb_deploy_execute | bool }}"
+    linux_security_apply_selinux: "{{ pb_deploy_execute | bool }}"
+  when: pb_enabled.security | bool
+
+# ── Step 1b: Tang / NBDE key escrow ─────────────────────────────────────────
+# Vendored; bare name resolves same-collection first. Real deploy (image pull,
+# container, SELinux/firewalld) stays Tier-3 until pb_deploy_execute is true.
+- name: Deploy Tang / NBDE key escrow server
+  ansible.builtin.include_role:
+    name: tang
+  vars:
+    action: deploy
+    tang_deploy_execute: "{{ pb_deploy_execute }}"
+  when: pb_enabled.tang | bool
+
+# ── Step 1c: KVM hypervisor platform — the estate's compute substrate ───────
+# Stood up early: after host baseline + key escrow, before identity/workloads.
+# No hypervisor dispatcher family exists; the product role is dispatched
+# directly, gated on type == kvm (other hypervisors are an honest, documented
+# boundary — vendor the product role + add a branch here to support one).
+- name: Deploy KVM hypervisor platform — install (packages + libvirtd)
+  ansible.builtin.include_role:
+    name: rhism.platform.kvm_platform
+  vars:
+    kvm_platform_action: install
+    kvm_platform_execute: "{{ pb_deploy_execute | bool }}"
+  when:
+    - pb_enabled.hypervisor | bool
+    - pb_type.hypervisor == 'kvm'
+
+# Gated on pb_deploy_execute (BUG-175): configure references community.libvirt.*
+# (infra EE only) and ansible-core resolves module FQCNs at play LOAD time,
+# before any when:/execute-gate — a dry-run must never enter configure.
+- name: Deploy KVM hypervisor platform — configure (storage pool + network)
+  ansible.builtin.include_role:
+    name: rhism.platform.kvm_platform
+  vars:
+    kvm_platform_action: configure
+    kvm_platform_execute: "{{ pb_deploy_execute | bool }}"
+  when:
+    - pb_deploy_execute | bool
+    - pb_enabled.hypervisor | bool
+    - pb_type.hypervisor == 'kvm'
+
+# ── Step 2: Identity Management ─────────────────────────────────────────────
+# AD-trust connection details flow from the manifest; the trust admin password
+# is override/vault-only, never manifest content.
+- name: Deploy identity management
+  ansible.builtin.include_role:
+    name: rhism.platform.identity_management
+  vars:
+    idm_action: baseline
+    idm_type: "{{ pb_type.identity }}"
+    idm_apply_server: "{{ pb_idm_apply_server | bool }}"
+    idm_apply_dns: "{{ pb_idm_apply_dns | bool }}"
+    idm_apply_client: "{{ pb_idm_apply_client | bool }}"
+    idm_apply_trust: "{{ pb_idm_trust }}"
+    idm_ad_trust_domain: "{{ pb_manifest.components.identity.ad_trust.domain | default('') }}"
+    idm_ad_trust_admin: >-
+      {{ pb_manifest.components.identity.ad_trust.admin | default('Administrator') }}
+    idm_ad_trust_range_type: >-
+      {{ pb_manifest.components.identity.ad_trust.range_type | default('ipa-ad-trust') }}
+    idm_ad_trust_password: "{{ pb_idm_ad_trust_password }}"
+    idm_server_install: "{{ pb_deploy_execute | bool }}"
+    # BUG-190: a dry-run must skip RHSM registration too — otherwise rh_idm's
+    # prepare_server attempts a real subscription-manager register (no target /
+    # aborts uncatchably when the EE lacks community.general). A real deploy
+    # (execute) registers with the activation key.
+    idm_rhsm_skip_registration: "{{ not (pb_deploy_execute | bool) }}"
+  when: pb_enabled.identity | bool
+
+# ── Step 3: Provisioning Services ───────────────────────────────────────────
+- name: Deploy provisioning services
+  ansible.builtin.include_role:
+    name: rhism.platform.provisioning_services
+  vars:
+    prov_action: baseline
+    prov_type: "{{ pb_type.provisioning }}"
+    prov_apply_install: "{{ pb_deploy_execute | bool }}"
+    prov_apply_configure: "{{ pb_deploy_execute | bool }}"
+    prov_install_execute: "{{ pb_deploy_execute | bool }}"
+  when: pb_enabled.provisioning | bool
+
+# ── Step 3b: Bare-host provisioning (rhism Phase D) ─────────────────────────
+# components.provisioning.hosts (empty = no-op) registers bare hosts against
+# whichever backend Step 3 selected, dispatched to the OWNING role's action —
+# neither dispatcher family covers these. Per-entry host shape differs by
+# backend: see each role's meta/argument_specs.yml.
+- name: Provision bare hosts via cobbler (light/no-Satellite PXE path)
+  ansible.builtin.include_role:
+    name: rhism.platform.cobbler
+  vars:
+    action: add_systems
+    prov_cobbler_systems: "{{ pb_provisioning_hosts }}"
+    prov_execute: "{{ pb_deploy_execute | bool }}"
+  when:
+    - pb_enabled.provisioning | bool
+    - pb_type.provisioning == 'cobbler'
+    - pb_provisioning_hosts | length > 0
+
+# Satellite's host action has its own execute-gate (a real host create + a
+# real reboot-into-installer are consequential); the builder passes
+# pb_deploy_execute straight through AND gates here — defense in depth.
+- name: Provision bare hosts via Satellite (heavy/Satellite-integrated path)
+  ansible.builtin.include_role:
+    name: rhism.platform.satellite
+  vars:
+    action: host
+    content_hosts: "{{ pb_provisioning_hosts }}"
+    content_host_execute: "{{ pb_deploy_execute }}"
+  when:
+    - pb_deploy_execute | bool
+    - pb_enabled.provisioning | bool
+    - pb_type.provisioning == 'satellite_proxy'
+    - pb_provisioning_hosts | length > 0
+
+# ── Step 3.5: Secrets Management ────────────────────────────────────────────
+- name: Deploy secrets management
+  ansible.builtin.include_role:
+    name: rhism.platform.password_management
+  vars:
+    pm_action: "{{ pb_pm_action }}"
+    pm_type: "{{ pb_type.secrets }}"
+    pm_target: "{{ pb_manifest.components.secrets.target | default('rhism-platform-admin') }}"
+    pm_execute: "{{ pb_deploy_execute | bool }}"
+  when: pb_enabled.secrets | bool
+
+# ── Step 4: Content Management ──────────────────────────────────────────────
+- name: Deploy content management
+  ansible.builtin.include_role:
+    name: rhism.platform.content_management
+  vars:
+    content_action: baseline
+    content_type: "{{ pb_type.content }}"
+    # BUG-194: a dry-run (pb_deploy_execute=false) must NOT run any content
+    # apply-stage — content_management's configure/repos/sync call the live
+    # Foreman/Satellite API (e.g. "Ensure organization exists"), which fails
+    # when no Satellite exists. Gate every apply toggle on pb_deploy_execute
+    # (mirrors the mail_server/identity blocks); the pb_content_apply_* toggles
+    # still govern WHICH stages run on a real deploy.
+    content_apply_install: "{{ pb_deploy_execute | bool and pb_content_apply_install | bool }}"
+    content_apply_configure: "{{ pb_deploy_execute | bool and pb_content_apply_configure | bool }}"
+    content_apply_repos: "{{ pb_deploy_execute | bool and pb_content_apply_repos | bool }}"
+    content_apply_sync: "{{ pb_deploy_execute | bool and pb_content_apply_sync | bool }}"
+    content_apply_content_views: false
+    content_apply_activation_keys: false
+    content_install_execute: "{{ pb_deploy_execute | bool }}"
+    # BUG-190: dry-run skips RHSM registration; a real deploy registers with the key.
+    content_rhsm_skip_registration: "{{ not (pb_deploy_execute | bool) }}"
+  when: pb_enabled.content | bool
+
+# ── Step 5: Mail Server ─────────────────────────────────────────────────────
+- name: Deploy mail server
+  ansible.builtin.include_role:
+    name: rhism.platform.mail_server
+  vars:
+    mail_action: baseline
+    mail_type: "{{ pb_type.mail }}"
+    mail_apply_install: "{{ pb_deploy_execute | bool }}"
+    mail_apply_configure: "{{ pb_deploy_execute | bool }}"
+    mail_apply_secure: false
+    mail_install_execute: "{{ pb_deploy_execute | bool }}"
+  when: pb_enabled.mail | bool
+
+# ── Step 6: SCM Deploy ──────────────────────────────────────────────────────
+- name: Deploy SCM (GitLab)
+  ansible.builtin.include_role:
+    name: rhism.platform.scm_deploy
+  vars:
+    scm_action: baseline
+    scm_type: "{{ pb_type.scm }}"
+    scm_apply_install: "{{ pb_scm_apply_install | bool }}"
+    scm_apply_configure: "{{ pb_scm_apply_configure | bool }}"
+    scm_apply_runners: "{{ pb_scm_apply_runners | bool }}"
+    scm_apply_backup: false
+    scm_install_execute: "{{ pb_deploy_execute | bool }}"
+  when: pb_enabled.scm | bool
+
+# ── Step 7: Backup Management ───────────────────────────────────────────────
+- name: Deploy backup management
+  ansible.builtin.include_role:
+    name: rhism.platform.backup_management
+  vars:
+    backup_action: baseline
+    backup_type: "{{ pb_type.backup }}"
+    backup_apply_server: "{{ pb_backup_apply_server | bool }}"
+    backup_apply_client: "{{ pb_backup_apply_client | bool }}"
+    backup_apply_schedule: false
+    backup_apply_verify: false
+    backup_install_execute: "{{ pb_deploy_execute | bool }}"
+  when: pb_enabled.backup | bool
+
+# ── Step 8: Container Platform ──────────────────────────────────────────────
+- name: Deploy container platform
+  ansible.builtin.include_role:
+    name: rhism.platform.container_platform
+  vars:
+    cp_action: baseline
+    cp_type: "{{ pb_type.container_platform }}"
+    cp_apply_install: "{{ pb_cp_apply_install | bool }}"
+    cp_apply_configure: "{{ pb_cp_apply_configure | bool }}"
+    cp_apply_storage: "{{ pb_cp_apply_storage | bool }}"
+    cp_apply_registry: "{{ pb_cp_apply_registry | bool }}"
+    cp_apply_ingress: "{{ pb_cp_apply_ingress | bool }}"
+    cp_install_execute: "{{ pb_deploy_execute | bool }}"
+  when: pb_enabled.container_platform | bool
+
+# ── Step 9: Monitoring Stack ────────────────────────────────────────────────
+- name: Deploy monitoring stack
+  ansible.builtin.include_role:
+    name: rhism.platform.monitoring_stack
+  vars:
+    mon_action: baseline
+  when: pb_enabled.monitoring | bool
+
+# ── Step 10: Automation Platform (AAP) — the estate capstone ────────────────
+# Deployed LAST: the control plane stands up after the infrastructure it
+# manages (identity for auth, content for entitlement, hypervisor for
+# compute). Dry-run renders installer inventory/CR only; a real deploy also
+# entitles hosts first (override aap_manage_subscription off when hosts are
+# already Satellite-entitled).
+- name: Deploy Automation Platform (AAP) — install
+  ansible.builtin.include_role:
+    name: rhism.platform.aap
+  vars:
+    action: install
+    aap_execute: "{{ pb_deploy_execute | bool }}"
+    aap_manage_subscription: "{{ pb_deploy_execute | bool }}"
+  when:
+    - pb_enabled.automation | bool
+    - pb_type.automation == 'aap'
+
+# Config-as-code needs a live controller: gated on a real deploy AND a known
+# controller URL — an empty URL skips cleanly rather than failing an API call
+# against a controller that isn't up yet.
+- name: Configure Automation Platform (AAP) — config-as-code
+  ansible.builtin.include_role:
+    name: rhism.platform.aap
+  vars:
+    action: configure
+    aap_configure_action: baseline
+    aap_controller_host: "{{ pb_aap_controller_host }}"
+  when:
+    - pb_deploy_execute | bool
+    - pb_aap_controller_host | length > 0
+    - pb_enabled.automation | bool
+    - pb_type.automation == 'aap'
+
+- name: Deployment complete
+  ansible.builtin.debug:
+    msg: >-
+      Platform Builder deploy complete.
+      Profile: {{ pb_manifest.profile }}.
+      Execute: {{ pb_deploy_execute | bool }}.
+      {% if not (pb_deploy_execute | bool) %}
+      DRY-RUN — set pb_deploy_execute: true to apply changes.
+      {% endif %}

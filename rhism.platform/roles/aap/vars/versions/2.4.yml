@@ -1,0 +1,62 @@
+---
+# =============================================================================
+# INSTALL PROFILE — AAP 2.4 (pre-gateway; controller-centric).
+#
+# 2.4 predates the platform gateway: no `automationgateway` group and no unified
+# CR. The containerized installer was TECH PREVIEW in 2.4 (GA install in 2.4 was
+# RPM/setup.sh, which this role deliberately does NOT model — RPM is being
+# obsoleted). On OpenShift, 2.4 uses the pre-gateway per-component custom
+# resources (AutomationController / AutomationHub / EDA), not the unified
+# AnsibleAutomationPlatform CR that arrives in 2.5.
+#
+# TODO(verify): the 2.4 tech-preview containerized inventory group names and the
+# installer playbook name were still stabilising in 2.4 — confirm against the
+# Red Hat AAP 2.4 Containerized Installation (Technology Preview) guide before a
+# real (aap_execute: true) run.
+# =============================================================================
+
+aap_version_profile:
+  version: "2.4"
+  gateway_era: false                      # NO platform gateway
+  install_methods:
+    - containerized
+    - openshift
+
+  # Legacy monolithic controller API base (pre-gateway).
+  controller_api_base: /api/v2/
+  ping_path: /api/v2/ping/
+
+  containerized:
+    available: true
+    tech_preview: true                    # containerized was TP in 2.4
+    installer_collection: containerized_installer
+    installer_install_playbook: install.yml           # TODO: confirm 2.4 TP name
+    installer_backup_playbook: backup.yml             # TODO: confirm
+    installer_restore_playbook: restore.yml           # TODO: confirm
+    # Pre-gateway containerized group model — no automationgateway group.
+    inventory_groups:
+      - automationcontroller
+      - automationhub
+      - automationeda
+      - database
+    required_group_vars:
+      - postgresql_admin_username
+      - postgresql_admin_password
+      - controller_admin_password
+      - hub_admin_password
+      - registry_username
+      - registry_password
+
+  openshift:
+    available: true
+    # Pre-gateway operator: separate CRs per component, no unified kind.
+    # TODO: confirm apiVersion (automationcontroller.ansible.com/v1beta1 etc.)
+    # against the 2.4 operator bundle.
+    cr_api_version: automationcontroller.ansible.com/v1beta1
+    cr_kind: AutomationController
+    cr_kinds_pre_gateway:
+      - AutomationController
+      - AutomationHub
+      - EDA
+    operator_channel: stable-2.4-cluster-scoped
+    operator_package: ansible-automation-platform-operator

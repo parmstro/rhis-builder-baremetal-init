@@ -1,0 +1,53 @@
+---
+- name: Audit report — placeholder when service not managed (container mode)
+  ansible.builtin.debug:
+    msg: >-
+      Audit report skipped — linux_auditing_start_service: false.
+      Run on a real host with auditd enabled to generate event summaries.
+  when: not linux_auditing_start_service | bool
+
+- name: Generate overall audit summary
+  ansible.builtin.command: aureport --summary
+  register: _la_summary
+  changed_when: false
+  when: linux_auditing_start_service | bool
+
+- name: Generate per-key event counts
+  ansible.builtin.command: aureport --key --summary -i
+  register: _la_key_counts
+  changed_when: false
+  failed_when: false
+  when: linux_auditing_start_service | bool
+
+- name: Generate failed access summary
+  ansible.builtin.command: aureport --access --failed --summary -i
+  register: _la_access_failed
+  changed_when: false
+  failed_when: false
+  when: linux_auditing_start_service | bool
+
+- name: Generate authentication summary
+  ansible.builtin.command: aureport --auth --summary -i
+  register: _la_auth_summary
+  changed_when: false
+  failed_when: false
+  when: linux_auditing_start_service | bool
+
+- name: Display audit report
+  ansible.builtin.debug:
+    msg:
+      summary: "{{ _la_summary.stdout_lines | default([]) }}"
+      key_events: "{{ _la_key_counts.stdout_lines | default([]) }}"
+      failed_access: "{{ _la_access_failed.stdout_lines | default([]) }}"
+      auth_events: "{{ _la_auth_summary.stdout_lines | default([]) }}"
+  when: linux_auditing_start_service | bool
+
+- name: Record report result
+  ansible.builtin.set_fact:
+    linux_auditing_report:
+      generated_at: "{{ '%Y-%m-%dT%H:%M:%SZ' | strftime(lookup('pipe', 'date +%s') | int) }}"
+      service_managed: "{{ linux_auditing_start_service | bool }}"
+      summary: "{{ _la_summary.stdout_lines | default([]) }}"
+      key_events: "{{ _la_key_counts.stdout_lines | default([]) }}"
+      failed_access: "{{ _la_access_failed.stdout_lines | default([]) }}"
+      auth_events: "{{ _la_auth_summary.stdout_lines | default([]) }}"

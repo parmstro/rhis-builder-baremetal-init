@@ -1,0 +1,78 @@
+---
+# --------------------------------------------------------------------------- #
+# export_content — disconnected/air-gapped content export (rhism alignment   #
+# Phase C item 3), the first of the pipeline's 3 real stages:                #
+#   export_content -> transfer_media -> import_content                      #
+#                                                                             #
+# Upstream RHIS runs this as 2 of 4 shell scripts: configure_export.sh does  #
+# drive-prep (mount an export volume, SELinux/ownership) which this role     #
+# deliberately does NOT automate (mounting external media is a host-level    #
+# concern outside this role's scope, same boundary as roles/tang not         #
+# automating LUKS binding); build_sat_disconnected_export.sh is a thin       #
+# wrapper around a playbook that isn't even in the vendored upstream tree —  #
+# ITS logic is fully replaced here by the real theforeman.foreman            #
+# content_export_* modules (found to exist, matching the 3 export           #
+# granularities exactly: library/repository/version).                       #
+#                                                                             #
+# List-guarded no-op with the empty content_exports default.                #
+# --------------------------------------------------------------------------- #
+- name: Export library content
+  theforeman.foreman.content_export_library:
+    server_url: "{{ content_server_url }}"
+    username: "{{ content_username }}"
+    password: "{{ content_password }}"
+    validate_certs: "{{ content_validate_certs }}"
+    organization: "{{ item.organization | default(content_organization) }}"
+    format: "{{ item.format | default(omit) }}"
+    chunk_size_gb: "{{ item.chunk_size_gb | default(omit) }}"
+    destination_server: "{{ item.destination_server | default(omit) }}"
+    fail_on_missing_content: "{{ item.fail_on_missing_content | default(omit) }}"
+    incremental: "{{ item.incremental | default(omit) }}"
+    from_history_id: "{{ item.from_history_id | default(omit) }}"
+  loop: "{{ content_exports | selectattr('type', 'equalto', 'library') | list }}"
+  loop_control:
+    label: "{{ item.name | default('library') }}"
+  no_log: "{{ content_no_log }}"
+  when: content_exports | length > 0
+
+- name: Export repository content
+  theforeman.foreman.content_export_repository:
+    server_url: "{{ content_server_url }}"
+    username: "{{ content_username }}"
+    password: "{{ content_password }}"
+    validate_certs: "{{ content_validate_certs }}"
+    organization: "{{ item.organization | default(content_organization) }}"
+    product: "{{ item.product }}"
+    repository: "{{ item.repository }}"
+    format: "{{ item.format | default(omit) }}"
+    chunk_size_gb: "{{ item.chunk_size_gb | default(omit) }}"
+    destination_server: "{{ item.destination_server | default(omit) }}"
+    fail_on_missing_content: "{{ item.fail_on_missing_content | default(omit) }}"
+    incremental: "{{ item.incremental | default(omit) }}"
+    from_history_id: "{{ item.from_history_id | default(omit) }}"
+  loop: "{{ content_exports | selectattr('type', 'equalto', 'repository') | list }}"
+  loop_control:
+    label: "{{ item.name | default(item.repository | default('repository')) }}"
+  no_log: "{{ content_no_log }}"
+  when: content_exports | length > 0
+
+- name: Export content view version
+  theforeman.foreman.content_export_version:
+    server_url: "{{ content_server_url }}"
+    username: "{{ content_username }}"
+    password: "{{ content_password }}"
+    validate_certs: "{{ content_validate_certs }}"
+    organization: "{{ item.organization | default(content_organization) }}"
+    content_view: "{{ item.content_view }}"
+    content_view_version: "{{ item.content_view_version }}"
+    format: "{{ item.format | default(omit) }}"
+    chunk_size_gb: "{{ item.chunk_size_gb | default(omit) }}"
+    destination_server: "{{ item.destination_server | default(omit) }}"
+    fail_on_missing_content: "{{ item.fail_on_missing_content | default(omit) }}"
+    incremental: "{{ item.incremental | default(omit) }}"
+    from_history_id: "{{ item.from_history_id | default(omit) }}"
+  loop: "{{ content_exports | selectattr('type', 'equalto', 'version') | list }}"
+  loop_control:
+    label: "{{ item.name | default(item.content_view | default('version')) }}"
+  no_log: "{{ content_no_log }}"
+  when: content_exports | length > 0

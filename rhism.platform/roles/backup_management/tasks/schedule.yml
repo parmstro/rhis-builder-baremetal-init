@@ -1,0 +1,6 @@
+---
+- name: Schedule backups ({{ backup_type }})
+  ansible.builtin.include_role:
+    name: "{{ backup_type }}"
+  vars:
+    action: schedule

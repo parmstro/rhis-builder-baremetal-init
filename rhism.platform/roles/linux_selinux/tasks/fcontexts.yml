@@ -1,0 +1,21 @@
+---
+- name: Manage SELinux file contexts
+  when: ansible_selinux.status != 'disabled'
+  block:
+    - name: Set SELinux file context rules
+      community.general.sefcontext:
+        target: "{{ item.target }}"
+        setype: "{{ item.setype }}"
+        state: present
+      loop: "{{ linux_selinux_fcontexts }}"
+      register: _selinux_fcontext_result
+      when: linux_selinux_fcontexts | length > 0
+
+    - name: Apply file context changes via restorecon # noqa: command-instead-of-module
+      ansible.builtin.command:
+        cmd: "restorecon -Rv {{ item.item.target | regex_replace('\\(.*\\)', '') }}"
+      loop: "{{ _selinux_fcontext_result.results | default([]) }}"
+      when:
+        - _selinux_fcontext_result.results is defined
+        - item.changed
+      changed_when: true

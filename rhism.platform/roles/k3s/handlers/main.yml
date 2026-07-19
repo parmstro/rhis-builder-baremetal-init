@@ -1,0 +1,12 @@
+---
+- name: k3s - restart server
+  ansible.builtin.service:
+    name: "{{ _cp_service_name }}"
+    state: restarted
+  become: true
+
+- name: k3s - restart agent
+  ansible.builtin.service:
+    name: "{{ _cp_service_name_agent }}"
+    state: restarted
+  become: true

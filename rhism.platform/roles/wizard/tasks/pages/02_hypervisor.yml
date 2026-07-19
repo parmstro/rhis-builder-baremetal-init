@@ -1,0 +1,30 @@
+---
+- name: Select hypervisor platform
+  ansible.builtin.command:
+    cmd: >-
+      {{ wizard_tui_backend }} --title "{{ wizard_tui_title }}"
+      --radiolist "Select hypervisor platform:" {{ wizard_tui_height }} {{ wizard_tui_width }} 2
+      "kvm"     "KVM/libvirt (bare metal host)"   ON
+      "proxmox" "Proxmox VE  (web UI, clustering)" OFF
+      3>&1 1>&2 2>&3
+  register: _wizard_hypervisor_result
+  changed_when: false
+  failed_when: _wizard_hypervisor_result.rc not in [0, 1]
+  tags: infra_wizard
+
+- name: Handle hypervisor cancel
+  ansible.builtin.fail:
+    msg: "Wizard cancelled by user at hypervisor selection."
+  when: _wizard_hypervisor_result.rc == 1
+  tags: infra_wizard
+
+- name: Record hypervisor choice
+  ansible.builtin.set_fact:
+    wizard_components: >-
+      {{ wizard_components | combine({
+        'hypervisor': {
+          'enabled': true,
+          'type': _wizard_hypervisor_result.stdout | trim
+        }
+      }) }}
+  tags: infra_wizard

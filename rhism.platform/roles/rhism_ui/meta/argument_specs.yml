@@ -1,0 +1,143 @@
+---
+argument_specs:
+  main:
+    short_description: >-
+      Security-hardened rhis-builder-ui — build-from-source podman deploy of
+      the real, security-fixed Node.js estate-manifest web UI.
+    description: >-
+      Standalone capability role. install builds the real application image
+      from this role's own files/rhism_ui/ source (already security-fixed
+      — real admin-secret auth, restricted CORS, path-traversal guards, a
+      loopback-only bind) via roles/podman's build action, then runs it via
+      roles/podman's container action, published on 127.0.0.1 only. configure
+      is a documented no-op — this app has no post-deploy administrative API
+      surface. status runs a health check against a running instance's own
+      /healthz endpoint. Complements (does not replace) rhism.platform.wizard
+      — both build the same kind of estate deployment manifest, this role
+      just deploys a web-based alternative interaction surface for doing so.
+    options:
+      rhism_ui_action:
+        description: >-
+          install builds and runs the real container (build-from-source, not
+          a pull). configure is a documented no-op (no post-deploy admin API
+          surface exists). status runs a health check against a running
+          instance.
+        type: str
+        default: install
+        choices:
+          - install
+          - configure
+          - status
+      rhism_ui_build_context:
+        description: >-
+          Path to the Containerfile + source tree this role builds from —
+          this role's own files/rhism_ui/ directory. role_path-relative so
+          it resolves correctly regardless of where the collection checkout
+          lives.
+        type: str
+        default: "{{ role_path }}/files/rhism_ui"
+      rhism_ui_image_repository:
+        description: >-
+          Repository name for the locally-built image (never pulled from a
+          registry).
+        type: str
+        default: localhost/rhism-ui
+      rhism_ui_image_tag:
+        description: Tag applied to the locally-built image.
+        type: str
+        default: latest
+      rhism_ui_image_digest:
+        description: >-
+          Digest pin for a REGISTRY-CONSUMED copy of this image. Empty by
+          default — a locally-built image has no pre-known digest to pin
+          ahead of a real build, unlike tang_image_digest/quay_image_digest
+          (which pin an OFFICIAL PULLED image). Reserved for a future path
+          where this image is pushed and re-consumed by digest; install falls
+          back to rhism_ui_image_tag when this is empty (same fallback
+          pattern roles/quay uses for quay_redis_image_digest).
+        type: str
+        default: ""
+      rhism_ui_container_name:
+        description: Name for the running rhism-ui container.
+        type: str
+        default: rhism-ui
+      rhism_ui_port:
+        description: >-
+          TCP port the app listens on and is published on (host and
+          container) — matches the app's own default fallback
+          (backend/src/index.js).
+        type: int
+        default: 3001
+      rhism_ui_data_volume_name:
+        description: >-
+          Named podman volume persisting the session-lock SQLite database
+          (backend/src/db.js) at rhism_ui_container_data_dir, so session
+          state survives a container restart/recreate.
+        type: str
+        default: rhism-ui-data
+      rhism_ui_container_data_dir:
+        description: In-container path the data volume is mounted at.
+        type: str
+        default: /app/backend/data
+      rhism_ui_admin_secret:
+        description: >-
+          Shared secret presented via the X-Admin-Secret header, required to
+          claim a first session or to steal an existing one (see
+          backend/src/auth.js). REQUIRED (no usable default — empty string)
+          whenever rhism_ui_deploy_execute is true; the role fails closed
+          rather than deploying every instance with no way to authenticate
+          the operator. Same fail-closed posture as roles/quay's
+          quay_secret_key.
+        type: str
+        default: ""
+        no_log: true
+      rhism_ui_allowed_origin:
+        description: >-
+          CORS allowed origin. Empty (the default) disables CORS entirely —
+          the app's own default posture (backend/src/app.js). Only needed for
+          local dev where the frontend is served from a different origin
+          than the backend API.
+        type: str
+        default: ""
+      rhism_ui_catalog_path:
+        description: >-
+          Host path mounted read-only at /catalog (CATALOG_PATH) — a real
+          rhis-builder-inventory schema/soe_catalog checkout. No usable
+          default: depends entirely on where an operator's own checkout
+          lives. REQUIRED whenever rhism_ui_deploy_execute is true.
+        type: str
+        default: ""
+      rhism_ui_deployment_path:
+        description: >-
+          Host path mounted read-write at /deployments (DEPLOYMENT_PATH) —
+          enables the export action to write files server-side instead of
+          returning them for browser download. Empty (the default) is a
+          genuinely supported optional mode, matching the app's own optional
+          DEPLOYMENT_PATH env var.
+        type: str
+        default: ""
+      rhism_ui_deploy_execute:
+        description: >-
+          Dry-run gate. install/status both validate and render but make NO
+          real changes (no build, no container, no HTTP call) until this is
+          true — install genuinely needs a target with real podman
+          (roles/podman shells out to the podman CLI, BUG-160), and status
+          needs an already-running instance. Unlike roles/tang/roles/quay
+          (Tier-1-only, real proof deferred to a Tier-3 lab), this role's own
+          molecule scenario exercises the real path in CI — a self-contained
+          Node app with no external infra dependency beyond podman itself.
+        type: bool
+        default: false
+      rhism_ui_base_url:
+        description: Base URL the status action's health check calls.
+        type: str
+        default: "http://127.0.0.1:{{ rhism_ui_port }}"
+      rhism_ui_sizing:
+        description: >-
+          Capacity-planning tier (docs/capacity-planning.md) — no vendor
+          guidance exists for this bespoke app, so figures are this
+          platform's own measured/estimated sizing, keyed by catalog size
+          and operator cycle volume.
+        type: str
+        default: s
+        choices: [s, m, l]

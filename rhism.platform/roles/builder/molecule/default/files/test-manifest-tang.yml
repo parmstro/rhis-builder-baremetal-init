@@ -1,0 +1,56 @@
+---
+# Dedicated fixture for the Tang/NBDE dispatch block (Step 1b in
+# tasks/deploy.yml — rhism alignment gap #2, docs/rhism-alignment-plan.md).
+# Every OTHER component stays disabled so this converge play exercises
+# exactly the new dispatch, nothing more.
+profile: rhis
+components:
+  hypervisor:
+    enabled: false
+    type: kvm
+  identity:
+    enabled: false
+    type: rh_idm
+    ad_trust:
+      enabled: false
+      domain: ""
+      admin: Administrator
+      range_type: ipa-ad-trust
+  provisioning:
+    enabled: false
+    type: satellite_proxy
+    hosts: []
+  secrets:
+    enabled: false
+    type: none
+  content:
+    enabled: false
+    type: satellite
+  mail:
+    enabled: false
+    type: none
+  scm:
+    enabled: false
+    type: none
+  backup:
+    enabled: false
+    type: none
+  container_platform:
+    enabled: false
+    type: none
+  security:
+    enabled: false
+    type: default
+  monitoring:
+    enabled: false
+    type: none
+  automation:
+    enabled: false
+    type: aap
+  tang:
+    enabled: true
+    type: default
+network: {}
+sizing: {}
+credentials: {}
+licensing: {}

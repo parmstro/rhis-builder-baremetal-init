@@ -1,0 +1,14 @@
+---
+# Action: reset — confirmed full k3s teardown
+
+- name: Assert reset confirmation flag is set
+  ansible.builtin.assert:
+    that: cp_reset_confirm | default(false) | bool
+    fail_msg: "Set cp_reset_confirm: true to confirm full k3s teardown"
+
+- name: Run k3s uninstall script
+  ansible.builtin.command:
+    cmd: /usr/local/bin/k3s-uninstall.sh
+    removes: "{{ _cp_binary }}"
+  become: true
+  changed_when: true

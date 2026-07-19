@@ -1,0 +1,21 @@
+---
+# --------------------------------------------------------------------------- #
+# cdn_repos — Red Hat CDN repository sets (satellite-only)                    #
+#                                                                             #
+# Requires RHSM subscription. Uses repository_set module to enable           #
+# CDN-backed repos by product and set name.                                  #
+# --------------------------------------------------------------------------- #
+- name: Enable CDN repository set
+  theforeman.foreman.repository_set:
+    server_url: "{{ content_server_url }}"
+    username: "{{ content_username }}"
+    password: "{{ content_password }}"
+    validate_certs: "{{ content_validate_certs }}"
+    organization: "{{ content_organization }}"
+    product: "{{ item.0.name }}"
+    name: "{{ item.1.name }}"
+    repositories: "{{ item.1.repositories | default(omit) }}"
+    state: enabled
+  loop: "{{ content_cdn_repository_sets | subelements('sets', skip_missing=True) }}"
+  no_log: "{{ content_no_log }}"
+  when: content_cdn_repository_sets | length > 0

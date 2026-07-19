@@ -1,0 +1,21 @@
+---
+- name: Validate backup_action
+  ansible.builtin.assert:
+    that:
+      - backup_action is defined
+      - backup_action in _backup_valid_actions
+    fail_msg: >-
+      backup_action must be one of: {{ _backup_valid_actions | join(', ') }}.
+      Got '{{ backup_action | default('undefined') }}'.
+
+- name: Validate backup_type
+  ansible.builtin.assert:
+    that:
+      - backup_type is defined
+      - backup_type in _backup_valid_types
+    fail_msg: >-
+      backup_type must be one of: {{ _backup_valid_types | join(', ') }}.
+      Got '{{ backup_type | default('undefined') }}'.
+
+- name: "Execute task file for: {{ backup_action }}"
+  ansible.builtin.include_tasks: "{{ backup_action }}.yml"

@@ -1,0 +1,33 @@
+---
+# config_organization — organization + teams (aap's OWN config-as-code engine;
+# internalised 2026-07-15, owner decision: aap is fully self-contained — the
+# duplication with the OSS awx role's config engine is traded for product
+# independence). Modules stay awx.awx FQCN: that is the API client for the AAP
+# controller, not a role dependency. The certified infra.aap_configuration /
+# gateway collections are the recorded future path (open Hub/EDA decision).
+
+- name: Create organization
+  awx.awx.organization:
+    name: "{{ aap_organization }}"
+    description: "{{ aap_organization_description }}"
+    state: present
+    controller_host: "{{ aap_controller_host }}"
+    controller_username: "{{ aap_admin_user }}"
+    controller_password: "{{ aap_admin_password }}"
+    validate_certs: "{{ aap_validate_certs }}"
+    request_timeout: "{{ aap_api_timeout }}"
+
+- name: Create teams
+  awx.awx.team:
+    name: "{{ item.name }}"
+    description: "{{ item.description | default(omit) }}"
+    organization: "{{ aap_organization }}"
+    state: present
+    controller_host: "{{ aap_controller_host }}"
+    controller_username: "{{ aap_admin_user }}"
+    controller_password: "{{ aap_admin_password }}"
+    validate_certs: "{{ aap_validate_certs }}"
+    request_timeout: "{{ aap_api_timeout }}"
+  loop: "{{ aap_teams }}"
+  loop_control:
+    label: "{{ item.name }}"

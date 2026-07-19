@@ -1,0 +1,26 @@
+---
+galaxy_info:
+  namespace: rhism
+  role_name: rhism_inventory
+  author: rhism
+  description: >-
+    Own the SOE (Standard Operating Environment) catalogue as platform data:
+    validate catalogue entries against the SOE bundle model, aggregate selected
+    bundles into the flat deduplicated Satellite list shapes, generate the
+    high-signal deployment inventory content (group_vars derivations, vault
+    skeleton, aggregated SOE chain) from an estate manifest, and publish the
+    catalogue to the directory the rhism_ui web UI serves. Standalone capability
+    role — all four actions run entirely on the control node.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: EL
+      versions:
+        - "9"
+  galaxy_tags:
+    - soe
+    - satellite
+    - inventory
+    - catalogue
+    - rhism
+dependencies: []

@@ -1,0 +1,41 @@
+---
+# Functional requirements — mail_relay (requirements→test-case layer +
+# Tier-3 elevation, owner rules 2026-07-12).
+functional_requirements:
+  - req_id: MAILRELAY-FR-001
+    statement: >-
+      The role SHALL deploy a REAL Postfix relay in CI and relay a message
+      (functional scenario: deliver + assert receipt), consuming the shared
+      mail_* family interface.
+    tier: 2
+    verified_by:
+      - molecule: functional
+
+  - req_id: MAILRELAY-FR-002
+    statement: >-
+      Relay restrictions and TLS posture SHALL match the configured
+      variables (no hard-coded environment facts).
+    tier: 2
+    verified_by:
+      - molecule: default
+
+  - req_id: MAILRELAY-FR-003
+    statement: >-
+      The relay SHALL serve lab hosts as their smarthost.
+    tier: 3
+    verified_by:
+      - lab: playbooks/mail_server.yml#mail_relay
+
+  # --- Image-factory Wave I (FPS.md, /new-image, 2026-07-13). verified_by
+  # stays empty until P4/P5 execution — UNCOVERED rendering is deliberate.
+  - {req_id: MAILRELAY-FR-004, statement: "The system SHALL accept SMTP from permitted networks and relay via the configured smarthost.", tier: 2, verified_by: []}
+  - {req_id: MAILRELAY-FR-005, statement: "The system SHALL reject relay attempts from outside mynetworks.", tier: 2, verified_by: []}
+  - {req_id: MAILRELAY-FR-006, statement: "The system SHALL offer STARTTLS inbound.", tier: 2, verified_by: []}
+  - {req_id: MAILRELAY-FR-007, statement: "The system SHALL attempt/enforce TLS toward the smarthost per smtp_tls_security_level.", tier: 2, verified_by: []}
+  - {req_id: MAILRELAY-FR-008, statement: "The system SHALL authenticate to the smarthost with SASL when configured.", tier: 3, verified_by: []}
+  - {req_id: MAILRELAY-FR-009, statement: "The system SHALL apply alias/canonical rewriting.", tier: 2, verified_by: []}
+  - {req_id: MAILRELAY-FR-010, statement: "The system SHALL enforce message size limits.", tier: 2, verified_by: []}
+  - {req_id: MAILRELAY-FR-011, statement: "The system SHALL queue on smarthost outage and deliver on recovery, with queue visibility.", tier: 2, verified_by: []}
+  - {req_id: MAILRELAY-FR-012, statement: "The system SHALL expose queue management operations (flush/purge role actions).", tier: 2, verified_by: []}
+  - {req_id: MAILRELAY-FR-013, statement: "The system SHALL serve authenticated submission on :587 (role capability gap today).", tier: 3, verified_by: []}
+  - {req_id: MAILRELAY-FR-014, statement: "The system SHALL support milter/content-filter hooks (DKIM wave item).", tier: 3, verified_by: []}

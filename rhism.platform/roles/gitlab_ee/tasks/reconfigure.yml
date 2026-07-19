@@ -1,0 +1,11 @@
+---
+# gitlab_ee — reconfigure
+# Shared sub-task: runs gitlab-ctl reconfigure.
+# Included standalone (action == 'reconfigure') and from configure, restore,
+# and upgrade action files.
+
+- name: Run gitlab-ctl reconfigure
+  ansible.builtin.command:
+    cmd: "{{ _scm_ctl_cmd }} reconfigure"
+  become: true
+  changed_when: true

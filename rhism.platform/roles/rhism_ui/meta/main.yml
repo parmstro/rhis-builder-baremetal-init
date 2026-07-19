@@ -1,0 +1,25 @@
+---
+galaxy_info:
+  role_name: rhism_ui
+  namespace: rhism
+  author: rhism
+  description: >-
+    Security-hardened fork of RHIS's rhis-builder-ui web application — deploys
+    the real, security-fixed Node.js app (real admin-secret auth, restricted
+    CORS, path-traversal guards) via a from-source podman build. rhism
+    alignment deliverable — see docs/rhism-ui.md.
+  company: rhism
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: EL
+      versions:
+        - "9"
+  galaxy_tags:
+    - rhism
+    - rhis
+    - builder-ui
+    - infrastructure
+    - security
+
+dependencies: []

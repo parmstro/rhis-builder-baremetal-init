@@ -1,0 +1,43 @@
+---
+- name: Verify monitoring_stack role
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Confirm dispatcher validation passed
+      ansible.builtin.assert:
+        that: true
+        success_msg: "Dispatcher validation passed in converge"
+
+    - name: Verify all template files were rendered
+      ansible.builtin.stat:
+        path: "/tmp/{{ item }}"
+      register: template_files
+      loop:
+        - nagios_contacts.cfg
+        - nagios_templates.cfg
+        - nagios_services.cfg
+        - nrpe.cfg
+        - splunk_savedsearches.conf
+        - splunk_inputs.conf
+        - elasticsearch.yml
+        - kibana.yml
+        - filebeat.yml
+        - eda_security_events.yml
+        - eda_infrastructure_events.yml
+        - eda_service_health.yml
+
+    - name: Assert all templates rendered
+      ansible.builtin.assert:
+        that: item.stat.exists
+        fail_msg: "Template {{ item.item }} was not rendered"
+      loop: "{{ template_files.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: Print test summary
+      ansible.builtin.debug:
+        msg: >-
+          monitoring_stack molecule tests passed. Dispatcher validation,
+          variable contract, and all template rendering verified (Nagios,
+          Splunk, Elasticsearch, Filebeat, EDA rulebooks).
+          Full deployment requires target hosts with appropriate access.

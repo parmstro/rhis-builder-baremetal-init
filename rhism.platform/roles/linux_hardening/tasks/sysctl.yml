@@ -1,0 +1,28 @@
+---
+- name: Apply kernel sysctl hardening parameters
+  ansible.posix.sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    state: present
+    reload: true
+    sysctl_set: true
+    sysctl_file: "{{ linux_hardening_sysctl_file }}"
+  become: true
+  loop: "{{ linux_hardening_sysctl_params | dict2items }}"
+  when: linux_hardening_sysctl_apply | bool
+
+# Config-only mode (BUG-103): ansible.posix.sysctl requires the `sysctl`
+# binary (procps-ng) even with sysctl_set/reload false — absent on minimal
+# images (UBI base, containers). Write the same key=value entries directly.
+- name: Write kernel sysctl hardening parameters (config only)
+  ansible.builtin.lineinfile:
+    path: "{{ linux_hardening_sysctl_file }}"
+    regexp: '^{{ item.key | regex_escape }}\s*='
+    line: "{{ item.key }}={{ item.value }}"
+    create: true
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  loop: "{{ linux_hardening_sysctl_params | dict2items }}"
+  when: not (linux_hardening_sysctl_apply | bool)

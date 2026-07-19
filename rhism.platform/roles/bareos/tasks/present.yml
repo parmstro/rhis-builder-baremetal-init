@@ -1,0 +1,19 @@
+---
+# ---------------------------------------------------------------------------
+# install.yml — Package management for present/absent
+#
+# Consolidates present and absent actions: both use state: "{{ action }}"
+# on ansible.builtin.package, so a single file handles both directions.
+# ---------------------------------------------------------------------------
+
+- name: Manage bareos director packages
+  ansible.builtin.package:
+    name: "{{ _bareos_director_packages }}"
+    state: "{{ action }}"
+  become: true
+
+- name: Manage bareos file daemon packages
+  ansible.builtin.package:
+    name: "{{ _bareos_fd_packages }}"
+    state: "{{ action }}"
+  become: true

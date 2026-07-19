@@ -1,0 +1,87 @@
+---
+# Functional requirements — scm_deploy (requirements->test-case layer +
+# Tier-3 elevation, wave-3+ standard). This is the DISPATCHER role for the SCM
+# edition family: its FRs are about correct EDITION selection and shared
+# lifecycle orchestration (install/configure/runners/backup/restore), not any
+# single edition's internals — gitlab_ce and gitlab_ee each carry their own
+# REQUIREMENTS.yml. Capability curated from README + vars/main.yml valid sets +
+# tasks/ (main/install/configure/runners/backup/restore/baseline) and grounded
+# in the GitLab omnibus install/administration docs (docs.gitlab.com/omnibus,
+# docs.gitlab.com/ee/administration/backup_restore, docs.gitlab.com/runner).
+# Family lab: playbooks/scm_deploy.yml.
+functional_requirements:
+  - req_id: SCM_DEPLOY-FR-001
+    statement: >-
+      The role SHALL validate scm_action against the supported action set
+      (install, configure, runners, backup, restore, baseline) and reject any
+      invalid value (negative dispatcher test).
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: SCM_DEPLOY-FR-002
+    statement: >-
+      The role SHALL validate scm_type against the two supported editions
+      (gitlab_ce, gitlab_ee) and reject any invalid value.
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: SCM_DEPLOY-FR-003
+    statement: >-
+      The role SHALL load the edition-specific variable file for the selected
+      scm_type (package name, repository script, edition, and RHSM-required
+      facts differ between gitlab_ce and gitlab_ee).
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: SCM_DEPLOY-FR-004
+    statement: >-
+      The role SHALL select the GitLab edition via scm_type and delegate the
+      install to that product role (include_role name=scm_type, action=present)
+      with the shared action interface — deploying a real GitLab instance.
+    tier: 3
+    verified_by:
+      - lab: playbooks/scm_deploy.yml#install
+
+  - req_id: SCM_DEPLOY-FR-005
+    statement: >-
+      The role SHALL apply configuration by templating /etc/gitlab/gitlab.rb and
+      running gitlab-ctl reconfigure on 'configure'.
+    tier: 3
+    verified_by:
+      - lab: playbooks/scm_deploy.yml#configure
+
+  - req_id: SCM_DEPLOY-FR-006
+    statement: >-
+      The role SHALL install and register GitLab Runners against the instance on
+      'runners' (one gitlab-runner register call per scm_runners entry).
+    tier: 3
+    verified_by:
+      - lab: playbooks/scm_deploy.yml#runners
+
+  - req_id: SCM_DEPLOY-FR-007
+    statement: >-
+      The role SHALL create an application backup via gitlab-rake
+      gitlab:backup:create and honour the configured retention on 'backup'.
+    tier: 3
+    verified_by:
+      - lab: playbooks/scm_deploy.yml#backup
+
+  - req_id: SCM_DEPLOY-FR-008
+    statement: >-
+      The role SHALL restore the instance from a named backup on 'restore' —
+      stopping services, restoring, restarting, and running the GitLab sanity
+      check.
+    tier: 3
+    verified_by:
+      - lab: playbooks/scm_deploy.yml#restore
+
+  - req_id: SCM_DEPLOY-FR-009
+    statement: >-
+      The baseline orchestrator SHALL run install -> configure -> runners ->
+      backup in order, each gated by its scm_apply_* boolean toggle.
+    tier: 1
+    verified_by:
+      - molecule: default

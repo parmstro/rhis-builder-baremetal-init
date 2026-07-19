@@ -1,0 +1,11 @@
+---
+# Action: backup — create etcd snapshot
+
+- name: Run etcd preflight checks
+  ansible.builtin.include_tasks: etcd_preflight.yml
+
+- name: Create k3s etcd snapshot
+  ansible.builtin.command:
+    cmd: "{{ _cp_binary }} etcd-snapshot save --name {{ cp_backup_snapshot_name | default(inventory_hostname ~ '-' ~ ansible_date_time.date) }}"
+  become: true
+  changed_when: true

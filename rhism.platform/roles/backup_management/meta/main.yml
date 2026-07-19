@@ -1,0 +1,11 @@
+---
+galaxy_info:
+  author: rhism
+  description: Backup management role — restic (push, encrypted) or Bareos (enterprise Director/Storage/FD)
+  license: Apache-2.0
+  min_ansible_version: "2.14"
+  platforms:
+    - name: EL
+      versions: ["8", "9"]
+  galaxy_tags: [backup, restic, bareos, restore, disaster-recovery]
+dependencies: []

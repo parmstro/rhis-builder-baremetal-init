@@ -1,0 +1,40 @@
+---
+# configure: create env file, create config dir, init repository
+
+- name: Validate configure requirements
+  ansible.builtin.assert:
+    that:
+      - backup_restic_repository | length > 0
+      - backup_restic_password | length > 0
+    fail_msg: "backup_restic_repository and backup_restic_password are required for configure"
+
+- name: Create /etc/restic directory
+  ansible.builtin.file:
+    path: /etc/restic
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+  become: true
+
+- name: Deploy restic env file
+  ansible.builtin.template:
+    src: restic-env.j2
+    dest: /etc/restic/env
+    owner: root
+    group: root
+    mode: "0600"
+  become: true
+  no_log: true
+
+- name: Initialise restic repository (idempotent)
+  ansible.builtin.command:
+    cmd: restic init --repo "{{ backup_restic_repository }}"
+  environment: "{{ {'RESTIC_PASSWORD': backup_restic_password, 'RESTIC_REPOSITORY': backup_restic_repository} | combine(backup_restic_env) }}"
+  become: true
+  no_log: true
+  register: _restic_init
+  changed_when: _restic_init.rc == 0
+  failed_when: >-
+    _restic_init.rc != 0 and
+    'already initialized' not in _restic_init.stderr

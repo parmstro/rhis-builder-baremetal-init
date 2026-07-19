@@ -1,0 +1,7 @@
+---
+# tang — shared envelope. Argument-spec validation runs automatically at
+# role entry from meta/argument_specs.yml (no hand-written action assert).
+
+- name: Dispatch to the requested action
+  ansible.builtin.include_tasks:
+    file: "{{ action }}.yml"

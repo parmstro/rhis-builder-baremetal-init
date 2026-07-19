@@ -1,0 +1,21 @@
+---
+- name: Validate linux_users_action
+  ansible.builtin.assert:
+    that:
+      - linux_users_action is defined
+      - linux_users_action in ['sudo', 'faillock', 'uid_standards', 'all']
+    fail_msg: >-
+      linux_users_action must be one of: sudo, faillock, uid_standards, all
+      (got '{{ linux_users_action | default("undefined") }}')
+
+- name: Configure sudo policy
+  ansible.builtin.include_tasks: sudo.yml
+  when: linux_users_action in ['sudo', 'all']
+
+- name: Configure account lockout via faillock
+  ansible.builtin.include_tasks: faillock.yml
+  when: linux_users_action in ['faillock', 'all']
+
+- name: Enforce uid/gid standards
+  ansible.builtin.include_tasks: uid_standards.yml
+  when: linux_users_action in ['uid_standards', 'all']

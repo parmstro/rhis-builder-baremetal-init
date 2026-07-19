@@ -1,0 +1,50 @@
+---
+argument_specs:
+  main:
+    short_description: Deploy OpenShift Data Foundation (OCS/ODF) storage.
+    description: >-
+      Standalone-first storage backend for container_platform. Deploys OpenShift Data
+      Foundation (formerly OCS) via its OLM operator and a StorageCluster CR on OCP/OKD.
+      Consumes the shared storage-backend interface (action, cp_* vars) so the
+      container_platform dispatcher can select any backend with identical code.
+    options:
+      action:
+        description: >-
+          Lifecycle action, shared across all storage backends. 'storage' (and its alias
+          'present') deploy ODF; 'absent' removes it.
+        type: str
+        default: storage
+        choices:
+          - storage
+          - present
+          - absent
+      cp_kubeconfig_path:
+        description: Path to the cluster kubeconfig. Shared storage-interface var.
+        type: str
+        default: /root/.kube/config
+      cp_type:
+        description: >-
+          Container platform type. OCS/ODF is only supported on OpenShift, so this must be
+          'ocp' or 'okd' for a real deploy (asserted when executing).
+        type: str
+        default: ocp
+      cp_storage_execute:
+        description: >-
+          Dry-run gate honoured by every storage backend. false validates action dispatch and
+          variable resolution without changing the node or cluster (used by molecule).
+        type: bool
+        default: true
+      cp_ocs_install_execute:
+        description: >-
+          OCS-specific hard gate. ODF is an OLM operator install with cluster-wide impact, so
+          it is additionally guarded by this flag. Set true to actually deploy ODF.
+        type: bool
+        default: false
+      cp_storage_ocs_size:
+        description: Storage request per OCS device set.
+        type: str
+        default: 500Gi
+      cp_storage_ocs_storage_class:
+        description: Underlying StorageClass backing the OCS device sets.
+        type: str
+        default: gp2

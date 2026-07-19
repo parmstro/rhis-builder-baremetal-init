@@ -1,0 +1,29 @@
+---
+- name: Verify standalone variable contract
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Load role defaults
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../../defaults/main.yml"
+      delegate_to: localhost
+
+    - name: Assert standalone interface defaults resolve
+      ansible.builtin.assert:
+        that:
+          - action == 'client'
+          - backup_restic_repository == ''
+          - backup_restic_paths | length > 0
+          - backup_restic_retention_daily | int == 7
+          - backup_restic_retention_weekly | int == 4
+          - backup_restic_restore_snapshot == 'latest'
+          - backup_restic_restore_path == '/var/restore'
+          - backup_restic_cron_enabled | bool
+          - _restic_packages | length > 0
+        fail_msg: "restic defaults did not resolve to the expected standalone contract"
+      delegate_to: localhost
+
+    - name: Report verification passed
+      ansible.builtin.debug:
+        msg: "PASS — restic standalone contract verified"
+      delegate_to: localhost

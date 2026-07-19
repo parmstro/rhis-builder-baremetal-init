@@ -1,0 +1,55 @@
+---
+# Action + variable interface are validated by meta/argument_specs.yml (ansible-core
+# runs the validation automatically at role entry — no manual assert needed).
+
+# ingress / present: deploy the nginx ingress controller via Helm
+- name: Deploy nginx ingress controller
+  when:
+    - action in ['ingress', 'present']
+    - cp_ingress_execute | bool
+  block:
+    - name: Add nginx ingress Helm repository
+      kubernetes.core.helm_repository:
+        name: ingress-nginx
+        repo_url: https://kubernetes.github.io/ingress-nginx
+
+    - name: Deploy nginx ingress controller via Helm
+      kubernetes.core.helm:
+        kubeconfig: "{{ cp_kubeconfig_path }}"
+        name: ingress-nginx
+        chart_ref: ingress-nginx/ingress-nginx
+        release_namespace: ingress-nginx
+        create_namespace: true
+        wait: true
+        values:
+          controller:
+            replicaCount: "{{ cp_ingress_replicas }}"
+            ingressClassResource:
+              default: true
+            config:
+              ssl-passthrough: "{{ cp_ingress_ssl_passthrough | bool | string | lower }}"
+            service:
+              type: LoadBalancer
+      notify: ingress_nginx - restart ingress
+
+# absent: remove the nginx ingress controller
+- name: Remove nginx ingress controller
+  when:
+    - action == 'absent'
+    - cp_ingress_execute | bool
+  block:
+    - name: Remove nginx ingress controller via Helm
+      kubernetes.core.helm:
+        kubeconfig: "{{ cp_kubeconfig_path }}"
+        name: ingress-nginx
+        release_namespace: ingress-nginx
+        state: absent
+        wait: true
+
+    - name: Remove nginx ingress namespace
+      kubernetes.core.k8s:
+        kubeconfig: "{{ cp_kubeconfig_path }}"
+        api_version: v1
+        kind: Namespace
+        name: ingress-nginx
+        state: absent

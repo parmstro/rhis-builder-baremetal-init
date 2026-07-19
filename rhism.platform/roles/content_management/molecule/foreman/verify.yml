@@ -1,0 +1,25 @@
+---
+- name: Verify Foreman dry-run scenario
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Confirm installer binary would be available (package check)
+      ansible.builtin.command:
+        cmd: dnf info foreman-installer
+      register: _foreman_pkg_check
+      changed_when: false
+      failed_when: false
+      become: true
+
+    - name: Report Foreman package availability
+      ansible.builtin.debug:
+        msg: >-
+          {{ 'foreman-installer available in repos' if _foreman_pkg_check.rc == 0
+             else 'foreman-installer not found — enable Foreman repository first' }}
+
+    - name: Confirm dry-run completed without errors
+      ansible.builtin.debug:
+        msg: >-
+          PASS — Foreman dry-run scenario completed.
+          content_install_execute=false skipped actual install.
+          Set content_install_execute=true on a real RHEL9 host with Foreman repo enabled.

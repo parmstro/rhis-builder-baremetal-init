@@ -1,0 +1,21 @@
+---
+# backup_spec.yml — assemble the Velero Backup spec once, shared by the backup action
+# (an on-demand Backup CR) and the schedule action (whose Schedule CR embeds the same
+# spec under spec.template). labelSelector is only included when a selector is set;
+# an absent selector means "all resources in the included namespaces".
+
+- name: Assemble the Velero Backup spec (shared by backup + schedule)
+  ansible.builtin.set_fact:
+    _oadp_backup_spec: >-
+      {{
+        {
+          'includedNamespaces': backup_oadp_included_namespaces,
+          'includedResources': backup_oadp_included_resources,
+          'snapshotVolumes': backup_oadp_snapshot_volumes | bool,
+          'defaultVolumesToFsBackup': backup_oadp_default_volumes_to_fs_backup | bool,
+          'ttl': backup_oadp_ttl,
+          'storageLocation': backup_oadp_storage_location
+        }
+        | combine({'labelSelector': {'matchLabels': backup_oadp_label_selector}}
+                  if backup_oadp_label_selector else {})
+      }}

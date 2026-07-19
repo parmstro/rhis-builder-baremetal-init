@@ -1,0 +1,52 @@
+---
+- name: Converge — restic functional backup/restore round-trip
+  hosts: all
+  become: true
+  vars:
+    backup_restic_repository: /var/restic-repo
+    backup_restic_password: molecule-test-pw  # pragma: allowlist secret
+    backup_restic_paths:
+      - /etc/restic-testdata
+    backup_restic_restore_path: /var/restore
+  tasks:
+    - name: Seed a directory to back up
+      ansible.builtin.file:
+        path: /etc/restic-testdata
+        state: directory
+        mode: "0755"
+
+    - name: Seed a file with known content
+      ansible.builtin.copy:
+        dest: /etc/restic-testdata/payload.txt
+        content: "molecule restic functional payload 42\n"
+        mode: "0644"
+
+    - name: Install restic
+      ansible.builtin.include_role:
+        name: rhism.platform.restic
+      vars:
+        action: present
+
+    - name: Configure + initialise the repository
+      ansible.builtin.include_role:
+        name: rhism.platform.restic
+      vars:
+        action: configure
+
+    - name: Back up the seeded directory
+      ansible.builtin.include_role:
+        name: rhism.platform.restic
+      vars:
+        action: backup
+
+    - name: List snapshots
+      ansible.builtin.include_role:
+        name: rhism.platform.restic
+      vars:
+        action: snapshots
+
+    - name: Restore the latest snapshot
+      ansible.builtin.include_role:
+        name: rhism.platform.restic
+      vars:
+        action: restore

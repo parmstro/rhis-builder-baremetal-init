@@ -1,0 +1,13 @@
+---
+- name: Set SELinux enforcement mode
+  when: ansible_selinux.status != 'disabled'
+  block:
+    - name: Apply SELinux state
+      ansible.posix.selinux:
+        state: "{{ linux_selinux_state }}"
+        policy: "{{ linux_selinux_policy }}"
+
+- name: Report SELinux skip
+  ansible.builtin.debug:
+    msg: "SELinux is disabled on this host — skipping enforcement configuration"
+  when: ansible_selinux.status == 'disabled'

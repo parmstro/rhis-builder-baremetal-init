@@ -1,0 +1,7 @@
+---
+# schedule — Update director configuration with backup schedules and jobs.
+# Re-renders bareos-dir.conf.j2 (which includes backup_bareos_schedules and backup_bareos_jobs)
+# and notifies the handler to restart the director.
+
+- name: Update Bareos director configuration
+  ansible.builtin.include_tasks: configure.yml

@@ -1,0 +1,43 @@
+---
+- name: Converge — configure dry-run (dispatch + shared var contract, no cluster)
+  hosts: all
+  gather_facts: false
+  vars:
+    action: storage
+    cp_storage_execute: false
+  roles:
+    - role: rhism.platform.storage_local_path
+
+- name: Converge — absent dry-run
+  hosts: all
+  gather_facts: false
+  vars:
+    action: absent
+    cp_storage_execute: false
+  roles:
+    - role: rhism.platform.storage_local_path
+
+- name: Converge — default action (standalone, no vars set) dry-run
+  hosts: all
+  gather_facts: false
+  vars:
+    cp_storage_execute: false
+  roles:
+    - role: rhism.platform.storage_local_path
+
+- name: Converge — negative test (bogus action must fail)
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Attempt bogus action
+      block:
+        - name: Call role with invalid action
+          ansible.builtin.include_role:
+            name: storage_local_path
+          vars:
+            action: bogus_action
+            cp_storage_execute: false
+      rescue:
+        - name: Confirm expected failure was caught
+          ansible.builtin.debug:
+            msg: "PASS — bogus action correctly rejected"

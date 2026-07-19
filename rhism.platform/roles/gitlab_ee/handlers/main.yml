@@ -1,0 +1,14 @@
+---
+- name: gitlab_ee - restart gitlab
+  ansible.builtin.command:
+    cmd: gitlab-ctl restart
+  become: true
+  listen: gitlab_ee - restart gitlab
+  changed_when: true
+
+- name: gitlab_ee - reconfigure
+  ansible.builtin.command:
+    cmd: gitlab-ctl reconfigure
+  become: true
+  listen: gitlab_ee - reconfigure
+  changed_when: true

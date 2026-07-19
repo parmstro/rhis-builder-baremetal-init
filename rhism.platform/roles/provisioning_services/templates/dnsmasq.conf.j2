@@ -1,0 +1,33 @@
+# Managed by Ansible — rhism provisioning_services (dnsmasq)
+# Do not edit manually — changes will be overwritten.
+
+# DNS
+domain={{ prov_domain }}
+{% for upstream in prov_dns_upstream %}
+server={{ upstream }}
+{% endfor %}
+{% if prov_dns_authoritative and prov_network | length > 0 %}
+auth-zone={{ prov_domain }},{{ prov_network }}
+auth-server={{ ansible_fqdn }},eth0
+{% endif %}
+
+# DHCP
+{% if prov_dhcp_enabled %}
+dhcp-range={{ prov_dhcp_range_start }},{{ prov_dhcp_range_end }},{{ prov_dhcp_netmask }},{{ prov_dhcp_lease_time }}
+dhcp-option=option:router,{{ prov_dhcp_gateway }}
+dhcp-option=option:dns-server,{{ ansible_default_ipv4.address }}
+dhcp-option=option:domain-name,{{ prov_domain }}
+{% for host in prov_dhcp_static_hosts %}
+dhcp-host={{ host.mac }},{{ host.ip }},{{ host.name }}
+{% endfor %}
+{% endif %}
+
+# TFTP / PXE
+{% if prov_tftp_enabled %}
+enable-tftp
+tftp-root={{ prov_tftp_root }}
+dhcp-boot=pxelinux.0,{{ ansible_fqdn }},{{ ansible_default_ipv4.address }}
+{% endif %}
+
+log-queries
+log-dhcp

@@ -1,0 +1,9 @@
+---
+# mail_relay — queue_flush action
+
+- name: Flush mail queue
+  ansible.builtin.command:
+    cmd: postfix flush
+  changed_when: true
+  become: true
+  when: mail_execute | bool

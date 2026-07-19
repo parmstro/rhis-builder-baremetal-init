@@ -1,0 +1,114 @@
+---
+# pm_ansible — rotate action.
+# Generates a new ISM-compliant password, archives the old one to history
+# (ISM-0408 enforcement), updates credential file and metadata.
+
+- name: Check that existing credential file is present
+  ansible.builtin.stat:
+    path: "{{ pm_ansible_cred_dir }}/{{ pm_target }}.cred"
+  register: _pm_cred_stat
+  delegate_to: localhost
+  become: "{{ pm_ansible_become | bool }}"
+
+- name: Assert credential exists before rotating
+  ansible.builtin.assert:
+    that:
+      - _pm_cred_stat.stat.exists
+    fail_msg: >-
+      No credential file found for '{{ pm_target }}'. Run pm_action=create first.
+
+- name: Read current credential for history archival
+  ansible.builtin.slurp:
+    src: "{{ pm_ansible_cred_dir }}/{{ pm_target }}.cred"
+  register: _pm_old_cred_raw
+  delegate_to: localhost
+  become: "{{ pm_ansible_become | bool }}"
+  no_log: true
+
+- name: Append current password hash to history (ISM-0408)
+  ansible.builtin.lineinfile:
+    path: "{{ pm_ansible_cred_dir }}/{{ pm_target }}.history"
+    line: "{{ _pm_old_cred_raw.content | b64decode | hash('sha512') }}"
+    create: true
+    mode: "0600"
+  delegate_to: localhost
+  become: "{{ pm_ansible_become | bool }}"
+  no_log: true
+
+- name: Read history to enforce reuse limit (ISM-0408 — last {{ pm_history_count }})
+  ansible.builtin.slurp:
+    src: "{{ pm_ansible_cred_dir }}/{{ pm_target }}.history"
+  register: _pm_history_raw
+  delegate_to: localhost
+  become: "{{ pm_ansible_become | bool }}"
+  no_log: true
+
+- name: Trim history to last {{ pm_history_count }} entries
+  ansible.builtin.copy:
+    content: "{{ (_pm_history_raw.content | b64decode).splitlines()[-pm_history_count:] | join('\n') }}\n"
+    dest: "{{ pm_ansible_cred_dir }}/{{ pm_target }}.history"
+    mode: "0600"
+  delegate_to: localhost
+  become: "{{ pm_ansible_become | bool }}"
+  no_log: true
+
+- name: Generate new ISM-compliant password
+  ansible.builtin.include_tasks: generate.yml
+
+- name: Set new password fact
+  ansible.builtin.set_fact:
+    _pm_password: "{{ _pm_generated.stdout }}"
+  no_log: true
+
+- name: Validate new password against ISM policy
+  ansible.builtin.include_tasks: validate.yml
+
+- name: Write new credential file (mode 0600)
+  ansible.builtin.copy:
+    content: "{{ _pm_password }}"
+    dest: "{{ pm_ansible_cred_dir }}/{{ pm_target }}.cred"
+    mode: "0600"
+  delegate_to: localhost
+  become: "{{ pm_ansible_become | bool }}"
+  no_log: true
+
+- name: Update metadata — reset creation timestamp and expiry
+  ansible.builtin.copy:
+    content: |
+      ---
+      target: {{ pm_target }}
+      service: {{ pm_service | default('') }}
+      created_at: "{{ '%Y-%m-%dT%H:%M:%SZ' | strftime(lookup('pipe', 'date +%s') | int) }}"
+      expires_at: "{{ '%Y-%m-%dT%H:%M:%SZ' | strftime((lookup('pipe', 'date +%s') | int + pm_expiry_days | int * 86400) | int) }}"
+      expiry_days: {{ pm_expiry_days }}
+      length: {{ _pm_password | length }}
+      ism_controls:
+        - ISM-0406
+        - ISM-0407
+        - ISM-0408
+        - ISM-0410
+        - ISM-0411
+        - ISM-0412
+    dest: "{{ pm_ansible_cred_dir }}/{{ pm_target }}.meta.yml"
+    mode: "0600"
+  delegate_to: localhost
+  become: "{{ pm_ansible_become | bool }}"
+
+- name: Update system user password after rotation
+  ansible.builtin.user:
+    name: "{{ pm_ansible_system_user }}"
+    password: "{{ _pm_password | password_hash('sha512') }}"  # pragma: allowlist secret
+    update_password: always
+    password_expire_max: "{{ pm_expiry_days }}"
+  become: true
+  no_log: true
+  when: pm_ansible_manage_system_user | bool
+
+- name: Expose rotated result (no_log on callers)
+  ansible.builtin.set_fact:
+    pm_result:
+      password: "{{ _pm_password }}"
+      target: "{{ pm_target }}"
+      backend: ansible
+      credential_file: "{{ pm_ansible_cred_dir }}/{{ pm_target }}.cred"
+  no_log: true

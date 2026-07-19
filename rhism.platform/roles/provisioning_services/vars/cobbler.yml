@@ -1,0 +1,16 @@
+---
+_prov_packages:
+  - cobbler
+  - cobbler-web
+  - pykickstart
+  - fence-agents
+_prov_service_name: cobblerd
+_prov_config_dir: /etc/cobbler
+_prov_config_file: /etc/cobbler/settings.yaml
+_prov_firewall_services:
+  - dns
+  - dhcp
+  - tftp
+  - http
+  - https
+_prov_has_smartproxy: false

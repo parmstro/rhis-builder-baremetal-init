@@ -1,0 +1,12 @@
+---
+- name: identity_management - restart ipa
+  ansible.builtin.service:
+    name: ipa
+    state: restarted
+  become: true
+
+- name: identity_management - restart sssd
+  ansible.builtin.service:
+    name: sssd
+    state: restarted
+  become: true

@@ -1,0 +1,22 @@
+---
+# Dispatch to type-specific replica install.
+
+- name: Validate replica action applies to this idm_type
+  ansible.builtin.assert:
+    that:
+      - idm_type in ['freeipa', 'rh_idm']
+    fail_msg: >-
+      idm_action: replica is not applicable for idm_type: {{ idm_type }}.
+
+- name: Validate required replica variables
+  ansible.builtin.assert:
+    that:
+      - idm_master_server | length > 0
+      - idm_admin_password | length > 0
+    fail_msg: "idm_master_server and idm_admin_password must be set for replica setup."
+
+- name: Set up {{ idm_type }} replica
+  ansible.builtin.include_role:
+    name: "{{ idm_type }}"
+  vars:
+    action: replica

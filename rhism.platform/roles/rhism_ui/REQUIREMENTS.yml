@@ -1,0 +1,172 @@
+---
+# Functional requirements — rhism_ui (requirements->test-case layer, owner
+# rule 2026-07-12; user-story schema, owner rule 2026-07-16 — see
+# docs/scaffolding-templates.md's REQUIREMENTS.yml template in the
+# orchestration repo. New role, first content authored directly in the new
+# schema). Renderer contract: see roles/cmdb/templates/requirements_traceability.md.j2
+# in the orchestration repo.
+functional_requirements:
+  - req_id: BUILDERUI-FR-001
+    persona: administrator
+    capability: >-
+      to deploy the real, security-fixed rhis-builder-ui application built
+      from this role's own source, not a vendored or unpatched image
+    benefit: >-
+      the estate-manifest web UI a network-reachable operator uses is
+      running code this platform actually reviewed and fixed, not the
+      original unauthenticated, open-CORS, path-traversable fork
+    acceptance:
+      - given: the role's own files/rhism_ui/ Containerfile and a real
+          podman-capable target host
+        when: install runs with the dry-run gate enabled
+        then: a running container serves the app on the configured port,
+          published on 127.0.0.1 only
+    statement: >-
+      As an administrator, I want to deploy the real, security-fixed
+      rhis-builder-ui built from source, so that the estate-manifest web UI
+      runs code this platform actually reviewed and fixed.
+    tier: 2
+    verified_by:
+      - molecule: default
+
+  - req_id: BUILDERUI-FR-002
+    persona: administrator
+    capability: >-
+      session claim/steal to require a real shared secret, so no anonymous
+      network-reachable caller can silently take over or wipe the active
+      deployment session
+    benefit: >-
+      the drive-by CSRF-class hole in the original app (anyone reachable on
+      the network could get a valid session token, or wipe all deployment
+      data, with a bare POST) is closed
+    acceptance:
+      - given: RHISM_UI_ADMIN_SECRET is set (rhism_ui_admin_secret)
+        when: POST /api/session/claim is called with no or a wrong
+          X-Admin-Secret header
+        then: the call is rejected with 401
+      - given: a valid X-Admin-Secret
+        when: POST /api/session/claim is called
+        then: a real session token is issued
+      - given: a valid X-Session-Token from a prior claim
+        when: POST /api/session/claim is called again (reconnect) with no
+          secret header
+        then: the call succeeds — holding a valid token is itself proof of a
+          prior successful authentication
+      - given: any caller
+        when: POST /api/session/steal is called with no valid X-Admin-Secret
+        then: the call is rejected with 401 — steal is the most consequential
+          endpoint (wipes all deployment data) and is never left open
+    statement: >-
+      As an administrator, I want session claim/steal to require a real
+      shared secret, so that no anonymous caller can hijack or wipe the
+      active deployment session.
+    tier: 2
+    verified_by:
+      - molecule: default
+
+  - req_id: BUILDERUI-FR-003
+    persona: administrator
+    capability: >-
+      CORS to be disabled by default, so no page loaded in an operator's
+      browser from another origin can silently call this API
+    benefit: >-
+      closes the drive-by CSRF-class issue the original app's wide-open
+      `cors()` (Access-Control-Allow-Origin: *) created, compounding the
+      unauthenticated-steal hole
+    acceptance:
+      - given: rhism_ui_allowed_origin left at its empty default
+        when: any request is made with a cross-origin Origin header
+        then: the response carries no Access-Control-Allow-Origin header
+    statement: >-
+      As an administrator, I want CORS disabled by default, so that no
+      cross-origin page can silently call this API.
+    tier: 2
+    verified_by:
+      - molecule: default
+
+  - req_id: BUILDERUI-FR-004
+    persona: administrator
+    capability: >-
+      unsafe path/domain values to be rejected outright rather than written
+      to a resolved-away location outside the intended deployment directory
+    benefit: >-
+      closes the arbitrary-file-write path-traversal hole in the original
+      app's unsanitized `join(DEPLOYMENT_PATH, domain)` — a malicious domain
+      value can no longer escape the intended output directory
+    acceptance:
+      - given: a session with basevars_global_domain_name set to a
+          traversal value (e.g. "../../../../tmp/pwned")
+        when: POST /api/deployment/export is called
+        then: the call is rejected with 400 and an "Invalid domain value"
+          error, and no file is written at the resolved-away location
+    statement: >-
+      As an administrator, I want unsafe domain values rejected before any
+      file write, so that a malicious session can never write outside the
+      intended deployment directory.
+    tier: 2
+    verified_by:
+      - molecule: default
+
+  - req_id: BUILDERUI-FR-005
+    persona: administrator
+    capability: >-
+      the UI to be reachable only from the machine it runs on, never from
+      the wider network, regardless of the container network path
+    benefit: >-
+      this app has no real multi-tenant access control beyond the
+      single-shared-secret model — network exposure is the last remaining
+      layer standing between a network-reachable attacker and the API, so it
+      must hold even if a future auth regression slips through
+    acceptance:
+      - given: a real deployment (rhism_ui_deploy_execute true)
+        when: install completes
+        then: the published port is bound to 127.0.0.1 only, never 0.0.0.0,
+          confirmed via the live container's own port publish
+    statement: >-
+      As an administrator, I want this UI reachable only from its own host,
+      so that network exposure is never the layer that fails.
+    tier: 2
+    verified_by:
+      - molecule: default
+
+  - req_id: BUILDERUI-FR-006
+    persona: administrator
+    capability: >-
+      a dry-run mode for install, so a run can be validated without
+      touching a real target
+    benefit: >-
+      the role's dispatch and argument contract can be proven safe in CI
+      without needing a real podman-capable target host, and without
+      accidentally deploying with a shared/default admin secret
+    acceptance:
+      - given: rhism_ui_deploy_execute left at its default (false)
+        when: install runs
+        then: no image build, container, or HTTP call is made
+    statement: >-
+      As an administrator, I want a dry-run mode for install, so that the
+      role's contract can be validated safely without a real target.
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: BUILDERUI-FR-007
+    persona: administrator
+    capability: >-
+      to check a running instance's health via automation, not just by
+      opening the UI manually
+    benefit: >-
+      health can be wired into the same monitoring/CI surfaces every other
+      product role in this platform already exposes via its own status
+      action (e.g. roles/quay)
+    acceptance:
+      - given: a running rhism-ui instance
+        when: status runs
+        then: a real GET /healthz call returns 200 with the expected
+          liveness JSON
+    statement: >-
+      As an administrator, I want to check a running instance's health via
+      automation, so that it participates in the same monitoring/CI
+      patterns as every other product role.
+    tier: 2
+    verified_by:
+      - molecule: default

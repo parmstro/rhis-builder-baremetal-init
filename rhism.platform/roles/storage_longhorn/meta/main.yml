@@ -1,0 +1,22 @@
+---
+galaxy_info:
+  namespace: rhism
+  role_name: storage_longhorn
+  author: rhism
+  description: >-
+    Deploy Longhorn distributed block storage on a Kubernetes cluster via Helm and set it
+    as the default StorageClass. Standalone-first product role, also selectable by the
+    container_platform dispatcher (cp_storage_type: longhorn).
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: EL
+      versions:
+        - "9"
+  galaxy_tags:
+    - kubernetes
+    - storage
+    - longhorn
+    - csi
+    - helm
+dependencies: []

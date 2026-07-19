@@ -1,0 +1,23 @@
+---
+galaxy_info:
+  namespace: rhism
+  role_name: okd
+  author: rhism
+  description: >-
+    Install and manage an OKD (community OpenShift) cluster via openshift-install and oc —
+    binaries, install-config, gated cluster install/destroy, node scaling, etcd
+    backup/restore, and upgrades. Standalone-first product role, also selectable by the
+    container_platform dispatcher (cp_type: okd).
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: EL
+      versions:
+        - "9"
+  galaxy_tags:
+    - kubernetes
+    - okd
+    - openshift
+    - k8s
+    - cluster
+dependencies: []

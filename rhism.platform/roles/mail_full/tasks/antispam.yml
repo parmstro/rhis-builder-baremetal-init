@@ -1,0 +1,65 @@
+---
+# tasks/antispam.yml — SpamAssassin rules, ClamAV signatures, amavisd-new integration.
+#
+# Enterprise Linux: the antispam chain (spamassassin/clamav/amavisd-new/
+# opendkim) is EPEL-only on EL (spamassassin removed from RHEL 10 outright) —
+# sourcing DEFERRED by owner decision 2026-07-14 (see FPS.md FR-018..020).
+# The action therefore skips gracefully on EL instead of failing on
+# Debian-style paths (/etc/default/spamassassin, /etc/amavis/conf.d) that do
+# not exist there. The task set below still serves Debian-family hosts.
+
+- name: Note antispam deferral on Enterprise Linux
+  ansible.builtin.debug:
+    msg: >-
+      antispam action skipped on Enterprise Linux — the antispam chain
+      (spamassassin/clamav/amavisd-new) is EPEL-only on EL and its sourcing
+      is deferred (owner decision 2026-07-14; FPS FR-018..020 record the gap).
+  when: (ansible_os_family | default('RedHat')) == 'RedHat'
+
+- name: Configure antispam (SpamAssassin + ClamAV + amavisd)
+  become: true
+  when:
+    - mail_execute | bool
+    - (ansible_os_family | default('RedHat')) != 'RedHat'
+  block:
+    - name: Configure SpamAssassin local rules
+      ansible.builtin.template:
+        src: local.cf.j2
+        dest: /etc/mail/spamassassin/local.cf
+        owner: root
+        group: root
+        mode: "0644"
+      when: mail_spamassassin_enabled | bool
+
+    - name: Enable SpamAssassin daemon
+      ansible.builtin.lineinfile:
+        path: /etc/default/spamassassin
+        regexp: '^ENABLED='
+        line: 'ENABLED=1'
+      when: mail_spamassassin_enabled | bool
+
+    - name: Update ClamAV virus signatures
+      ansible.builtin.command:
+        cmd: freshclam
+      register: _mail_full_freshclam
+      changed_when: "'Database updated' in _mail_full_freshclam.stdout"
+      failed_when: _mail_full_freshclam.rc not in [0, 1]
+      when: mail_clamav_enabled | bool
+
+    - name: Deploy amavisd-new configuration
+      ansible.builtin.template:
+        src: amavisd.conf.j2
+        dest: /etc/amavis/conf.d/50-user
+        owner: root
+        group: amavis
+        mode: "0640"
+      when: mail_spamassassin_enabled or mail_clamav_enabled
+
+    - name: Ensure amavisd-new service is started
+      ansible.builtin.service:
+        name: amavis
+        state: started
+        enabled: true
+      when:
+        - mail_manage_service | bool
+        - mail_spamassassin_enabled or mail_clamav_enabled

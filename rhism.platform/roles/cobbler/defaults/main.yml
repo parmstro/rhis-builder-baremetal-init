@@ -1,0 +1,100 @@
+---
+# cobbler — standalone-first defaults over the SHARED provisioning-services interface.
+#
+# Every provisioning backend (dnsmasq / cobbler / foreman_proxy / satellite_proxy) consumes
+# the SAME variable names (bare `action` + prov_* vars), so the provisioning_services
+# dispatcher selects any of them with one identical `include_role` call and never needs
+# per-backend code. Standalone callers set these same vars directly; the defaults below make
+# the role runnable on its own.
+
+# Shared action across every provisioning backend. cobbler actions:
+#   present | absent              — install / remove packages + firewall
+#   configure                     — deploy settings.yaml + sync
+#   add_distro | add_profile      — register a distro / profile
+#   add_system | remove_system    — register / remove a system
+#   sync                          — run `cobbler sync`
+#   status                        — query `cobbler status`
+#   started | stopped | restarted — service state
+# The dispatcher passes `action` via include_role vars; this default covers standalone use.
+action: configure
+
+# Shared dry-run gate honoured by every provisioning backend — false validates action
+# dispatch + variable resolution without installing packages or running cobbler CLI
+# (used by the molecule scenario). Mirrors cp_storage_execute in the storage family.
+prov_execute: true
+
+# Service-management toggle shared across the provisioning family (dnsmasq-family
+# convention). Guards the service action and the restart handler — containers and
+# other non-systemd contexts set false. Standalone-first default is true.
+prov_manage_service: true
+
+# ── Cobbler server + managed services ────────────────────────────────────────
+prov_cobbler_server: localhost
+prov_cobbler_next_server: ""
+prov_cobbler_manage_dhcp: true
+prov_cobbler_manage_dns: true
+prov_cobbler_manage_tftp: true
+# Make the local `cobbler` CLI reach the API over 127.0.0.1 rather than the
+# advertised `server` address (cobbler's own client_use_localhost setting). True
+# is the robust posture for a cobbler host managing itself — without it, every
+# CLI action (add_distro/add_profile/add_system/sync/status) fails to connect
+# whenever `server` is a routable IP that is not a local address on the host.
+prov_cobbler_client_use_localhost: true
+# TFTP root ensured on configure (cobbler's own tftpboot_location default).
+prov_cobbler_tftpboot_dir: /var/lib/tftpboot
+# Group that must read settings.yaml — cobbler's mod_wsgi cobbler_api runs as
+# this group (root:apache 0640 as shipped); wrong group breaks the HTTP API.
+prov_cobbler_settings_group: apache
+prov_cobbler_distros: []
+# - name: rhel9
+#   breed: redhat
+#   os_version: rhel9
+#   kernel: /boot/vmlinuz
+#   initrd: /boot/initrd.img
+#   arch: x86_64
+prov_cobbler_profiles: []
+# - name: rhel9-basic
+#   distro: rhel9
+#   kickstart: /var/lib/cobbler/templates/rhel9.ks
+
+# ── Per-action inputs (set only for the matching action) ─────────────────────
+# add_distro  — requires name, kernel, initrd (os_version used; arch/breed defaulted in task)
+prov_cobbler_distro: {}
+# add_profile — requires name, distro (kickstart optional)
+prov_cobbler_profile: {}
+# add_system  — requires name, profile, mac, ip, hostname
+prov_cobbler_system: {}
+# add_systems — bulk add_system, list of the same shape (rhism Phase C item 2)
+prov_cobbler_systems: []
+# remove_system
+prov_cobbler_system_name: ""
+
+# ── Role-internal (not part of the standalone interface; mirrors vars/cobbler.yml) ──
+_prov_packages:
+  - cobbler
+  - cobbler-web
+  - pykickstart
+  - fence-agents
+_prov_service_name: cobblerd
+_prov_config_dir: /etc/cobbler
+_prov_config_file: /etc/cobbler/settings.yaml
+_prov_firewall_services:
+  - dns
+  - dhcp
+  - tftp
+  - http
+  - https
+_prov_has_smartproxy: false
+_cobbler_valid_actions:
+  - present
+  - absent
+  - started
+  - stopped
+  - restarted
+  - configure
+  - add_distro
+  - add_profile
+  - add_system
+  - remove_system
+  - sync
+  - status

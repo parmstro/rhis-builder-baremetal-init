@@ -1,0 +1,7 @@
+---
+- name: storage_nfs - configure storage
+  ansible.builtin.debug:
+    msg: >-
+      NFS StorageClass '{{ cp_storage_class_name | default('nfs-client') }}' configured.
+      NFS server: {{ cp_storage_nfs_server | default('not set') }}:{{ cp_storage_nfs_path | default('not set') }}.
+  listen: storage_nfs - configure storage

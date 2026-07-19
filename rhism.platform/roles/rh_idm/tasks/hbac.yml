@@ -1,0 +1,15 @@
+---
+- name: Manage IPA HBAC rules
+  freeipa.ansible_freeipa.ipahbacrule:
+    ipaadmin_password: "{{ idm_admin_password }}"
+    name: "{{ item.name }}"
+    description: "{{ item.description | default(omit) }}"
+    usercategory: "{{ item.usercategory | default(omit) }}"
+    hostcategory: "{{ item.hostcategory | default(omit) }}"
+    servicecategory: "{{ item.servicecategory | default(omit) }}"
+    state: "{{ item.state | default('present') }}"
+  loop: "{{ idm_hbac_rules | default([]) }}"
+  no_log: true
+  when:
+    - idm_hbac_rules is defined
+    - idm_hbac_rules | length > 0

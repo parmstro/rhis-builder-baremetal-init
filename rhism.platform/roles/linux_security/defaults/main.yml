@@ -1,0 +1,9 @@
+---
+# Boolean flags controlling which constituent roles are applied.
+# Set any to false to skip that security domain.
+linux_security_apply_packages: true
+linux_security_apply_hardening: true
+linux_security_apply_firewall: true
+linux_security_apply_auditing: true
+linux_security_apply_users: true
+linux_security_apply_selinux: true

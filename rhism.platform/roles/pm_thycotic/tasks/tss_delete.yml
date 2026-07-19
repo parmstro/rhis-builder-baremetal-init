@@ -1,0 +1,11 @@
+---
+# TSS API call for delete — only included when pm_thycotic_skip_api is false.
+- name: Retire secret in Thycotic Secret Server (soft delete — preserves audit trail)
+  delinea.tss.secret:
+    server_url: "{{ pm_thycotic_server_url }}"
+    username: "{{ pm_thycotic_username }}"
+    password: "{{ pm_thycotic_password }}"
+    domain: "{{ pm_thycotic_domain | default(omit) }}"
+    state: absent
+    id: "{{ pm_thycotic_secret_id }}"
+  delegate_to: localhost

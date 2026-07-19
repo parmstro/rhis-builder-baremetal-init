@@ -1,0 +1,11 @@
+---
+- name: Manage SELinux booleans
+  when: ansible_selinux.status != 'disabled'
+  block:
+    - name: Set SELinux booleans
+      ansible.posix.seboolean:
+        name: "{{ item.name }}"
+        state: "{{ item.state }}"
+        persistent: "{{ item.persistent | default(true) }}"
+      loop: "{{ linux_selinux_booleans }}"
+      when: linux_selinux_booleans | length > 0

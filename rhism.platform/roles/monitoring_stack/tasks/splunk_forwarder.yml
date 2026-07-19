@@ -1,0 +1,114 @@
+---
+- name: Validate forwarder server is set
+  ansible.builtin.assert:
+    that:
+      - mon_splunk_fwd_server | length > 0
+    fail_msg: "mon_splunk_fwd_server must be set (e.g. splunk.example.com:9997)"
+
+# ── User / group ─────────────────────────────────────────────────────
+- name: Create Splunk forwarder group
+  ansible.builtin.group:
+    name: "{{ mon_splunk_fwd_group }}"
+    state: present
+  become: true
+
+- name: Create Splunk forwarder user
+  ansible.builtin.user:
+    name: "{{ mon_splunk_fwd_user }}"
+    group: "{{ mon_splunk_fwd_group }}"
+    home: "{{ mon_splunk_fwd_home }}"
+    shell: /sbin/nologin
+    system: true
+  become: true
+
+# ── Install Universal Forwarder ──────────────────────────────────────
+- name: Check if Splunk forwarder is installed
+  ansible.builtin.stat:
+    path: "{{ mon_splunk_fwd_home }}/bin/splunk"
+  register: splunk_fwd_binary
+
+- name: Download Splunk Universal Forwarder RPM
+  ansible.builtin.get_url:
+    url: >-
+      https://download.splunk.com/products/universalforwarder/releases/{{
+      mon_splunk_fwd_version }}/linux/splunkforwarder-{{ mon_splunk_fwd_version }}-linux-x86_64.rpm
+    dest: "/tmp/splunkforwarder-{{ mon_splunk_fwd_version }}.rpm"
+    mode: "0644"
+  when: not splunk_fwd_binary.stat.exists
+
+- name: Install Splunk Universal Forwarder RPM
+  ansible.builtin.package:
+    name: "/tmp/splunkforwarder-{{ mon_splunk_fwd_version }}.rpm"
+    state: present
+    disable_gpg_check: true
+  become: true
+  when: not splunk_fwd_binary.stat.exists
+
+- name: Accept forwarder license
+  ansible.builtin.command:
+    cmd: >-
+      {{ mon_splunk_fwd_home }}/bin/splunk start --accept-license
+      --answer-yes --no-prompt
+      --seed-passwd {{ mon_splunk_fwd_password }}
+  become: true
+  become_user: "{{ mon_splunk_fwd_user }}"
+  changed_when: true
+  no_log: true
+  when:
+    - not splunk_fwd_binary.stat.exists
+    - mon_splunk_fwd_password | length > 0
+
+# ── Configure forward server ────────────────────────────────────────
+- name: Set forward server
+  ansible.builtin.command:
+    cmd: >-
+      {{ mon_splunk_fwd_home }}/bin/splunk add forward-server {{ mon_splunk_fwd_server }}
+      -auth admin:{{ mon_splunk_fwd_password }}
+  become: true
+  become_user: "{{ mon_splunk_fwd_user }}"
+  changed_when: true
+  no_log: true
+  failed_when: false
+
+# ── Configure inputs ────────────────────────────────────────────────
+- name: Deploy forwarder inputs.conf
+  ansible.builtin.template:
+    src: splunk_inputs.conf.j2
+    dest: "{{ mon_splunk_fwd_home }}/etc/system/local/inputs.conf"
+    owner: "{{ mon_splunk_fwd_user }}"
+    group: "{{ mon_splunk_fwd_group }}"
+    mode: "0600"
+  become: true
+  notify: monitoring_stack - restart splunk forwarder
+
+# ── Grant log read access ───────────────────────────────────────────
+- name: Add forwarder user to adm group for log access
+  ansible.builtin.user:
+    name: "{{ mon_splunk_fwd_user }}"
+    groups: adm
+    append: true
+  become: true
+
+# ── Enable on boot ──────────────────────────────────────────────────
+- name: Enable forwarder at boot
+  ansible.builtin.command:
+    cmd: "{{ mon_splunk_fwd_home }}/bin/splunk enable boot-start -user {{ mon_splunk_fwd_user }}"
+  become: true
+  changed_when: true
+
+- name: Ensure forwarder is running
+  ansible.builtin.command:
+    cmd: "{{ mon_splunk_fwd_home }}/bin/splunk status"
+  become: true
+  become_user: "{{ mon_splunk_fwd_user }}"
+  changed_when: false
+  failed_when: false
+  register: splunk_fwd_status
+
+- name: Start forwarder if not running
+  ansible.builtin.command:
+    cmd: "{{ mon_splunk_fwd_home }}/bin/splunk start"
+  become: true
+  become_user: "{{ mon_splunk_fwd_user }}"
+  changed_when: true
+  when: "'running' not in splunk_fwd_status.stdout"

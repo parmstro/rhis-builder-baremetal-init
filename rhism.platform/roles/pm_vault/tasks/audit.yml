@@ -1,0 +1,109 @@
+---
+# pm_vault — audit action.
+# Reads KV metadata (version history, creation date) and checks ISM compliance.
+# KV v2: reads metadata endpoint to get created_time and current_version.
+
+- name: Authenticate to Vault
+  ansible.builtin.include_tasks: connect.yml
+
+- name: Read KV v2 secret with metadata (version history + creation timestamps)
+  community.hashi_vault.vault_kv2_get:
+    url: "{{ pm_vault_url }}"
+    namespace: "{{ pm_vault_namespace | default(omit) }}"
+    token: "{{ _pm_vault_token }}"
+    engine_mount_point: "{{ pm_vault_kv_mount }}"
+    path: "{{ _pm_vault_kv_path }}"
+  register: _pm_vault_meta
+  delegate_to: localhost
+  when: pm_vault_kv_version | int == 2
+
+- name: Read current secret (KV v1)
+  community.hashi_vault.vault_kv1_get:
+    url: "{{ pm_vault_url }}"
+    namespace: "{{ pm_vault_namespace | default(omit) }}"
+    token: "{{ _pm_vault_token }}"
+    engine_mount_point: "{{ pm_vault_kv_mount }}"
+    path: "{{ _pm_vault_kv_path }}"
+  register: _pm_vault_secret
+  delegate_to: localhost
+  no_log: true
+  when: pm_vault_kv_version | int == 1
+
+- name: Get current timestamp
+  ansible.builtin.command:
+    cmd: "date +%s"
+  register: _pm_now_epoch
+  changed_when: false
+  delegate_to: localhost
+
+- name: Parse creation time and calculate age (KV v2)
+  ansible.builtin.set_fact:
+    _pm_created_at: "{{ _pm_vault_meta.raw.data.metadata.created_time | default('unknown') }}"
+    _pm_current_version: "{{ _pm_vault_meta.raw.data.metadata.version | default(1) }}"
+    _pm_expiry_days_stored: "{{ _pm_vault_meta.raw.data.data.expiry_days | default(pm_expiry_days) }}"
+  when: pm_vault_kv_version | int == 2
+
+- name: Calculate password age from Vault metadata (KV v2)
+  ansible.builtin.set_fact:
+    _pm_age_days: >-
+      {{
+        ((_pm_now_epoch.stdout | int) -
+         (_pm_created_at | regex_replace('T.*', '') | to_datetime('%Y-%m-%d')).strftime('%s') | int
+        ) // 86400
+      }}
+  when:
+    - pm_vault_kv_version | int == 2
+    - _pm_created_at != 'unknown'
+
+- name: Alias vault_meta as vault_secret for KV v2 data access
+  ansible.builtin.set_fact:
+    _pm_vault_secret: "{{ _pm_vault_meta }}"
+  when: pm_vault_kv_version | int == 2
+
+- name: Build audit report
+  ansible.builtin.set_fact:
+    _pm_audit_report:
+      target: "{{ pm_target }}"
+      service: "{{ _pm_vault_secret.raw.data.data.service | default('') }}"
+      backend: vault
+      vault_path: "{{ pm_vault_kv_mount }}/{{ _pm_vault_kv_path }}"
+      audit_timestamp: "{{ lookup('pipe', 'date -u +%Y-%m-%dT%H:%M:%SZ') }}"
+      password_age_days: "{{ _pm_age_days | default('unknown') }}"
+      expiry_days: "{{ _pm_expiry_days_stored | default(pm_expiry_days) }}"
+      kv_version: "{{ pm_vault_kv_version }}"
+      current_version: "{{ _pm_current_version | default('N/A') }}"
+      ism_controls_recorded: "{{ _pm_vault_secret.raw.data.data.ism_controls | default('not set') }}"
+      ism_checks:
+        ISM_0406_length_compliant: >-
+          {{ (_pm_vault_secret.raw.data.data.length | default(0) | int) >= pm_length }}
+        ISM_0410_not_expired: >-
+          {{ (_pm_age_days | default(0) | int) < (_pm_expiry_days_stored | default(pm_expiry_days) | int) }}
+
+- name: Write audit report
+  ansible.builtin.copy:
+    content: "{{ _pm_audit_report | to_nice_yaml }}"
+    dest: "{{ pm_audit_report_path }}"
+    mode: "0600"
+  delegate_to: localhost
+  become: true
+  when: pm_audit_report_format == 'text'
+
+- name: Write audit report (JSON)
+  ansible.builtin.copy:
+    content: "{{ _pm_audit_report | to_nice_json }}"
+    dest: "{{ pm_audit_report_path }}"
+    mode: "0600"
+  delegate_to: localhost
+  become: true
+  when: pm_audit_report_format == 'json'
+
+- name: Assert ISM-0410 — password is not expired
+  ansible.builtin.assert:
+    that:
+      - (_pm_age_days | default(0) | int) < (_pm_expiry_days_stored | default(pm_expiry_days) | int)
+    fail_msg: >-
+      ISM-0410: password for '{{ pm_target }}' is {{ _pm_age_days | default('unknown') }} days old
+      (limit: {{ _pm_expiry_days_stored | default(pm_expiry_days) }} days). Rotate immediately.
+    success_msg: >-
+      ISM-0410: password for '{{ pm_target }}' is within expiry policy
+      ({{ _pm_age_days | default('?') }}/{{ _pm_expiry_days_stored | default(pm_expiry_days) }} days).

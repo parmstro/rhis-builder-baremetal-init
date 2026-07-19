@@ -1,0 +1,2 @@
+---
+# No handlers in the orchestrator — each constituent role owns its own handlers.

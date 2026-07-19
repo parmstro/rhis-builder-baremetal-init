@@ -1,0 +1,54 @@
+---
+- name: Converge — ingress dry-run on k3s (built-in Traefik path, no cluster)
+  hosts: all
+  gather_facts: false
+  vars:
+    action: ingress
+    cp_type: k3s
+    cp_ingress_execute: false
+  roles:
+    - role: rhism.platform.ingress_traefik
+
+- name: Converge — present dry-run on non-k3s (Helm path)
+  hosts: all
+  gather_facts: false
+  vars:
+    action: present
+    cp_type: rke2
+    cp_ingress_execute: false
+  roles:
+    - role: rhism.platform.ingress_traefik
+
+- name: Converge — absent dry-run
+  hosts: all
+  gather_facts: false
+  vars:
+    action: absent
+    cp_ingress_execute: false
+  roles:
+    - role: rhism.platform.ingress_traefik
+
+- name: Converge — default action (standalone, no vars set) dry-run
+  hosts: all
+  gather_facts: false
+  vars:
+    cp_ingress_execute: false
+  roles:
+    - role: rhism.platform.ingress_traefik
+
+- name: Converge — negative test (bogus action must fail)
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Attempt bogus action
+      block:
+        - name: Call role with invalid action
+          ansible.builtin.include_role:
+            name: ingress_traefik
+          vars:
+            action: bogus_action
+            cp_ingress_execute: false
+      rescue:
+        - name: Confirm expected failure was caught
+          ansible.builtin.debug:
+            msg: "PASS — bogus action correctly rejected"

@@ -1,0 +1,41 @@
+---
+# gitlab_ee — runners
+# Install gitlab-runner package, register runners, start service.
+
+- name: Manage GitLab EE runners
+  become: true
+  block:
+    - name: Ensure gitlab-runner package is present
+      ansible.builtin.dnf:
+        name: gitlab-runner
+        state: present
+
+    - name: Register GitLab runners
+      ansible.builtin.command:
+        cmd: >-
+          gitlab-runner register
+          --non-interactive
+          --name "{{ item.name }}"
+          --url "{{ item.url | default(scm_external_url) }}"
+          --registration-token "{{ item.token }}"
+          --executor "{{ item.executor | default('shell') }}"
+          {% if item.executor | default('shell') == 'docker' %}
+          --docker-image "{{ item.docker_image | default('alpine:latest') }}"
+          {% endif %}
+          {% for tag in (item.tags | default([])) %}
+          --tag-list "{{ tag }}"
+          {% endfor %}
+          {% if item.run_untagged | default(true) %}
+          --run-untagged=true
+          {% endif %}
+      loop: "{{ scm_runners | default([]) }}"
+      loop_control:
+        label: "{{ item.name }}"
+      no_log: true
+      changed_when: true
+
+    - name: Ensure gitlab-runner service is started and enabled
+      ansible.builtin.service:
+        name: gitlab-runner
+        state: started
+        enabled: true

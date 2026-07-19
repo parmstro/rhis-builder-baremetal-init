@@ -1,0 +1,17 @@
+---
+# baseline — orchestrator. Stands up the whole OADP backup posture in one call:
+# install the operator + DPA (server), optionally apply the recurring Schedule, then
+# verify. Each stage is gated on a backup_oadp_apply_* boolean so a baseline run can be
+# narrowed (e.g. server + verify without touching an existing schedule).
+
+- name: Baseline — install the OADP operator and DataProtectionApplication
+  ansible.builtin.include_tasks: server.yml
+  when: backup_oadp_apply_server | bool
+
+- name: Baseline — apply the backup Schedule
+  ansible.builtin.include_tasks: schedule.yml
+  when: backup_oadp_apply_schedule | bool
+
+- name: Baseline — verify the backup stack
+  ansible.builtin.include_tasks: verify.yml
+  when: backup_oadp_apply_verify | bool

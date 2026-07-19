@@ -1,0 +1,13 @@
+server.port: {{ mon_kibana_port }}
+server.host: "0.0.0.0"
+server.name: {{ mon_kibana_server_name }}
+
+elasticsearch.hosts: ["https://localhost:{{ mon_elastic_http_port }}"]
+{% if mon_elastic_security_enabled %}
+elasticsearch.username: "kibana_system"
+elasticsearch.password: "{{ mon_elastic_password }}"
+elasticsearch.ssl.verificationMode: none
+{% endif %}
+
+xpack.reporting.enabled: true
+xpack.security.enabled: {{ mon_elastic_security_enabled | lower }}

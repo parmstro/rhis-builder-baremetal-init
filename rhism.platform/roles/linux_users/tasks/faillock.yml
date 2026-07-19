@@ -1,0 +1,8 @@
+---
+- name: Configure account lockout via faillock
+  ansible.builtin.template:
+    src: faillock.conf.j2
+    dest: /etc/security/faillock.conf
+    owner: root
+    group: root
+    mode: "0644"

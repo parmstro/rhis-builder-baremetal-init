@@ -1,0 +1,55 @@
+---
+# Functional requirements — storage_local_path (requirements->test-case layer +
+# Tier-3 elevation, owner rules 2026-07-12). Product role in the container_platform
+# storage family (a user picks exactly one of storage_local_path/storage_nfs/
+# storage_longhorn/storage_ocs). Product capability fact-checked against the
+# official Rancher local-path-provisioner docs (github.com/rancher/local-path-provisioner)
+# and the k3s storage docs (docs.k3s.io/storage — local-path is k3s built-in).
+# Curated against README + meta/argument_specs.yml action set + tasks/main.yml.
+# Family lab: playbooks/container_platform.yml (cp_storage_type: local-path).
+functional_requirements:
+  - req_id: STORAGE_LOCAL_PATH-FR-001
+    statement: >-
+      The role SHALL consume the shared container_platform storage interface
+      (bare action + cp_storage_* + cp_kubeconfig_path) and pass its contract
+      scenario — argument-spec validation, standalone default (action=storage),
+      dispatch for storage/present/absent, negative bad-action rejection, and the
+      cp_storage_execute dry-run gate — without a cluster.
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: STORAGE_LOCAL_PATH-FR-002
+    statement: >-
+      The role SHALL verify the k3s built-in local-path StorageClass (provisioner
+      rancher.io/local-path, WaitForFirstConsumer binding, Delete reclaim policy)
+      is present on the cluster and warn when it is missing.
+    tier: 2
+    verified_by:
+      - molecule: functional
+
+  - req_id: STORAGE_LOCAL_PATH-FR-003
+    statement: >-
+      When cp_storage_make_default is true, the role SHALL mark local-path as the
+      cluster-default StorageClass via the
+      storageclass.kubernetes.io/is-default-class=true annotation.
+    tier: 2
+    verified_by:
+      - molecule: functional
+
+  - req_id: STORAGE_LOCAL_PATH-FR-004
+    statement: >-
+      When cp_storage_make_default is false, the role SHALL clear the default-class
+      annotation (set it false), leaving the cluster with no local-path default.
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#storage-local-path
+
+  - req_id: STORAGE_LOCAL_PATH-FR-005
+    statement: >-
+      On action absent the role SHALL report that local-path is built into k3s and
+      take no destructive action (data-loss-safe — it never auto-removes the
+      built-in StorageClass).
+    tier: 1
+    verified_by:
+      - molecule: default

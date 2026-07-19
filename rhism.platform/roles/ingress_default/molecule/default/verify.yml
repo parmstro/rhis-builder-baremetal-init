@@ -1,0 +1,25 @@
+---
+- name: Verify standalone variable contract
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Load role defaults
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../../defaults/main.yml"
+      delegate_to: localhost
+
+    - name: Assert shared interface defaults resolve for standalone use
+      ansible.builtin.assert:
+        that:
+          - action == 'ingress'
+          - cp_kubeconfig_path == '/etc/rancher/k3s/k3s.yaml'
+          - cp_type == 'k3s'
+          - cp_ingress_execute | bool
+          - _cp_builtin_ingress_name == 'traefik'
+        fail_msg: "ingress_default defaults did not resolve to the expected standalone contract"
+      delegate_to: localhost
+
+    - name: Report verification passed
+      ansible.builtin.debug:
+        msg: "PASS — ingress_default standalone contract verified"
+      delegate_to: localhost

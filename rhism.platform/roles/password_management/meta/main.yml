@@ -1,0 +1,25 @@
+---
+galaxy_info:
+  role_name: password_management
+  author: rhism
+  description: >-
+    ISM-aligned password lifecycle management dispatcher. Supports pure Ansible,
+    HashiCorp Vault, and Delinea/Thycotic Secret Server backends.
+    Actions: create, delete, audit, rotate.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: EL
+      versions:
+        - "9"
+    - name: Ubuntu
+      versions:
+        - jammy
+  galaxy_tags:
+    - security
+    - password
+    - vault
+    - ism
+    - credentials
+
+dependencies: []

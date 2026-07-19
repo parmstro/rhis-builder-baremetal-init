@@ -1,0 +1,54 @@
+---
+# Functional requirements — linux_packages (requirements->test-case layer +
+# Tier-3 elevation, wave-3+ standard). Standalone linux_* domain role (chained
+# by the linux_security orchestrator). Capability fact-checked against RHEL
+# package management (dnf), EPEL (aide/rkhunter provenance), and AIDE/rkhunter
+# tooling documentation, plus CIS guidance on removing insecure legacy services.
+# Curated from README + meta/argument_specs.yml + tasks/. Molecule default is a
+# real Tier 2 scenario on EL8/9/10 (removes telnet, installs audit with EPEL,
+# asserts state via package_facts). Family lab: playbooks/linux_security.yml.
+functional_requirements:
+  - req_id: LINUX_PACKAGES-FR-001
+    statement: >-
+      remove SHALL uninstall the insecure legacy packages in
+      linux_packages_remove (telnet, rsh, rsh-server, ypserv, ypbind, tftp,
+      tftp-server, xinetd by default), confirmed absent via package_facts.
+    tier: 2
+    verified_by:
+      - molecule: default
+
+  - req_id: LINUX_PACKAGES-FR-002
+    statement: >-
+      install SHALL install the security tooling in linux_packages_install
+      (aide, rkhunter, audit, firewalld by default), first installing
+      epel-release when linux_packages_enable_epel is true (required for
+      aide/rkhunter), confirmed present via package_facts.
+    tier: 2
+    verified_by:
+      - molecule: default
+
+  - req_id: LINUX_PACKAGES-FR-003
+    statement: >-
+      all SHALL run remove then install in sequence.
+    tier: 2
+    verified_by:
+      - molecule: default
+
+  - req_id: LINUX_PACKAGES-FR-004
+    statement: >-
+      patch SHALL upgrade the packages in linux_packages_patch, deriving the list
+      from CMDB CVE exposure data at or above linux_packages_patch_min_severity
+      when the list is empty — needs a live CMDB API and a real host.
+    tier: 3
+    verified_by:
+      - lab: playbooks/linux_security.yml#packages
+
+  - req_id: LINUX_PACKAGES-FR-005
+    statement: >-
+      When linux_packages_aide_init is true the role SHALL build and activate the
+      AIDE baseline database (aide --init), and when linux_packages_rkhunter_init
+      is true SHALL refresh rkhunter data files and baseline file properties
+      (--update/--propupd) — opt-in, meaningful only on a real host.
+    tier: 3
+    verified_by:
+      - lab: playbooks/linux_security.yml#packages

@@ -1,0 +1,6 @@
+---
+- name: Verify backups ({{ backup_type }})
+  ansible.builtin.include_role:
+    name: "{{ backup_type }}"
+  vars:
+    action: verify

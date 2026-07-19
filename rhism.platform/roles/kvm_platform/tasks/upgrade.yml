@@ -1,0 +1,17 @@
+---
+# kvm_platform — upgrade action.
+# Upgrades the same package set `install` would install, to the latest available version.
+# Restarts libvirtd via the handler if the package task reports a change.
+
+- name: Upgrade KVM/libvirt host platform
+  when: kvm_platform_execute | bool
+  block:
+    - name: Resolve package list
+      ansible.builtin.include_tasks: packages.yml
+
+    - name: Upgrade KVM/libvirt packages to latest
+      ansible.builtin.package:
+        name: "{{ _kvm_platform_resolved_packages }}"
+        state: latest
+      become: true
+      notify: kvm_platform - restart libvirtd

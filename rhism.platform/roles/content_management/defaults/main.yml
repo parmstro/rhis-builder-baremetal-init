@@ -1,0 +1,114 @@
+---
+# Role control
+content_action: baseline
+content_type: foreman
+
+# Server connection
+content_server_url: "https://{{ ansible_fqdn }}"
+content_username: admin
+content_password: ""
+content_validate_certs: true
+content_no_log: true       # set false in dev to see API task output
+
+# Scope
+content_organization: "Default Organization"
+content_location: "Default Location"
+
+# Install gate — dry-run by default
+content_install_execute: false
+
+# Extra args passed verbatim to foreman-installer or satellite-installer
+content_installer_extra_args: []
+
+# RHSM (satellite type only)
+content_rhsm_org_id: ""
+content_rhsm_activation_key: ""
+content_rhsm_skip_registration: false
+content_rhsm_manifest_path: ""      # path to RHSM manifest .zip
+
+# Smart proxy — enable integrated DNS/DHCP/TFTP in the installer
+content_proxy_dns: false
+content_proxy_dhcp: false
+content_proxy_tftp: false
+
+# Products and custom repositories (both types)
+# - name: "RHEL 9"
+#   label: rhel-9
+#   description: "Red Hat Enterprise Linux 9"
+#   repos:
+#     - name: "BaseOS x86_64"
+#       content_type: yum
+#       url: https://mirror.example.com/rhel9/baseos/x86_64/
+#       download_policy: on_demand   # immediate | on_demand | streamed
+content_products: []
+
+# CDN repository sets (satellite only — RHSM subscription required)
+# - name: "Red Hat Enterprise Linux 9"
+#   sets:
+#     - name: "Red Hat Enterprise Linux 9 for x86_64 - BaseOS (RPMs)"
+#       repositories:
+#         - releasever: "9"
+content_cdn_repository_sets: []
+
+# Lifecycle environments (created in dependency order)
+# - name: Development
+#   prior: Library
+# - name: QA
+#   prior: Development
+# - name: Production
+#   prior: QA
+content_lifecycle_environments: []
+
+# Sync plans
+# - name: "Daily sync"
+#   interval: daily          # hourly | daily | weekly | custom
+#   sync_date: "2024-01-01 01:00:00 UTC"
+#   enabled: true
+#   products:
+#     - "RHEL 9"
+content_sync_plans: []
+
+# Trigger immediate sync after plan setup
+content_sync_now: false
+content_sync_products: []
+
+# Content views
+# - name: "RHEL9 Base"
+#   description: "RHEL9 base content view"
+#   repositories:
+#     - name: "BaseOS x86_64"
+#       product: "RHEL 9"
+#   lifecycle_environments:
+#     - Library
+#     - Development
+#     - Production
+content_views: []
+content_views_publish: true    # publish a new version after managing CV
+content_views_promote: true    # promote version to specified lifecycle environments
+
+# Activation keys
+# - name: "rhel9-dev"
+#   lifecycle_environment: Development
+#   content_view: "RHEL9 Base"
+#   auto_attach: true
+#   subscriptions: []
+#   host_collections: []
+content_activation_keys: []
+
+# Host collections
+# - name: "RHEL9 Servers"
+#   description: "All RHEL9 servers"
+content_host_collections: []
+
+# Global settings to apply (name/value pairs)
+# - name: default_location
+#   value: "Default Location"
+content_settings: []
+
+# Baseline toggles — set true to include each phase
+content_apply_install: false
+content_apply_configure: false
+content_apply_repos: false
+content_apply_sync: false
+content_apply_content_views: false
+content_apply_activation_keys: false

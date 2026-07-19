@@ -1,0 +1,83 @@
+---
+# pm_ansible — create action.
+# Generates an ISM-compliant password, validates it, writes encrypted credential
+# file + metadata. Optionally sets a system user account password.
+
+- name: Ensure credential directory exists (mode 0700)
+  ansible.builtin.file:
+    path: "{{ pm_ansible_cred_dir }}"
+    state: directory
+    mode: "0700"
+  delegate_to: localhost
+  become: "{{ pm_ansible_become | bool }}"
+
+- name: Generate ISM-compliant password
+  ansible.builtin.include_tasks: generate.yml
+
+- name: Set password fact
+  ansible.builtin.set_fact:
+    _pm_password: "{{ _pm_generated.stdout }}"
+  no_log: true
+
+- name: Validate password against ISM policy
+  ansible.builtin.include_tasks: validate.yml
+
+- name: Write credential file (mode 0600)
+  ansible.builtin.copy:
+    content: "{{ _pm_password }}"
+    dest: "{{ pm_ansible_cred_dir }}/{{ pm_target }}.cred"
+    mode: "0600"
+  delegate_to: localhost
+  become: "{{ pm_ansible_become | bool }}"
+  no_log: true
+
+- name: Write metadata file (ISM audit trail)
+  ansible.builtin.copy:
+    content: |
+      ---
+      target: {{ pm_target }}
+      service: {{ pm_service | default('') }}
+      created_at: "{{ '%Y-%m-%dT%H:%M:%SZ' | strftime(lookup('pipe', 'date +%s') | int) }}"
+      expires_at: "{{ '%Y-%m-%dT%H:%M:%SZ' | strftime((lookup('pipe', 'date +%s') | int + pm_expiry_days | int * 86400) | int) }}"
+      expiry_days: {{ pm_expiry_days }}
+      length: {{ _pm_password | length }}
+      ism_controls:
+        - ISM-0406
+        - ISM-0407
+        - ISM-0408
+        - ISM-0410
+        - ISM-0411
+        - ISM-0412
+    dest: "{{ pm_ansible_cred_dir }}/{{ pm_target }}.meta.yml"
+    mode: "0600"
+  delegate_to: localhost
+  become: "{{ pm_ansible_become | bool }}"
+
+- name: Initialise password history file
+  ansible.builtin.copy:
+    content: ""
+    dest: "{{ pm_ansible_cred_dir }}/{{ pm_target }}.history"
+    mode: "0600"
+    force: false
+  delegate_to: localhost
+  become: "{{ pm_ansible_become | bool }}"
+
+- name: Update system user password (ISM-0407 hash via SHA-512)
+  ansible.builtin.user:
+    name: "{{ pm_ansible_system_user }}"
+    password: "{{ _pm_password | password_hash('sha512') }}"  # pragma: allowlist secret
+    update_password: always
+    shell: "{{ pm_ansible_user_shell }}"
+    password_expire_max: "{{ pm_expiry_days }}"
+  become: true
+  no_log: true
+  when: pm_ansible_manage_system_user | bool
+
+- name: Expose result (no_log on callers)
+  ansible.builtin.set_fact:
+    pm_result:
+      password: "{{ _pm_password }}"
+      target: "{{ pm_target }}"
+      backend: ansible
+      credential_file: "{{ pm_ansible_cred_dir }}/{{ pm_target }}.cred"
+  no_log: true

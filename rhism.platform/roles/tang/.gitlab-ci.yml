@@ -1,0 +1,9 @@
+---
+# GitLab CI for the rhism.platform.tang role.
+# Uses the shared lint + secrets + molecule template — see ci/role-pipeline.yml in
+# the platform orchestration repo (ansible_galaxy) for what each stage runs.
+
+include:
+  - project: $CI_PROJECT_ROOT_NAMESPACE/ansible_galaxy
+    ref: main
+    file: ci/role-pipeline.yml

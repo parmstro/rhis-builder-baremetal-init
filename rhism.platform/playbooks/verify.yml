@@ -1,0 +1,10 @@
+---
+- name: rhism Verify — post-deploy service health checks
+  hosts: "{{ pb_target_hosts | default('localhost') }}"
+  connection: "{{ 'local' if (pb_target_hosts is not defined or pb_target_hosts == 'localhost') else 'ssh' }}"
+  gather_facts: true
+
+  roles:
+    - role: rhism.platform.builder
+      vars:
+        pb_action: verify

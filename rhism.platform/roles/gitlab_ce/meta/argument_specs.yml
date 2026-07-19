@@ -1,0 +1,88 @@
+---
+argument_specs:
+  main:
+    short_description: Install and manage GitLab Community Edition (omnibus) on EL9.
+    description: >-
+      Standalone-first SCM product role. Installs GitLab CE via the omnibus package and
+      manages its full lifecycle (configure, runners, backup, restore, upgrade, service
+      state, status). Consumes the shared SCM interface (action, scm_* vars) so the
+      scm_deploy dispatcher can select gitlab_ce or gitlab_ee with identical code. CE and
+      EE stay separate roles because they are distinct install targets (EE adds RHSM).
+    options:
+      action:
+        description: >-
+          Lifecycle action, shared with gitlab_ee. present/absent install or remove;
+          configure/reconfigure apply gitlab.rb; runners register CI runners; backup and
+          restore manage backups; upgrade updates the package (gated by scm_upgrade_execute);
+          status reports state; started/stopped/restarted manage the service.
+        type: str
+        default: present
+        choices:
+          - present
+          - absent
+          - configure
+          - reconfigure
+          - runners
+          - backup
+          - restore
+          - upgrade
+          - status
+          - started
+          - stopped
+          - restarted
+      scm_external_url:
+        description: External URL GitLab serves on (EXTERNAL_URL at install; runner default URL).
+        type: str
+        default: "http://localhost"
+      scm_config_template:
+        description: >-
+          Path to a gitlab.rb Jinja2 template. Empty runs a bare reconfigure instead of
+          templating the file.
+        type: str
+        default: ""
+      scm_runners:
+        description: >-
+          List of GitLab runner definitions to register (each with name, token, and optional
+          url/executor/docker_image/tags/run_untagged).
+        type: list
+        elements: dict
+        default: []
+      scm_backup_path:
+        description: Directory GitLab writes backups to.
+        type: str
+        default: /var/opt/gitlab/backups
+      scm_backup_skip:
+        description: Comma-separated backup components to SKIP (e.g. "uploads,artifacts").
+        type: str
+        default: ""
+      scm_restore_backup_id:
+        description: Backup ID to restore from (required for the restore action).
+        type: str
+        default: ""
+      scm_open_http:
+        description: Open the http firewall service.
+        type: bool
+        default: true
+      scm_open_https:
+        description: Open the https firewall service.
+        type: bool
+        default: true
+      scm_open_ssh:
+        description: Open the ssh firewall service.
+        type: bool
+        default: true
+      scm_purge_config:
+        description: On the absent action, also remove /etc/gitlab.
+        type: bool
+        default: false
+      scm_upgrade_execute:
+        description: >-
+          Existing dry-run gate for the upgrade action. false (default) blocks a real package
+          upgrade so the action validates its guard without changing packages; set true to
+          upgrade. Reused as the molecule dry-run gate.
+        type: bool
+        default: false
+      scm_rhsm_skip_registration:
+        description: Interface parity with gitlab_ee; unused by CE.
+        type: bool
+        default: false

@@ -1,0 +1,18 @@
+# Managed by Ansible — rhism bareos role ( File Daemon)
+
+FileDaemon {
+  Name = {{ backup_bareos_client_name }}
+  FDport = {{ backup_bareos_file_daemon_port }}
+  WorkingDirectory = "/var/lib/bareos"
+}
+
+Director {
+  Name = bareos-dir
+  Address = {{ backup_bareos_director_host }}
+  Password = "{{ backup_bareos_file_daemon_password }}"
+}
+
+Messages {
+  Name = Standard
+  director = bareos-dir = all, !skipped, !restored
+}

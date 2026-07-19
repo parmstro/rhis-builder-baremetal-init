@@ -1,0 +1,3 @@
+---
+# Role-internal variables — not intended for override by inventory.
+# (empty — all user-facing configuration lives in defaults/main.yml)

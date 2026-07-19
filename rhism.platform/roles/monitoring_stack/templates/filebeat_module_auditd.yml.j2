@@ -1,0 +1,4 @@
+- module: auditd
+  log:
+    enabled: {{ (mon_filebeat_modules | selectattr('name', 'equalto', 'auditd') | first).log_enabled | default(true) | lower }}
+    var.paths: ["/var/log/audit/audit.log"]

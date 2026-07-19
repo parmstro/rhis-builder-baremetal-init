@@ -1,0 +1,45 @@
+---
+# Default scenario — Tier 1 CONTRACT (control host only).
+#
+# AAP is a heavy, licensed, multi-node appliance (and the OpenShift path needs a
+# cluster) — it cannot run in CI, the same justification as the satellite role.
+# This scenario validates the standalone contract entirely on localhost: the
+# argument spec rejects a bogus action and a bogus version, all four version
+# profiles load and expose their install method + group model, the role RENDERS
+# both a containerized installer inventory and an OpenShift CR for a sample host
+# set (a genuine functional assertion of the render logic — no live install),
+# the aap_execute:false gate leaves Red Hat's real installer un-invoked, and a
+# dispatch file exists for every action. The SELF-CONTAINED config-as-code
+# engine (owner decision 2026-07-15 — no awx_config/awx include_role) is
+# contract-tested too: a bogus aap_configure_action is rejected, the seven
+# config_<section>.yml files exist, configure.yml carries no include_role, and
+# the aap_* config defaults resolve self-sufficiently. Real
+# deploy/configure/backup/status are Tier 3 (entitled hosts / OpenShift —
+# playbooks/aap.yml).
+prerun: false
+
+dependency:
+  name: galaxy
+  enabled: false
+
+driver:
+  name: default
+
+platforms:
+  - name: localhost
+    groups:
+      - control
+
+provisioner:
+  name: ansible
+  inventory:
+    host_vars:
+      localhost:
+        ansible_connection: local
+
+scenario:
+  test_sequence:
+    - dependency
+    - syntax
+    - converge
+    - verify

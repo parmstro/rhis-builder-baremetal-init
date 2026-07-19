@@ -1,0 +1,44 @@
+---
+- name: Converge — storage_local_path functional (against a real k3s cluster)
+  hosts: all
+  become: true
+  # KubeletInUserNamespace makes kubelet tolerate rootless-container limits — see
+  # roles/k3s/molecule/functional and docs/k3s-rootless-podman-research.md.
+  environment:
+    INSTALL_K3S_EXEC: >-
+      --snapshotter=native
+      --kubelet-arg=feature-gates=KubeletInUserNamespace=true
+      --disable=traefik --disable=servicelb --disable=metrics-server
+  vars:
+    cp_node_role: control_plane
+    cp_kubeconfig_path: /etc/rancher/k3s/k3s.yaml
+    cp_storage_make_default: true
+  tasks:
+    - name: Bring up a single-node k3s cluster
+      ansible.builtin.include_role:
+        name: k3s
+      vars:
+        action: present
+
+    # Absolute path — sudo secure_path excludes /usr/local/bin under become (BUG-041)
+    - name: Wait for the k3s node to reach Ready
+      ansible.builtin.command: /usr/local/bin/k3s kubectl get nodes --no-headers
+      register: _nodes
+      until: "'Ready' in _nodes.stdout and 'NotReady' not in _nodes.stdout"
+      retries: 40
+      delay: 10
+      changed_when: false
+
+    - name: Wait for the built-in local-path StorageClass to appear
+      ansible.builtin.command: /usr/local/bin/k3s kubectl get storageclass local-path
+      register: _scwait
+      until: _scwait.rc == 0
+      retries: 18
+      delay: 5
+      changed_when: false
+
+    - name: Configure local-path as the default StorageClass (the role under test)
+      ansible.builtin.include_role:
+        name: storage_local_path
+      vars:
+        action: storage

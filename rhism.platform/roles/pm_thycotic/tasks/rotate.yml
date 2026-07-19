@@ -1,0 +1,32 @@
+---
+# pm_thycotic — rotate action.
+# Generates a new ISM-compliant password locally and updates the existing secret
+# in Delinea/Thycotic Secret Server. TSS logs the change in its native audit trail.
+
+- name: Validate secret ID is set
+  ansible.builtin.assert:
+    that:
+      - pm_thycotic_secret_id | length > 0
+    fail_msg: "pm_thycotic_secret_id must be set for the rotate action."
+  when: not pm_thycotic_skip_api | bool
+
+- name: Generate new ISM-compliant password
+  ansible.builtin.include_tasks: generate.yml
+
+- name: Set new password fact
+  ansible.builtin.set_fact:
+    _pm_password: "{{ _pm_generated.stdout }}"
+  no_log: true
+
+- name: Push rotated password to Thycotic Secret Server
+  ansible.builtin.include_tasks: tss_rotate.yml
+  when: not pm_thycotic_skip_api | bool
+
+- name: Expose rotated result (no_log on callers)
+  ansible.builtin.set_fact:
+    pm_result:
+      password: "{{ _pm_password }}"
+      target: "{{ pm_target }}"
+      backend: thycotic
+      secret_id: "{{ pm_thycotic_secret_id | default('dry-run') }}"
+  no_log: true

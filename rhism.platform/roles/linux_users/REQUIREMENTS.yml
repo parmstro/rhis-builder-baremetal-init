@@ -1,0 +1,46 @@
+---
+# Functional requirements — linux_users (requirements->test-case layer + Tier-3
+# elevation, wave-3+ standard). Standalone linux_* domain role (chained by the
+# linux_security orchestrator). Capability fact-checked against the RHEL
+# documentation for pam_faillock (deny/unlock_time/fail_interval; replaces
+# pam_tally2 from EL8), sudoers/sudoers.d + visudo -cf validation, and
+# ansible.builtin.user for account standards. Curated from README +
+# meta/argument_specs.yml + tasks/. Molecule default is a real Tier 2 scenario
+# on EL8/9/10 (applies faillock; sudo no-op on empty lists; verifies
+# faillock.conf + sudo installed). Family lab: playbooks/linux_security.yml.
+functional_requirements:
+  - req_id: LINUX_USERS-FR-001
+    statement: >-
+      faillock SHALL configure /etc/security/faillock.conf with
+      linux_users_faillock_deny, linux_users_faillock_unlock_time, and
+      linux_users_faillock_fail_interval (pam_faillock, EL8+).
+    tier: 2
+    verified_by:
+      - molecule: default
+
+  - req_id: LINUX_USERS-FR-002
+    statement: >-
+      sudo SHALL render /etc/sudoers.d/linux_users_groups and
+      /etc/sudoers.d/linux_users_users from linux_users_sudo_nopasswd_groups/
+      _users, each validated with visudo -cf before deployment, installing sudo
+      if absent and no-opping on empty lists.
+    tier: 2
+    verified_by:
+      - molecule: default
+
+  - req_id: LINUX_USERS-FR-003
+    statement: >-
+      uid_standards SHALL enforce each linux_users_uid_standards entry ({name,
+      uid, gid, groups, shell, comment}) via ansible.builtin.user — needs real
+      managed accounts on the host.
+    tier: 3
+    verified_by:
+      - lab: playbooks/linux_security.yml#users
+
+  - req_id: LINUX_USERS-FR-004
+    statement: >-
+      all SHALL run sudo then faillock then uid_standards in sequence against a
+      host with real accounts present.
+    tier: 3
+    verified_by:
+      - lab: playbooks/linux_security.yml#users

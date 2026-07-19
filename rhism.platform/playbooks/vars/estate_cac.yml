@@ -1,0 +1,142 @@
+---
+# rhism governed estate — AAP Config-as-Code: the DAY-1 BUILD workflow + its jobs.
+# "Workflow" = an AAP workflow_job_template (owner 2026-07-19). Applied by rhism's
+# own vendored `aap` role config engine (see playbooks/estate_cac.yml).
+# Design: docs/aap-demo-estate-design.md.
+#
+# REUSE BY PARAMETERISATION (owner rule 2026-07-19). The run's choices are INPUT
+# VARIABLES on the workflow, never hardcoded — so the SAME templates build any
+# variant:
+#   - sizing tier defaults to SMALL for testing (wizard_estate_sizing_tier: s),
+#   - the run defaults to DRY-RUN (pb_deploy_execute: false),
+#   - each product "solution" is a variable (pb_*_type): one identity node deploys
+#     rh_idm OR freeipa, one content node satellite OR foreman, etc.
+# ask_variables_on_launch exposes them all at launch. A SINGLE generic
+# "deploy component" job template is reused by every deploy node (parameterised by
+# node extra_data), maximising reuse.
+#
+# DUAL-MODE: the deploy template runs the standalone rhism.platform.deploy playbook;
+# the same content runs ansible-core-light with the same vars. Product deploys are
+# pb_deploy_execute-gated (dry-run by default — real deploy is Tier-3 on subscribed
+# hosts; tang deploys for real as a container).
+
+aap_organization: rhism
+
+# SCOPE this focused day-1 estate CaC so `aap` action=configure/baseline applies
+# cleanly with no per-run toggle overrides (proven 2026-07-19, TEST-RHISM-ESTATE-GITOPS).
+# The role's full-platform default `aap_schedules` reference job templates this
+# estate build doesn't create (ITSM Full Sync, Daily Operations, …), which would
+# make awx.awx.schedule fail on a null unified_job_template. This CaC defines its
+# own build objects only; day-2 schedules belong to the broader platform baseline.
+aap_schedules: []
+
+aap_projects:
+  # The SELF-CONTAINED project AWX clones to RUN the jobs — it must carry the
+  # playbooks (capacity_preflight.yml, rhism.platform.deploy), the rhism.platform
+  # collection, AND the estate inventory (inventories/rhism_estate/). Point
+  # aap_estate_scm_url at that repo (an input variable — reuse per estate/lab;
+  # a constrained lab may instead use a local/manual project). Default = the
+  # collection repo.
+  - name: rhism-estate
+    scm_url: "{{ aap_estate_scm_url | default(aap_scm_url_base ~ '/rhism-platform.git') }}"
+    scm_branch: "{{ aap_estate_scm_branch | default('main') }}"
+
+aap_inventories:
+  - name: rhism-estate
+
+# Populate AWX's rhism-estate inventory from the project's tracked estate tree
+# (the inventory_forge output adopted in Phase 1). update_on_launch keeps it fresh.
+aap_inventory_sources:
+  - name: rhism-estate-scm
+    inventory: rhism-estate
+    source: scm
+    source_project: rhism-estate
+    source_path: "{{ aap_estate_inventory_path | default('inventories/rhism_estate/hosts.ini') }}"
+
+# Register OUR platform EE — it carries the product collections the stock awx-ee
+# LACKS (freeipa / community.libvirt / community.general / containers.podman —
+# BUG-192), so the product roles parse + check_mode-validate. Image = the
+# lab-mirror-staged copy (override aap_estate_ee_image with the mirror ref).
+aap_execution_environments:
+  - name: "rhism platform EE"
+    image: "{{ aap_estate_ee_image | default('ansible_galaxy_platform_ee:latest') }}"
+    pull: missing
+
+# --- Job templates: a capacity gate + ONE generic, reusable deploy template ----
+aap_job_templates:
+  - name: "rhism :: capacity pre-flight"
+    description: "GATE: assert the estate's sized demand fits target headroom (sizing tier is a launch variable, default small); fail fast before any deploy."
+    project: rhism-estate
+    # AWX job-template playbook = a path RELATIVE TO THE PROJECT CHECKOUT (AWX's
+    # contract) — NOT an Ansible-templated field, so {{ playbook_dir }} cannot be
+    # used here (it would resolve on the control node at apply time). Kept as an
+    # input variable (parameterisation) so a different project layout overrides it;
+    # the deploy jobs avoid a path entirely via the FQCN rhism.platform.deploy.
+    playbook: "{{ aap_estate_capacity_playbook | default('playbooks/capacity_preflight.yml') }}"
+    inventory: rhism-estate
+    ask_variables_on_launch: true
+    execution_environment: "rhism platform EE"
+    extra_vars: {capacity_preflight_action: check}
+
+  - name: "rhism :: deploy component"
+    description: "Generic governed deploy — runs rhism.platform.deploy scoped by the node's pb_enable_* and the run's pb_*_type. Reused by every deploy node."
+    project: rhism-estate
+    # FQCN by default (valid on an AAP 2.5+ controller). Parameterised like the
+    # capacity playbook above so a controller that resolves collection playbooks
+    # only by their discovered FILE PATH (e.g. AWX 24.6.x rejects the dotted FQCN
+    # in job_template.playbook — BUG-188) can override to the path form.
+    playbook: "{{ aap_estate_deploy_playbook | default('rhism.platform.deploy') }}"
+    inventory: rhism-estate
+    ask_variables_on_launch: true
+    execution_environment: "rhism platform EE"
+
+# --- The DAY-1 BUILD workflow: run-level input variables + the dependency DAG ---
+aap_workflow_templates:
+  - name: "rhism :: day-1 estate build"
+    description: >-
+      Governed day-1 build of the rhism estate. Capacity gate first; then identity;
+      content/tang/hypervisor; provisioning/automation; a security baseline converges
+      last. Run-level choices (sizing, dry-run, product solutions) are launch inputs.
+    ask_variables_on_launch: true
+    # Run-level INPUT VARIABLES (defaults; override at launch). Testing = small +
+    # dry-run; each product solution is a swap-in variable. Propagate to every node.
+    extra_vars:
+      wizard_estate_sizing_tier: s          # s | m | l — capacity + deploy sizing
+      pb_deploy_execute: false              # false = dry-run (test); true = real deploy
+      pb_identity_type: rh_idm              # identity_management family
+      pb_content_type: satellite            # content_management family
+      pb_provisioning_type: satellite_proxy
+      pb_hypervisor_type: kvm
+      pb_security_type: default
+    nodes:
+      - identifier: capacity-preflight
+        unified_job_template: "rhism :: capacity pre-flight"
+        success_nodes: [identity]
+      - identifier: identity
+        unified_job_template: "rhism :: deploy component"
+        extra_data: {pb_enable_identity: true}
+        success_nodes: [content, tang, hypervisor]
+      - identifier: content
+        unified_job_template: "rhism :: deploy component"
+        extra_data: {pb_enable_content: true}
+        success_nodes: [provisioning, automation]
+      - identifier: provisioning
+        unified_job_template: "rhism :: deploy component"
+        extra_data: {pb_enable_provisioning: true}
+        success_nodes: [security]
+      - identifier: automation
+        unified_job_template: "rhism :: deploy component"
+        extra_data: {pb_enable_automation: true}
+        success_nodes: [security]
+      - identifier: tang
+        unified_job_template: "rhism :: deploy component"
+        extra_data: {pb_enable_tang: true}
+        success_nodes: [security]
+      - identifier: hypervisor
+        unified_job_template: "rhism :: deploy component"
+        extra_data: {pb_enable_hypervisor: true}
+        success_nodes: [security]
+      - identifier: security
+        unified_job_template: "rhism :: deploy component"
+        extra_data: {pb_enable_security: true}
+        all_parents_must_converge: true

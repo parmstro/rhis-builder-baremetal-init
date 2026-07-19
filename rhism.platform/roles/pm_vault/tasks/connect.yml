@@ -1,0 +1,51 @@
+---
+# Shared — authenticate to HashiCorp Vault and set _pm_vault_token.
+# Supports: approle, token, ldap, aws_iam, jwt.
+
+- name: Authenticate via AppRole
+  community.hashi_vault.vault_login:
+    url: "{{ pm_vault_url }}"
+    namespace: "{{ pm_vault_namespace | default(omit) }}"
+    auth_method: approle
+    role_id: "{{ pm_vault_role_id }}"
+    secret_id: "{{ pm_vault_secret_id }}"
+  register: _pm_vault_login
+  delegate_to: localhost
+  no_log: true
+  when: pm_vault_auth_method == 'approle'
+
+- name: Authenticate via LDAP
+  community.hashi_vault.vault_login:
+    url: "{{ pm_vault_url }}"
+    namespace: "{{ pm_vault_namespace | default(omit) }}"
+    auth_method: ldap
+    username: "{{ pm_vault_ldap_username }}"
+    password: "{{ pm_vault_ldap_password }}"
+  register: _pm_vault_login
+  delegate_to: localhost
+  no_log: true
+  when: pm_vault_auth_method == 'ldap'
+
+- name: Authenticate via JWT
+  community.hashi_vault.vault_login:
+    url: "{{ pm_vault_url }}"
+    namespace: "{{ pm_vault_namespace | default(omit) }}"
+    auth_method: jwt
+    jwt: "{{ pm_vault_jwt }}"
+    role_id: "{{ pm_vault_jwt_role }}"
+  register: _pm_vault_login
+  delegate_to: localhost
+  no_log: true
+  when: pm_vault_auth_method == 'jwt'
+
+- name: Set Vault token from login result
+  ansible.builtin.set_fact:
+    _pm_vault_token: "{{ _pm_vault_login.login.auth.client_token }}"
+  no_log: true
+  when: pm_vault_auth_method in ['approle', 'ldap', 'jwt']
+
+- name: Set Vault token (static token auth)
+  ansible.builtin.set_fact:
+    _pm_vault_token: "{{ pm_vault_token }}"
+  no_log: true
+  when: pm_vault_auth_method == 'token'

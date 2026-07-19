@@ -1,0 +1,31 @@
+---
+- name: Select identity management type
+  ansible.builtin.command:
+    cmd: >-
+      {{ wizard_tui_backend }} --title "{{ wizard_tui_title }}"
+      --radiolist "Select identity management platform:" {{ wizard_tui_height }} {{ wizard_tui_width }} 3
+      "freeipa"        "FreeIPA     (open source, deploy new)"          ON
+      "rh_idm"         "Red Hat IDM (subscription required)"            OFF
+      "ad_integration" "Microsoft AD (integrate with existing domain)"  OFF
+      3>&1 1>&2 2>&3
+  register: _wizard_identity_result
+  changed_when: false
+  failed_when: _wizard_identity_result.rc not in [0, 1]
+  tags: infra_wizard
+
+- name: Handle identity cancel
+  ansible.builtin.fail:
+    msg: "Wizard cancelled by user at identity selection."
+  when: _wizard_identity_result.rc == 1
+  tags: infra_wizard
+
+- name: Record identity choice
+  ansible.builtin.set_fact:
+    wizard_components: >-
+      {{ wizard_components | combine({
+        'identity': {
+          'enabled': true,
+          'type': _wizard_identity_result.stdout | trim
+        }
+      }) }}
+  tags: infra_wizard

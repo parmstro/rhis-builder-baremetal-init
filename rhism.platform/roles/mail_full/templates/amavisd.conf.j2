@@ -1,0 +1,46 @@
+{# Managed by Ansible — role mail_full. Do not edit by hand. #}
+# amavisd-new user configuration (/etc/amavis/conf.d/50-user)
+# Managed by Ansible (mail_full role). Do not edit manually.
+use strict;
+
+# Local domain(s) served by this host.
+@local_domains_acl = ( "{{ mail_domain }}" );
+
+# Content-check toggles.
+{% if mail_spamassassin_enabled | bool %}
+@bypass_spam_checks_maps  = ( \%bypass_spam_checks,  \@bypass_spam_checks_acl );
+$sa_tag_level_deflt  = -999;
+$sa_tag2_level_deflt = {{ mail_spamassassin_required_score }};
+$sa_kill_level_deflt = {{ mail_spamassassin_required_score }};
+{% if mail_spamassassin_rewrite_subject | bool %}
+$sa_spam_subject_tag = '[SPAM] ';
+{% else %}
+$sa_spam_subject_tag = undef;   # do not rewrite Subject
+{% endif %}
+{% else %}
+@bypass_spam_checks_maps = (1);   # SpamAssassin disabled
+{% endif %}
+
+{% if mail_clamav_enabled | bool %}
+# ClamAV virus scanner.
+@av_scanners = (
+  ['ClamAV-clamd',
+   \&ask_daemon, ["CONTSCAN {}\n", "/run/clamav/clamd.ctl"],
+   qr/\bOK$/m, qr/\bFOUND$/m,
+   qr/^.*?: (?!Infected Archive)(.*) FOUND$/m ],
+);
+{% else %}
+@av_scanners = ();   # ClamAV disabled
+{% endif %}
+
+# Final dispositions.
+$final_virus_destiny      = D_DISCARD;
+$final_spam_destiny       = D_PASS;
+$final_banned_destiny     = D_BOUNCE;
+$final_bad_header_destiny = D_PASS;
+
+# Re-injection back to Postfix (matches master.cf 127.0.0.1:10025).
+$forward_method = 'smtp:[127.0.0.1]:10025';
+$notify_method  = $forward_method;
+
+1;  # ensure a defined return
