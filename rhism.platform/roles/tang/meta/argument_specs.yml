@@ -1,0 +1,132 @@
+---
+argument_specs:
+  main:
+    short_description: >-
+      Tang / NBDE key-escrow server — deploy the official Red Hat image,
+      verify with a real clevis round-trip.
+    description: >-
+      Standalone capability role. Consumes the OFFICIAL, digest-pinned
+      registry.redhat.io/rhel9/tang image via the platform's `podman` role
+      mechanics (pull + container) — no custom Dockerfile, per the
+      reputable-sources rule and the same precedent already set for FreeIPA.
+      `deploy` stands up (or re-applies) the container with a persistent
+      key-volume, SELinux port label, and firewalld opening. `verify` proves
+      the deployment with a real `clevis encrypt tang | clevis decrypt`
+      round-trip — the same functional check upstream RHIS itself uses.
+      Client-side LUKS/clevis binding is deliberately OUT of scope for this
+      role (it lives with host-provisioning/kickstart concerns, not the Tang
+      server itself). Key rotation is an honest, documented gap — upstream
+      RHIS doesn't automate it either; see the depth doc.
+    options:
+      action:
+        description: >-
+          deploy stands up the Tang container (pull the pinned image,
+          run/re-apply it, key volume, SELinux port label, firewalld
+          opening). verify proves it works with a real clevis round-trip.
+        type: str
+        default: deploy
+        choices:
+          - deploy
+          - verify
+      tang_image_repository:
+        description: Fully-qualified repository for the official Tang image.
+        type: str
+        default: registry.redhat.io/rhel9/tang
+      tang_image_tag:
+        description: >-
+          Tag used only to PULL the image (the `podman` role's pull action
+          needs a human-readable tag). The running container is pinned to
+          tang_image_digest regardless — the tag never reaches the actual
+          container reference, matching the FreeIPA precedent
+          (roles/podman/molecule/default/converge.yml).
+        type: str
+        default: latest
+      tang_image_digest:
+        description: >-
+          Digest pin for the Tang image (sha256:...) — this is what the
+          running container actually resolves to. Resolved via a real
+          `podman pull` against the official repository — never a floating
+          tag, per the container-security digest-pinning stance.
+        type: str
+        default: "sha256:6e94ae19a27caeba726e46a2124a396fc1f7d6c5f4f55ca11fe75e24e232deda"
+      tang_container_name:
+        description: Name for the running Tang container.
+        type: str
+        default: tang
+      tang_port:
+        description: TCP port Tang listens on (host and container).
+        type: int
+        default: 8080
+      tang_volume_name:
+        description: Named podman volume persisting Tang's key material (/var/db/tang).
+        type: str
+        default: tang-keys
+      tang_manage_selinux:
+        description: >-
+          Apply the tangd_port_t SELinux port label. Disable in
+          container-kernel-limited test scopes (BUG-class: even privileged
+          test containers commonly can't manage SELinux booleans/contexts).
+        type: bool
+        default: true
+      tang_manage_firewall:
+        description: Open tang_port in firewalld's public zone.
+        type: bool
+        default: true
+      tang_verify_test_string:
+        description: >-
+          Plaintext used for the deploy verification round-trip (encrypted
+          then decrypted through the live Tang server; the role asserts the
+          output matches this string byte-for-byte).
+        type: str
+        default: "tang-verify-round-trip-check"
+      tang_verify_url:
+        description: >-
+          URL clevis uses to reach the Tang server for verify. Defaults to
+          the local host on tang_port; override for a molecule sibling
+          container (host.containers.internal) or a real remote deployment.
+        type: str
+        default: "http://{{ ansible_default_ipv4.address | default('127.0.0.1', true) }}:{{ tang_port }}"
+      tang_manage_packages:
+        description: >-
+          Install the clevis package needed to run the verify round-trip.
+          Disable if clevis is already present or package-management is
+          gated in a minimal test scope.
+        type: bool
+        default: true
+      tang_deploy_execute:
+        description: >-
+          Dry-run gate. deploy validates and renders but makes NO changes
+          (no pull, no container, no firewalld/SELinux) until this is true —
+          deploy genuinely needs a target with real podman available (this
+          role reuses roles/podman, which shells out to the podman CLI, not
+          a forwarded-socket API), so the gate keeps a Tier-1 contract run
+          side-effect-free. Real functional proof is a Tier-3 lab concern.
+        type: bool
+        default: false
+      tang_backup_keys:
+        description: >-
+          Real-world resilience (owner ask 2026-07-16): a single Tang server
+          is a network-reachability point of failure for every host bound to
+          it — if its key volume is ever lost with no other copy, bound hosts
+          can be permanently unable to auto-unlock. When true (and only when
+          tang_deploy_execute is also true — this needs a real deployed
+          server to back up from), deploy fetches the escrow key material
+          and writes a vault-encrypted backup to the CONTROL NODE running
+          the build (never left only on the Tang server itself). Not
+          exercised in molecule/CI — a real-world-only step.
+        type: bool
+        default: true
+      tang_key_backup_dir:
+        description: >-
+          Local directory on the control node where the vault-encrypted key
+          backup is written. Deliberately NOT inside this repo by default —
+          this is operator/control-node state, not platform content.
+        type: str
+        default: "{{ lookup('ansible.builtin.env', 'HOME') }}/.rhism/tang_key_backups"
+      tang_key_backup_vault_password_file:
+        description: >-
+          Vault password file used to encrypt the key backup. REQUIRED
+          (no default) whenever tang_backup_keys + tang_deploy_execute are
+          both true — the role fails closed rather than ever writing escrow
+          key material to disk unencrypted.
+        type: str

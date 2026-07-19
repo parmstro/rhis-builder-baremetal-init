@@ -1,0 +1,45 @@
+---
+# client — full ReaR client setup on a protected host.
+# Chains: resolve method-matched packages -> install -> render /etc/rear config.
+
+- name: Resolve the ISO/media builder package by RHEL major version
+  # RHEL 9/10 build ISOs with xorriso; 7/8 use genisoimage. Only needed when the
+  # OUTPUT format produces bootable media.
+  ansible.builtin.set_fact:
+    _rear_iso_builder: >-
+      {{ (['xorriso'] if (ansible_distribution_major_version | default('9') | int >= 9)
+          else ['genisoimage'])
+         if backup_rear_output_format in _rear_output_media_formats else [] }}
+
+- name: Resolve the BIOS bootloader package (x86_64 only; EFI arches boot via grub2)
+  ansible.builtin.set_fact:
+    _rear_bios_boot: >-
+      {{ ['syslinux'] if (backup_rear_output_format in _rear_output_media_formats
+                          and ansible_architecture | default('x86_64') == 'x86_64')
+         else [] }}
+
+- name: Resolve the backup URL scheme
+  ansible.builtin.set_fact:
+    _rear_url_scheme: >-
+      {{ (backup_rear_backup_url | regex_search('^([a-z]+)://', '\1') | first)
+         if (backup_rear_backup_url | regex_search('^([a-z]+)://'))
+         else 'file' }}
+
+- name: Compose the full ReaR package set (base + media builder + bootloader + method + scheme)
+  ansible.builtin.set_fact:
+    _rear_packages_full: >-
+      {{ (_rear_packages
+          + _rear_iso_builder
+          + _rear_bios_boot
+          + (_rear_backup_method_pkg_map[backup_rear_backup_method] | default([]))
+          + (_rear_url_scheme_pkg_map[_rear_url_scheme] | default([])))
+         | unique }}
+
+- name: Install ReaR and method-matched dependencies
+  ansible.builtin.package:
+    name: "{{ _rear_packages_full }}"
+    state: present
+  become: true
+
+- name: Render the ReaR configuration
+  ansible.builtin.include_tasks: configure.yml

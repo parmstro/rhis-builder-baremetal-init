@@ -1,0 +1,67 @@
+---
+# kvm_platform — configure action.
+# Ensures the default libvirt storage pool and network exist and are active, then runs
+# informational nested-virtualization sanity checks. Assumes `install` has already run
+# (packages present, libvirtd up) — configure does not install anything itself.
+
+- name: Configure default KVM/libvirt storage pool and network
+  when: kvm_platform_execute | bool
+  block:
+    - name: Ensure default storage pool is defined
+      community.libvirt.virt_pool:
+        name: "{{ kvm_platform_pool_name }}"
+        state: present
+        xml: "{{ lookup('template', 'pool.xml.j2') }}"
+        uri: "{{ kvm_platform_uri }}"
+      become: true
+
+    - name: Ensure the storage pool is active
+      community.libvirt.virt_pool:
+        name: "{{ kvm_platform_pool_name }}"
+        state: active
+        autostart: "{{ kvm_platform_pool_autostart }}"
+        uri: "{{ kvm_platform_uri }}"
+      become: true
+
+    - name: Ensure default network is defined
+      community.libvirt.virt_net:
+        name: "{{ kvm_platform_network_name }}"
+        state: present
+        xml: "{{ lookup('template', 'network.xml.j2') }}"
+        uri: "{{ kvm_platform_uri }}"
+      become: true
+
+    - name: Ensure the network is active
+      community.libvirt.virt_net:
+        name: "{{ kvm_platform_network_name }}"
+        state: active
+        autostart: "{{ kvm_platform_network_autostart }}"
+        uri: "{{ kvm_platform_uri }}"
+      become: true
+
+    - name: Check for /dev/kvm (informational — no auto-fix)
+      ansible.builtin.stat:
+        path: /dev/kvm
+      register: _kvm_platform_dev_kvm
+      when: kvm_platform_check_nested_virt | bool
+
+    - name: Check for kvm_intel/kvm_amd kernel module (informational — no auto-fix)
+      ansible.builtin.command: lsmod
+      register: _kvm_platform_lsmod
+      changed_when: false
+      when: kvm_platform_check_nested_virt | bool
+
+    - name: Report nested-virtualization sanity status
+      ansible.builtin.assert:
+        that:
+          - _kvm_platform_dev_kvm.stat.exists
+          - "'kvm_intel' in _kvm_platform_lsmod.stdout or 'kvm_amd' in _kvm_platform_lsmod.stdout"
+        fail_msg: >-
+          /dev/kvm is missing or no kvm_intel/kvm_amd kernel module is loaded. Hardware
+          virtualization (Intel VT-x / AMD-V) is most likely disabled in BIOS/UEFI, or this
+          host is itself a VM whose hypervisor doesn't expose nested virtualization. Ansible
+          cannot fix this — it needs a BIOS change, a host reboot, or a hypervisor-level
+          nested-virt flag. Informational check only; set kvm_platform_check_nested_virt:
+          false to skip it.
+        success_msg: "KVM nested-virtualization support confirmed (/dev/kvm present, kvm module loaded)."
+      when: kvm_platform_check_nested_virt | bool

@@ -1,0 +1,309 @@
+---
+# Functional requirements — satellite (requirements->test-case layer + Tier-3
+# elevation, owner rules 2026-07-12). Content-management product role (foreman |
+# satellite; a site picks exactly one). Satellite is the Red Hat subscription
+# choice — adds RHSM registration, manifest upload, and CDN repository sets on
+# top of the shared interface. Product capability fact-checked against the
+# official Red Hat Satellite docs (docs.redhat.com/theforeman.org:
+# satellite-installer, subscription manifest, CDN repository sets, sync plans,
+# content views + lifecycle environments, activation keys, smart proxies,
+# compute resources). Curated against README + meta/argument_specs.yml action
+# set + tasks/. Family lab: playbooks/content_management.yml (content_type=
+# satellite). Real install/CDN need a Red Hat subscription — genuinely
+# uncoverable in CI (honest UNCOVERED).
+functional_requirements:
+  - req_id: SATELLITE-FR-001
+    statement: >-
+      The role SHALL consume the shared content-management interface (bare
+      action + content_* vars) and pass its contract scenario — argument-spec
+      validation, standalone default (action=status), a dispatch task file for
+      every declared action, and the negative (bad-action) path — without a Red
+      Hat subscription or a live Satellite server.
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: SATELLITE-FR-002
+    statement: >-
+      The 'install' action SHALL honour the content_install_execute dry-run gate
+      (false prints the satellite-installer command instead of running it).
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: SATELLITE-FR-003
+    statement: >-
+      With content_install_execute enabled, the role SHALL register the host
+      with RHSM (content_rhsm_org_id/content_rhsm_activation_key), install
+      Satellite via satellite-installer, and upload the subscription manifest
+      (content_rhsm_manifest_path) — genuinely uncoverable by CI (needs a Red
+      Hat subscription + entitlement + manifest).
+    tier: 3
+    verified_by: []
+
+  - req_id: SATELLITE-FR-004
+    statement: >-
+      The 'cdn_repos' action SHALL enable the configured Red Hat CDN repository
+      sets (Satellite-only, via theforeman.foreman.repository_set) — genuinely
+      uncoverable by CI (needs RHSM entitlement).
+    tier: 3
+    verified_by: []
+
+  - req_id: SATELLITE-FR-005
+    statement: >-
+      The role SHALL manage the satellite package lifecycle (present/absent) and
+      service lifecycle (started/stopped/restarted).
+    tier: 3
+    verified_by:
+      - lab: playbooks/content_management.yml#install
+
+  - req_id: SATELLITE-FR-006
+    statement: >-
+      The 'configure' action SHALL manage the organization, location, lifecycle
+      environments, and global settings via the theforeman.foreman collection.
+    tier: 3
+    verified_by:
+      - lab: playbooks/content_management.yml#configure
+
+  - req_id: SATELLITE-FR-007
+    statement: >-
+      The 'repos' action SHALL create the configured custom products and their
+      repositories.
+    tier: 3
+    verified_by:
+      - lab: playbooks/content_management.yml#repos
+
+  - req_id: SATELLITE-FR-008
+    statement: >-
+      The 'sync' action SHALL create sync plans, assign products, and optionally
+      trigger an immediate sync (content_sync_now).
+    tier: 3
+    verified_by:
+      - lab: playbooks/content_management.yml#sync
+
+  - req_id: SATELLITE-FR-009
+    statement: >-
+      The 'content_views' action SHALL create content views, publish a version,
+      and promote it through the configured lifecycle environments.
+    tier: 3
+    verified_by:
+      - lab: playbooks/content_management.yml#content_views
+
+  - req_id: SATELLITE-FR-010
+    statement: >-
+      The 'activation_keys' action SHALL create host collections and activation
+      keys bound to a content view and lifecycle environment.
+    tier: 3
+    verified_by:
+      - lab: playbooks/content_management.yml#activation_keys
+
+  - req_id: SATELLITE-FR-011
+    statement: >-
+      The role SHALL register smart proxies ('smart_proxy') and compute
+      resources ('compute_resource') via the theforeman.foreman collection.
+    tier: 3
+    verified_by:
+      - lab: playbooks/content_management.yml#smart_proxy
+
+  - req_id: SATELLITE-FR-012
+    statement: >-
+      The 'status' action SHALL report Satellite service and API health.
+    tier: 3
+    verified_by:
+      - lab: playbooks/content_management.yml#status
+
+  # New entry authored in the user-story-lens schema (owner rule 2026-07-16,
+  # docs/scaffolding-templates.md) — added, not retrofitted alongside the
+  # existing entries above (incremental "touch it, fix it" standing rule).
+  - req_id: SATELLITE-FR-013
+    persona: administrator
+    capability: >-
+      to create bare hosts and put them into a real PXE-build state through
+      the same content-management connection already used for everything
+      else, without a separate host-provisioning tool
+    benefit: >-
+      a new estate host goes from "does not exist" to "installing" in one
+      role call, matching how RHIS's own deploy_*.sh -> Satellite host-create
+      + PXE-build sequence works today — but through this platform's
+      declarative, idempotent interface instead of 37 hand-sequenced shell
+      scripts
+    acceptance:
+      - given: a list of hosts (fqdn, hostgroup, compute_resource,
+          interfaces) in content_hosts AND content_host_execute set to true
+        when: the host action runs
+        then: each host is created (or removed) via the Satellite API and,
+          when requested, power-cycled to kick off its PXE build
+      - given: a populated content_hosts but content_host_execute left at
+          its default (false)
+        when: the host action runs
+        then: nothing is created or power-cycled — the role reports what
+          it would do and makes zero API calls, since this action is
+          materially more consequential than this role's other
+          list-guarded actions and a populated list alone is deliberately
+          not sufficient authorization to act
+      - given: content_hosts is empty (the default)
+        when: the host action runs
+        then: nothing happens — a true no-op, no Satellite connection
+          required
+    statement: >-
+      As an administrator, I want to create bare hosts and trigger their PXE
+      build through the same content-management connection I already use for
+      everything else, so that a new host goes from "does not exist" to
+      "installing" in one role call.
+    tier: 3
+    verified_by:
+      - molecule: default
+      - manual: >-
+          real host-create + PXE-build completion needs a live Satellite +
+          compute resource/hypervisor — rhism alignment Phase C item 2,
+          Tier-3 lab request queued (external test lab), not yet executed. Waiting
+          for kickstart completion is deliberately NOT automated by this
+          role — see roles/satellite/docs/satellite.md.
+
+  - req_id: SATELLITE-FR-014
+    persona: administrator
+    capability: >-
+      to export a defined slice of Satellite content (a whole library, one
+      repository, or one content-view version) into a self-contained bundle
+      on disk, ready to leave the connected network
+    benefit: >-
+      the same content an administrator already curates for connected hosts
+      can reach a disconnected/air-gapped environment without hand-running
+      pulp export commands or bespoke shell scripts, and without granting
+      the air-gapped side any network path back to Satellite
+    acceptance:
+      - given: content_exports lists one or more export requests (name,
+          type, and the fields that type needs)
+        when: the export_content action runs
+        then: each requested library, repository, or content-view version
+          is exported to the server's Pulp export directory in the
+          requested format
+      - given: content_exports is empty (the default)
+        when: the export_content action runs
+        then: nothing happens — a true no-op, no Satellite connection
+          required
+    statement: >-
+      As an administrator, I want to export a defined slice of Satellite
+      content into a self-contained bundle on disk, so that it can reach a
+      disconnected environment without hand-run pulp commands or a network
+      path back to Satellite.
+    tier: 3
+    verified_by:
+      - molecule: default
+      - manual: >-
+          a real export needs a live Satellite with synced content — Tier-3
+          lab request queued alongside SATELLITE-FR-013/COBBLER-FR-013 (see
+          output/satellite-cobbler-tier3-request.md), not yet executed.
+
+  - req_id: SATELLITE-FR-015
+    persona: administrator
+    capability: >-
+      to move an exported content bundle onto physical transfer media and
+      know — not assume — that every byte arrived intact
+    benefit: >-
+      the weakest link in any air-gapped transfer is silent corruption on
+      the media itself; a verified copy means the disconnected side can
+      trust what it imports without re-deriving trust from the network it
+      deliberately doesn't have
+    acceptance:
+      - given: an already-exported content tree and a configured
+          content_transfer_media_path
+        when: the transfer_media action runs
+        then: every file in the export tree is copied onto the media and
+          its destination checksum is confirmed to match the source before
+          the action reports success
+      - given: content_transfer_media_path is not configured
+        when: the transfer_media action runs
+        then: the action fails closed immediately, refusing to guess a
+          destination for an air-gapped copy
+    statement: >-
+      As an administrator, I want to move an exported content bundle onto
+      transfer media with a verified, checksummed copy, so that I don't
+      have to trust an unverifiable physical handoff.
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: SATELLITE-FR-016
+    persona: administrator
+    capability: >-
+      to import a content bundle that arrived via transfer media into a
+      disconnected Satellite, using the same interface as every other
+      content operation
+    benefit: >-
+      the disconnected side of an air gap gets the same declarative,
+      idempotent, role-driven experience as the connected side — no bespoke
+      import playbook, no hand-run pulp import commands
+    acceptance:
+      - given: content_imports lists one or more import requests (type
+          and, per entry, the path the content landed at)
+        when: the import_content action runs
+        then: each requested library, repository, or content-view version
+          is imported into the disconnected Satellite from the given path
+      - given: content_imports is empty (the default)
+        when: the import_content action runs
+        then: nothing happens — a true no-op, no Satellite connection
+          required
+    statement: >-
+      As an administrator, I want to import a transferred content bundle
+      into a disconnected Satellite through the same interface as every
+      other content operation, so that the air-gapped side needs no bespoke
+      tooling.
+    tier: 3
+    verified_by:
+      - molecule: default
+      - manual: >-
+          a real import needs a live (disconnected) Satellite — Tier-3 lab
+          request queued alongside SATELLITE-FR-013/-014 — not yet
+          executed.
+
+  - req_id: SATELLITE-FR-017
+    persona: administrator
+    capability: >-
+      to define one composable "Standard Operating Environment" (SOE) —
+      content view, lifecycle environment, activation key, and a
+      hostgroup/kickstart-snippet reference — for a single OS build,
+      instead of hand-keeping four separate lists in sync
+    benefit: >-
+      a new OS build's whole Satellite content posture is declared once, in
+      one place, and dispatched through the same content-view/lifecycle-
+      environment/activation-key mechanics this role already exposes —
+      matching upstream RHIS's "one build spec per OS image" mental model,
+      but through this platform's declarative interface, closing the
+      strongest reuse-map gap found in the rhism alignment review
+      (docs/rhism-alignment-plan.md)
+    acceptance:
+      - given: content_soe_bundles lists one or more SOE bundle entries
+          (name, lifecycle_environment, and the rest of the SOE's content
+          spec)
+        when: the soe_bundles action runs
+        then: each bundle is transformed into the equivalent lifecycle-
+          environment, content-view, host-collection, and activation-key
+          definitions and dispatched through the SAME content_views.yml/
+          activation_keys.yml task logic the flat content_views/
+          activation_keys actions already use — no parallel API-calling
+          logic
+      - given: content_soe_bundles_execute is set false
+        when: the soe_bundles action runs
+        then: the SOE bundles are still validated and transformed into
+          their derived shapes, but no Satellite API call is made —
+          provable without a live server
+      - given: content_soe_bundles is empty (the default)
+        when: the soe_bundles action runs
+        then: nothing happens — a true no-op, no Satellite connection
+          required
+    statement: >-
+      As an administrator, I want to define one SOE bundle per OS build
+      instead of hand-syncing separate content-view/lifecycle-environment/
+      activation-key lists, so that a new OS build's content posture is
+      declared once and dispatched through the role's existing,
+      already-proven mechanics.
+    tier: 3
+    verified_by:
+      - molecule: default
+      - manual: >-
+          the transform itself (bundle -> derived lifecycle_environment/
+          content_view/host_collections/activation_key shapes) IS fully
+          proven in molecule via content_soe_bundles_execute: false; real
+          object creation against a live Satellite needs the Tier-3 lab,
+          same queue as SATELLITE-FR-013/-014/-016, not yet executed.

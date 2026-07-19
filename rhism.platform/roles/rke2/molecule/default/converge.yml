@@ -1,0 +1,48 @@
+---
+# rke2 installs via a `curl | sh` script under `become`, which fails on a minimal container
+# (no sudo). This scenario validates the STANDALONE CONTRACT on the control host: argument-spec
+# enforcement (a real negative test — the role loads fine on Linux), the default action, and
+# the presence of every dispatch task file. Functional install is validated in the full-stack
+# test lab, not molecule.
+- name: Validate rke2 dispatcher + standalone variable contract (control host only)
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Load role defaults
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../../defaults/main.yml"
+
+    - name: Negative test — argument spec rejects a bogus action
+      block:
+        - name: Call role with invalid action
+          ansible.builtin.include_role:
+            name: rke2
+          vars:
+            action: bogus_action
+        - name: Fail if validation did not catch invalid action
+          ansible.builtin.fail:
+            msg: "argument_spec should have rejected the bogus action"
+      rescue:
+        - name: Confirm expected failure was caught
+          ansible.builtin.debug:
+            msg: "PASS — bogus action correctly rejected"
+
+    - name: Assert standalone default contract
+      ansible.builtin.assert:
+        that:
+          - action == 'present'
+        fail_msg: "rke2 standalone default contract not satisfied"
+
+    - name: Verify a dispatch task file exists for every declared action
+      ansible.builtin.stat:
+        path: "{{ playbook_dir }}/../../tasks/{{ item }}.yml"
+      register: _rke2_action_stat
+      failed_when: not _rke2_action_stat.stat.exists
+      loop:
+        - present
+        - absent
+        - configure
+        - status
+        - upgrade
+        - backup
+        - restore

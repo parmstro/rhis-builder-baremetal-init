@@ -1,0 +1,74 @@
+---
+# mail_relay — standalone-first defaults over the SHARED mail-server interface.
+#
+# Both mail product roles (mail_relay / mail_full) consume the SAME variable names,
+# so the mail_server dispatcher selects either with one identical call —
+# `include_role: name="mail_{{ mail_type }}"` — and never needs per-product code.
+# Standalone callers set these same vars directly; the defaults below make the role
+# runnable on its own.
+
+# Shared action (both products). Postfix relay lifecycle:
+# present | absent | configure | secure | test | status |
+# started | stopped | restarted | queue_flush | queue_purge.
+# The dispatcher passes `action` via include_role vars; this default covers standalone use.
+action: present
+
+# Shared dry-run gate honoured by both mail products — false validates dispatch +
+# variable resolution without touching the node (used by the molecule scenario).
+mail_execute: true
+
+# Identity (shared interface).
+mail_domain: "{{ ansible_domain | default('example.local') }}"
+mail_hostname: "{{ ansible_fqdn | default('mail.example.local') }}"
+
+# Upstream SMTP smarthost (relay type).
+mail_relay_host: ""            # e.g. smtp.sendgrid.net or company relay
+mail_relay_port: 587
+mail_relay_user: ""
+mail_relay_password: ""        # vault-backed (no_log)
+
+# TLS (shared interface).
+mail_tls_enabled: true
+mail_tls_cert_file: ""         # PEM certificate path
+mail_tls_key_file: ""          # PEM private key path
+mail_tls_security_level: may   # may | encrypt | dane | dane-only | verify
+
+# Postfix tuning (shared interface).
+mail_inet_interfaces: all
+mail_inet_protocols: ipv4
+mail_message_size_limit: 10485760   # 10 MB
+mail_mailbox_size_limit: 0
+
+# Firewall ports (shared interface).
+mail_open_smtp: true        # port 25
+mail_open_submission: true  # port 587
+mail_open_smtps: false      # port 465
+
+# Test action.
+mail_test_recipient: "admin@localhost"
+
+# Queue-purge safety gate (destructive action).
+mail_queue_purge_confirm: false
+
+# Role-internal package/service constants (namespaced, not part of the shared interface).
+_mail_packages:
+  - postfix
+  - mailx
+_mail_service_name: postfix
+_mail_full_stack: false
+_mail_firewall_services:
+  - smtp
+  - smtp-submission
+
+# Service management toggle (BUG-117 class — containers have no systemd);
+# guards the restart/reload handlers. Labs/scenarios set false.
+mail_manage_service: true
+
+# Postfix lookup-table type (BUG-122 — EL10/postfix 3.8 unbundles hash: into
+# the deprecated postfix-hash subpackage; lmdb is the EL10 default). EL-aware.
+mail_db_type: "{{ 'lmdb' if (ansible_distribution_major_version | default('9')) | int >= 10 else 'hash' }}"
+
+# Networks permitted to relay (BUG-124; drives mynetworks +
+# smtpd_relay_restrictions = permit_mynetworks, reject_unauth_destination).
+mail_mynetworks:
+  - 127.0.0.0/8

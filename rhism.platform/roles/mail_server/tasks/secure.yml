@@ -1,0 +1,131 @@
+---
+# TLS configuration and DKIM/SPF/DMARC are applied to both types,
+# with additional steps for full stack.
+
+- name: Validate TLS configuration
+  ansible.builtin.assert:
+    that:
+      - mail_tls_cert_file | length > 0
+      - mail_tls_key_file | length > 0
+    fail_msg: >-
+      mail_tls_cert_file and mail_tls_key_file are required for the secure action.
+      Provide PEM certificate and key paths.
+  when: mail_tls_enabled
+
+- name: Deploy TLS certificate
+  ansible.builtin.copy:
+    src: "{{ mail_tls_cert_file }}"
+    dest: /etc/pki/tls/certs/mail.crt
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  when: mail_tls_enabled and mail_tls_cert_file | length > 0
+  notify: mail_server - restart postfix
+
+- name: Deploy TLS private key
+  ansible.builtin.copy:
+    src: "{{ mail_tls_key_file }}"
+    dest: /etc/pki/tls/private/mail.key
+    owner: root
+    group: root
+    mode: "0600"
+  become: true
+  no_log: true
+  when: mail_tls_enabled and mail_tls_key_file | length > 0
+  notify: mail_server - restart postfix
+
+- name: Generate DKIM keys
+  ansible.builtin.command:
+    cmd: >-
+      opendkim-genkey
+      -b {{ mail_dkim_key_size }}
+      -d {{ mail_domain }}
+      -s {{ mail_dkim_selector }}
+      -D /etc/opendkim/keys/{{ mail_domain }}/
+  args:
+    creates: /etc/opendkim/keys/{{ mail_domain }}/{{ mail_dkim_selector }}.private
+  become: true
+  when: mail_dkim_enabled and _mail_full_stack
+
+- name: Set correct ownership on DKIM key
+  ansible.builtin.file:
+    path: /etc/opendkim/keys/{{ mail_domain }}
+    state: directory
+    owner: opendkim
+    group: opendkim
+    recurse: true
+  become: true
+  when: mail_dkim_enabled and _mail_full_stack
+
+- name: Configure opendkim
+  ansible.builtin.template:
+    src: opendkim.conf.j2
+    dest: /etc/opendkim.conf
+    owner: root
+    group: opendkim
+    mode: "0640"
+  become: true
+  when: mail_dkim_enabled and _mail_full_stack
+  notify: mail_server - restart opendkim
+
+- name: Create opendkim KeyTable
+  ansible.builtin.copy:
+    # One KeyTable record — folded scalar renders it as a single line.
+    content: >
+      {{ mail_dkim_selector }}._domainkey.{{ mail_domain }}
+      {{ mail_domain }}:{{ mail_dkim_selector }}:/etc/opendkim/keys/{{
+      mail_domain }}/{{ mail_dkim_selector }}.private
+    dest: /etc/opendkim/KeyTable
+    owner: opendkim
+    group: opendkim
+    mode: "0640"
+  become: true
+  when: mail_dkim_enabled and _mail_full_stack
+
+- name: Create opendkim SigningTable
+  ansible.builtin.copy:
+    content: |
+      *@{{ mail_domain }} {{ mail_dkim_selector }}._domainkey.{{ mail_domain }}
+    dest: /etc/opendkim/SigningTable
+    owner: opendkim
+    group: opendkim
+    mode: "0640"
+  become: true
+  when: mail_dkim_enabled and _mail_full_stack
+
+- name: Create opendkim TrustedHosts
+  ansible.builtin.copy:
+    content: |
+      127.0.0.1
+      localhost
+      {{ mail_hostname }}
+    dest: /etc/opendkim/TrustedHosts
+    owner: opendkim
+    group: opendkim
+    mode: "0640"
+  become: true
+  when: mail_dkim_enabled and _mail_full_stack
+
+- name: Enable and start opendkim
+  ansible.builtin.service:
+    name: opendkim
+    state: started
+    enabled: true
+  become: true
+  when: mail_dkim_enabled and _mail_full_stack
+
+- name: Display DKIM public key (add to DNS TXT record)
+  ansible.builtin.command:
+    cmd: cat /etc/opendkim/keys/{{ mail_domain }}/{{ mail_dkim_selector }}.txt
+  become: true
+  register: _mail_dkim_public
+  changed_when: false
+  when: mail_dkim_enabled and _mail_full_stack
+
+- name: Show DKIM DNS record to add
+  ansible.builtin.debug:
+    msg: |
+      Add this TXT record to your DNS zone for {{ mail_domain }}:
+      {{ _mail_dkim_public.stdout | default('DKIM key not yet generated') }}
+  when: mail_dkim_enabled and _mail_full_stack

@@ -1,0 +1,31 @@
+---
+- name: Verify — k3s goal (single-node cluster is up and Ready)
+  hosts: all
+  become: true
+  gather_facts: false
+  tasks:
+    - name: k3s server service is active
+      ansible.builtin.command: systemctl is-active k3s  # noqa: command-instead-of-module
+      register: _svc
+      changed_when: false
+      failed_when: _svc.stdout != 'active'
+
+    - name: Node status
+      ansible.builtin.command: /usr/local/bin/k3s kubectl get nodes --no-headers
+      register: _nodes
+      changed_when: false
+
+    - name: Core kube-system pods exist
+      ansible.builtin.command: /usr/local/bin/k3s kubectl get pods -n kube-system --no-headers
+      register: _pods
+      changed_when: false
+
+    - name: Assert k3s functional goal is met
+      ansible.builtin.assert:
+        that:
+          - _svc.stdout == 'active'
+          - "'Ready' in _nodes.stdout"
+          - "'NotReady' not in _nodes.stdout"
+          - _pods.stdout | length > 0
+        fail_msg: "k3s goal not met (service={{ _svc.stdout }}, nodes='{{ _nodes.stdout }}')"
+        success_msg: "PASS — k3s single-node cluster is up and the node is Ready"

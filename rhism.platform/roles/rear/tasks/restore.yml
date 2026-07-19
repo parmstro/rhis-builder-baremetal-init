@@ -1,0 +1,36 @@
+---
+# restore — the REAL, LIVE, IRREVERSIBLE bare-metal recover (`rear recover`).
+# It REPARTITIONS DISKS and REINSTALLS THE BOOTLOADER from the rescue image + data
+# backup; there is no rollback once it starts. Normally run from the booted ReaR
+# rescue environment; driven here for a Tier-3 KVM lab against a throwaway target.
+#
+# FAILS CLOSED, BEFORE ANYTHING ELSE, unless BOTH backup_rear_recover_execute AND
+# backup_rear_recover_confirm_irreversible are explicitly true. This is a deliberate
+# DOUBLE gate (convert2rhel-style): execute alone is too easy to leave set from a
+# prior run and trigger a real, unrecoverable disk rewrite by accident. Never enabled
+# in CI — this action is lab-only.
+
+- name: Fail closed unless BOTH recover gates are explicitly true
+  ansible.builtin.assert:
+    that:
+      - backup_rear_recover_execute | bool
+      - backup_rear_recover_confirm_irreversible | bool
+    fail_msg: >-
+      restore refused: rear recover REPARTITIONS DISKS and REINSTALLS THE BOOTLOADER
+      with no rollback. Both backup_rear_recover_execute AND
+      backup_rear_recover_confirm_irreversible must be explicitly set to true together
+      — deliberately a double gate so a single leftover flag can never trigger a real
+      recover by accident. Set both only in a Tier-3 lab against a throwaway target.
+    success_msg: >-
+      Double gate satisfied — proceeding with a REAL, irreversible rear recover.
+
+- name: Run the real ReaR recover (repartitions disks, reinstalls bootloader)
+  ansible.builtin.command: /usr/sbin/rear -v recover  # noqa: command-instead-of-module
+  become: true
+  register: _rear_recover
+  changed_when: _rear_recover.rc == 0
+  failed_when: _rear_recover.rc != 0
+
+- name: Report the recover outcome
+  ansible.builtin.debug:
+    msg: "{{ _rear_recover.stdout_lines | default([]) }}"

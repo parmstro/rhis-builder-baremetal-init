@@ -1,0 +1,29 @@
+---
+# config_templates — job templates (aap's own config-as-code engine; awx.awx is
+# the API client, not a role dependency).
+
+- name: Create job templates
+  awx.awx.job_template:
+    name: "{{ item.name }}"
+    description: "{{ item.description | default(omit) }}"
+    organization: "{{ aap_organization }}"
+    project: "{{ item.project }}"
+    playbook: "{{ item.playbook }}"
+    inventory: "{{ item.inventory }}"
+    execution_environment: "{{ item.execution_environment | default(aap_execution_environment) }}"
+    credentials: "{{ item.credentials | default([]) }}"
+    extra_vars: "{{ item.extra_vars | default(omit) }}"
+    ask_variables_on_launch: "{{ item.ask_variables_on_launch | default(false) }}"
+    ask_inventory_on_launch: "{{ item.ask_inventory_on_launch | default(false) }}"
+    ask_credential_on_launch: "{{ item.ask_credential_on_launch | default(false) }}"
+    ask_limit_on_launch: "{{ item.ask_limit_on_launch | default(true) }}"
+    verbosity: "{{ item.verbosity | default(0) }}"
+    state: present
+    controller_host: "{{ aap_controller_host }}"
+    controller_username: "{{ aap_admin_user }}"
+    controller_password: "{{ aap_admin_password }}"
+    validate_certs: "{{ aap_validate_certs }}"
+    request_timeout: "{{ aap_api_timeout }}"
+  loop: "{{ aap_job_templates }}"
+  loop_control:
+    label: "{{ item.name }}"

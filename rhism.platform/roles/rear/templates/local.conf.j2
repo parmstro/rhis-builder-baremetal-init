@@ -1,0 +1,34 @@
+# {{ ansible_managed }}
+# Per-host ReaR configuration — rhism.platform.rear (action: client/configure).
+# Do NOT edit by hand; managed by Ansible. Never edit /usr/share/rear/conf/default.conf.
+#
+# ReaR emits two independent artifacts, configured as two separate groups:
+#   OUTPUT — the bootable rescue image (how you boot to recover)
+#   BACKUP — the data backup (what is restored once booted)
+
+# --- OUTPUT side (rescue image) ---
+OUTPUT={{ backup_rear_output_format }}
+{% if backup_rear_output_url | length > 0 %}
+OUTPUT_URL={{ backup_rear_output_url }}
+{% endif %}
+{% if backup_rear_grub_rescue | bool %}
+GRUB_RESCUE=y
+{% endif %}
+
+# --- BACKUP side (data backup) ---
+BACKUP={{ backup_rear_backup_method }}
+BACKUP_URL={{ backup_rear_backup_url }}
+BACKUP_PROG={{ backup_rear_backup_prog }}
+{% if backup_rear_exclude_patterns | length > 0 %}
+BACKUP_PROG_EXCLUDE=( "${BACKUP_PROG_EXCLUDE[@]}" {{ backup_rear_exclude_patterns | map('quote') | join(' ') }} )
+{% endif %}
+{% if backup_rear_keep_old_backup_copy | bool %}
+NETFS_KEEP_OLD_BACKUP_COPY=y
+{% endif %}
+{% if backup_rear_backup_type | length > 0 %}
+BACKUP_TYPE={{ backup_rear_backup_type }}
+FULLBACKUPDAY=( {{ backup_rear_fullbackup_day }} )
+{% endif %}
+
+# --- Scratch ---
+TMPDIR="{{ backup_rear_tmpdir }}"

@@ -1,0 +1,18 @@
+---
+- name: Deploy gitlab.rb configuration
+  ansible.builtin.template:
+    src: gitlab.rb.j2
+    dest: /etc/gitlab/gitlab.rb
+    owner: root
+    group: root
+    mode: "0600"
+  become: true
+  no_log: true
+  notify: scm_deploy - reconfigure gitlab
+
+- name: Reconfigure GitLab to apply changes
+  ansible.builtin.command:
+    cmd: "{{ _scm_ctl_cmd }} reconfigure"
+  become: true
+  changed_when: true
+  notify: scm_deploy - restart gitlab

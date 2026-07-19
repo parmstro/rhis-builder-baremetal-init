@@ -1,0 +1,7 @@
+---
+# Action: add_node — scale MachineSet up to add worker nodes
+
+- name: Scale MachineSet to add node
+  ansible.builtin.include_tasks: node_scale.yml
+  vars:
+    _cp_node_scale_replicas: "{{ cp_node_replicas | default(1) }}"

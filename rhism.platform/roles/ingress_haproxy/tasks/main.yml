@@ -1,0 +1,79 @@
+---
+# Action + variable interface are validated by meta/argument_specs.yml (ansible-core
+# runs the validation automatically at role entry — no manual assert needed).
+
+# OCP/OKD: HAProxy is the built-in router; only report status
+- name: Report built-in HAProxy ingress status (OCP/OKD)
+  ansible.builtin.debug:
+    msg: >-
+      OCP/OKD uses HAProxy as the built-in ingress/router.
+      Domain: {{ cp_ingress_domain | default('not set', true) }}.
+      Use 'oc get ingresscontroller default -n openshift-ingress-operator' to check status.
+  when:
+    - action in ['ingress', 'present']
+    - cp_type in ['ocp', 'okd']
+
+# Non-OCP/OKD: deploy HAProxy ingress controller via Helm
+- name: Deploy HAProxy ingress controller
+  when:
+    - action in ['ingress', 'present']
+    - cp_type not in ['ocp', 'okd']
+    - cp_ingress_execute | bool
+  block:
+    - name: Add HAProxy ingress Helm repository
+      kubernetes.core.helm_repository:
+        name: haproxy-tech
+        repo_url: https://haproxy-tech.github.io/helm-charts
+
+    - name: Deploy HAProxy ingress controller via Helm
+      kubernetes.core.helm:
+        kubeconfig: "{{ cp_kubeconfig_path }}"
+        name: haproxy-kubernetes-ingress
+        chart_ref: haproxy-tech/kubernetes-ingress
+        release_namespace: haproxy-controller
+        create_namespace: true
+        wait: true
+        values:
+          controller:
+            replicaCount: "{{ cp_ingress_replicas }}"
+            ingressClass: haproxy
+            service:
+              type: LoadBalancer
+      notify: ingress_haproxy - restart ingress
+
+    - name: Set HAProxy as the default IngressClass
+      kubernetes.core.k8s:
+        kubeconfig: "{{ cp_kubeconfig_path }}"
+        state: present
+        definition:
+          apiVersion: networking.k8s.io/v1
+          kind: IngressClass
+          metadata:
+            name: haproxy
+            annotations:
+              ingressclass.kubernetes.io/is-default-class: "true"
+          spec:
+            controller: haproxy.org/ingress-controller
+
+# absent: remove HAProxy ingress controller (non-OCP/OKD)
+- name: Remove HAProxy ingress controller
+  when:
+    - action == 'absent'
+    - cp_type not in ['ocp', 'okd']
+    - cp_ingress_execute | bool
+  block:
+    - name: Remove HAProxy ingress controller via Helm
+      kubernetes.core.helm:
+        kubeconfig: "{{ cp_kubeconfig_path }}"
+        name: haproxy-kubernetes-ingress
+        release_namespace: haproxy-controller
+        state: absent
+        wait: true
+
+    - name: Remove HAProxy ingress namespace
+      kubernetes.core.k8s:
+        kubeconfig: "{{ cp_kubeconfig_path }}"
+        api_version: v1
+        kind: Namespace
+        name: haproxy-controller
+        state: absent

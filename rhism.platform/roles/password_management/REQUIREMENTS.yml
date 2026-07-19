@@ -1,0 +1,20 @@
+---
+# Functional requirements — password_management dispatcher (requirements→
+# test-case layer + Tier-3 elevation, owner rules 2026-07-12).
+functional_requirements:
+  - req_id: PMDISP-FR-001
+    statement: >-
+      The dispatcher SHALL validate pm_type (ansible/vault/thycotic) and
+      action, selecting any product via one identical parameterised
+      include_role with the shared pm_* family interface.
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: PMDISP-FR-002
+    statement: >-
+      Dispatched secret lifecycle SHALL run against a real backing store
+      end-to-end on lab hosts.
+    tier: 3
+    verified_by:
+      - lab: playbooks/password_management.yml#pm_hosts

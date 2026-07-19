@@ -1,0 +1,52 @@
+---
+- name: Verify — linux_security orchestrator applied constituent roles
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Assert audit package is installed
+      ansible.builtin.package_facts:
+        manager: auto
+
+    - name: Assert audit installed (linux_packages ran)
+      ansible.builtin.assert:
+        that: "'audit' in ansible_facts.packages"
+        fail_msg: "audit package missing — linux_packages role did not run"
+
+    - name: Assert sshd_config exists (linux_hardening ran)
+      ansible.builtin.stat:
+        path: /etc/ssh/sshd_config
+      register: _sshd
+
+    - name: Assert sshd_config was written
+      ansible.builtin.assert:
+        that: _sshd.stat.exists
+        fail_msg: "/etc/ssh/sshd_config missing — linux_hardening role did not run"
+
+    - name: Assert audit rules deployed (linux_auditing ran)
+      ansible.builtin.stat:
+        path: /etc/audit/rules.d/linux_auditing.rules
+      register: _audit_rules
+
+    - name: Assert audit rules file exists
+      ansible.builtin.assert:
+        that: _audit_rules.stat.exists
+        fail_msg: "/etc/audit/rules.d/linux_auditing.rules missing — linux_auditing role did not run"
+
+    - name: Assert faillock.conf exists (linux_users ran)
+      ansible.builtin.stat:
+        path: /etc/security/faillock.conf
+      register: _faillock
+
+    - name: Assert faillock.conf was written
+      ansible.builtin.assert:
+        that: _faillock.stat.exists
+        fail_msg: "/etc/security/faillock.conf missing — linux_users role did not run"
+
+- name: Verify — summary
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Print summary
+      ansible.builtin.debug:
+        msg: "linux_security orchestrator verified on EL8, EL9, EL10 containers."

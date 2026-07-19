@@ -1,0 +1,45 @@
+---
+argument_specs:
+  main:
+    short_description: User account security policy for EL 8/9/10.
+    options:
+      linux_users_action:
+        type: str
+        required: true
+        choices:
+          - sudo
+          - faillock
+          - uid_standards
+          - all
+        description: >-
+          Selects which task file(s) to run. 'all' runs sudo, faillock,
+          and uid_standards in sequence.
+      linux_users_faillock_deny:
+        type: int
+        default: 5
+        description: Number of consecutive failures before account is locked.
+      linux_users_faillock_unlock_time:
+        type: int
+        default: 900
+        description: Seconds until a locked account is automatically unlocked (0 = manual unlock).
+      linux_users_faillock_fail_interval:
+        type: int
+        default: 900
+        description: Window in seconds within which failures are counted.
+      linux_users_sudo_nopasswd_groups:
+        type: list
+        elements: str
+        default: []
+        description: Groups granted passwordless sudo. Written to /etc/sudoers.d/linux_users_groups.
+      linux_users_sudo_nopasswd_users:
+        type: list
+        elements: str
+        default: []
+        description: Users granted passwordless sudo. Written to /etc/sudoers.d/linux_users_users.
+      linux_users_uid_standards:
+        type: list
+        elements: dict
+        default: []
+        description: >-
+          List of {name, uid, gid, groups, shell, comment} dicts to enforce
+          via ansible.builtin.user.

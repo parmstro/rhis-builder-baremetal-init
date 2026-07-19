@@ -1,0 +1,24 @@
+---
+galaxy_info:
+  namespace: rhism
+  role_name: cobbler
+  author: rhism
+  description: >-
+    Install and configure Cobbler to drive PXE/DHCP/DNS/TFTP network installs, registering
+    distros, profiles, and systems. Standalone-first provisioning backend, also selectable by
+    the provisioning_services dispatcher (prov_type: cobbler) when no Satellite or Foreman is
+    available.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: EL
+      versions:
+        - "9"
+  galaxy_tags:
+    - cobbler
+    - pxe
+    - dhcp
+    - dns
+    - provisioning
+    - kickstart
+dependencies: []

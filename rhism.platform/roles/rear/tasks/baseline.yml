@@ -1,0 +1,20 @@
+---
+# baseline — orchestrate a full ReaR standup: server -> client -> schedule -> verify.
+# Each phase is gated on a backup_rear_apply_* toggle so an already-completed phase can
+# be skipped. restore is deliberately NOT part of baseline (it is destructive/lab-only).
+
+- name: Prepare the storage target (server phase)
+  ansible.builtin.include_tasks: server.yml
+  when: backup_rear_apply_server | bool
+
+- name: Install ReaR and render configuration (client phase)
+  ansible.builtin.include_tasks: client.yml
+  when: backup_rear_apply_client | bool
+
+- name: Enable scheduled protection (schedule phase)
+  ansible.builtin.include_tasks: schedule.yml
+  when: backup_rear_apply_schedule | bool
+
+- name: Verify recovery readiness (verify phase)
+  ansible.builtin.include_tasks: verify.yml
+  when: backup_rear_apply_verify | bool

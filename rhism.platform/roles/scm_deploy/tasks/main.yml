@@ -1,0 +1,25 @@
+---
+- name: Validate scm_action
+  ansible.builtin.assert:
+    that:
+      - scm_action is defined
+      - scm_action in _scm_valid_actions
+    fail_msg: >-
+      scm_action must be one of: {{ _scm_valid_actions | join(', ') }}.
+      Got '{{ scm_action | default('undefined') }}'.
+
+- name: Validate scm_type
+  ansible.builtin.assert:
+    that:
+      - scm_type is defined
+      - scm_type in _scm_valid_types
+    fail_msg: >-
+      scm_type must be one of: {{ _scm_valid_types | join(', ') }}.
+      Got '{{ scm_type | default('undefined') }}'.
+
+- name: "Load type vars for: {{ scm_type }}"
+  ansible.builtin.include_vars:
+    file: "{{ scm_type }}.yml"
+
+- name: "Execute task file for: {{ scm_action }}"
+  ansible.builtin.include_tasks: "{{ scm_action }}.yml"

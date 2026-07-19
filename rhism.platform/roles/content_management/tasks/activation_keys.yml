@@ -1,0 +1,6 @@
+---
+- name: Manage activation keys ({{ content_type }})
+  ansible.builtin.include_role:
+    name: "{{ content_type }}"
+  vars:
+    action: activation_keys

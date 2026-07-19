@@ -1,0 +1,24 @@
+---
+galaxy_info:
+  role_name: pm_ansible
+  author: rhism
+  description: >-
+    Pure-Ansible password management product role. ISM-compliant generation
+    (python3 secrets module), credential file storage, history enforcement.
+    Called exclusively from roles/password_management.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: EL
+      versions:
+        - "9"
+    - name: Ubuntu
+      versions:
+        - jammy
+  galaxy_tags:
+    - security
+    - password
+    - ism
+    - credentials
+
+dependencies: []

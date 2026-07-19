@@ -1,0 +1,16 @@
+---
+# Action: backup — etcd snapshot via oc debug node
+
+- name: Etcd backup preflight
+  ansible.builtin.include_tasks: preflight.yml
+
+- name: Run etcd backup via oc debug node
+  ansible.builtin.command:
+    cmd: >
+      oc debug node/{{ inventory_hostname }} --
+      chroot /host /usr/local/bin/cluster-backup.sh
+      {{ cp_backup_dir | default('/var/backup/etcd') }}
+  environment:
+    KUBECONFIG: "{{ _cp_kubeconfig_path }}"
+  changed_when: true
+  become: true

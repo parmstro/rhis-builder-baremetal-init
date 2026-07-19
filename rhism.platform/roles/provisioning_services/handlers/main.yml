@@ -1,0 +1,21 @@
+---
+- name: provisioning_services - restart dnsmasq
+  ansible.builtin.service:
+    name: dnsmasq
+    state: restarted
+  become: true
+  listen: provisioning_services - restart dnsmasq
+
+- name: provisioning_services - restart cobbler
+  ansible.builtin.service:
+    name: cobblerd
+    state: restarted
+  become: true
+  listen: provisioning_services - restart cobbler
+
+- name: provisioning_services - restart foreman-proxy
+  ansible.builtin.service:
+    name: foreman-proxy
+    state: restarted
+  become: true
+  listen: provisioning_services - restart foreman-proxy

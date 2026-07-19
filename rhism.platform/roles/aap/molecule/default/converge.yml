@@ -1,0 +1,196 @@
+---
+# Tier 1 contract converge (control host only). Exercises the real role render
+# logic with aap_execute:false; artifacts are re-asserted from disk in verify.yml.
+- name: aap standalone contract + installer-render test
+  hosts: localhost
+  gather_facts: false
+  vars:
+    _aap_role_root: "{{ playbook_dir }}/../.."
+    _aap_out: "{{ lookup('ansible.builtin.env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/aap"
+    _aap_sample_gateway: [gw1.example.com]
+    _aap_sample_controller: [ctrl1.example.com]
+    _aap_sample_hub: [hub1.example.com]
+    _aap_sample_eda: [eda1.example.com]
+    _aap_sample_db: db1.example.com
+  tasks:
+    - name: Load role defaults
+      ansible.builtin.include_vars:
+        file: "{{ _aap_role_root }}/defaults/main.yml"
+
+    # ------------------------------------------------------------- AAP-FR-001
+    - name: Negative test — argument spec rejects a bogus action
+      block:
+        - name: Call role with an invalid action
+          ansible.builtin.include_role:
+            name: aap
+          vars:
+            action: bogus_action
+        - name: Fail if validation did not catch the invalid action
+          ansible.builtin.fail:
+            msg: "argument_spec should have rejected the bogus action"
+      rescue:
+        - name: Confirm the bogus action was rejected
+          ansible.builtin.debug:
+            msg: "PASS — bogus action correctly rejected"
+
+    - name: Negative test — argument spec rejects a bogus aap_version
+      block:
+        - name: Call role with an invalid version
+          ansible.builtin.include_role:
+            name: aap
+          vars:
+            action: status
+            aap_version: "9.9"
+        - name: Fail if validation did not catch the invalid version
+          ansible.builtin.fail:
+            msg: "argument_spec should have rejected the bogus aap_version"
+      rescue:
+        - name: Confirm the bogus version was rejected
+          ansible.builtin.debug:
+            msg: "PASS — bogus aap_version correctly rejected"
+
+    # ------------------------------------------------------------- AAP-FR-003
+    - name: Negative test — argument spec rejects a bogus aap_configure_action
+      block:
+        - name: Call role with an invalid config section
+          ansible.builtin.include_role:
+            name: aap
+          vars:
+            action: configure
+            aap_controller_host: "https://ctrl.invalid.example.com"
+            aap_configure_action: not_a_section
+        - name: Fail if validation did not catch the invalid config section
+          ansible.builtin.fail:
+            msg: "argument_spec should have rejected the bogus aap_configure_action"
+      rescue:
+        - name: Confirm the bogus config section was rejected
+          ansible.builtin.debug:
+            msg: "PASS — bogus aap_configure_action correctly rejected"
+
+    - name: Assert the config-as-code defaults contract (self-contained engine)
+      ansible.builtin.assert:
+        that:
+          # connection + dispatch defaults
+          - aap_admin_user == 'admin'
+          - aap_configure_action == 'baseline'
+          # every baseline section toggle defaults on
+          - aap_apply_organization | bool
+          - aap_apply_credentials | bool
+          - aap_apply_projects | bool
+          - aap_apply_inventories | bool
+          - aap_apply_templates | bool
+          - aap_apply_workflows | bool
+          - aap_apply_schedules | bool
+          # content vars resolve self-sufficiently from the role's OWN defaults
+          - aap_organization == 'rhism'
+          - aap_teams | length == 3
+          - aap_credential_types | map(attribute='name') | list == ['CMDB PostgreSQL', 'ITSM ServiceNow']
+          - aap_credentials | map(attribute='name') | list | length == 4
+          # a project's scm_url renders through aap_scm_url_base (Jinja resolves)
+          - aap_projects | length > 0
+          - aap_projects[0].scm_url is match('git@gitlab.example.com:platform/.*')
+          - aap_inventories | map(attribute='name') | sort | list == ['dev', 'prod', 'test']
+          - aap_inventory_sources | length > 0
+          # every job template carries the keys config_templates.yml consumes
+          - aap_job_templates | length > 0
+          - aap_job_templates | selectattr('project', 'undefined') | list | length == 0
+          - aap_job_templates | selectattr('playbook', 'undefined') | list | length == 0
+          - aap_job_templates | selectattr('inventory', 'undefined') | list | length == 0
+          # every workflow has nodes; every schedule has an rrule
+          - aap_workflow_templates | selectattr('nodes', 'undefined') | list | length == 0
+          - aap_schedules | selectattr('rrule', 'undefined') | list | length == 0
+          - aap_project_sync_timeout | int > 0
+        fail_msg: "the internalised aap_* config-as-code defaults contract is broken"
+        success_msg: >-
+          PASS — the self-contained config engine's aap_* variables resolve from
+          the role's own defaults (no awx_config dependency)
+
+    # Load each version profile under a distinct name to assert the whole matrix.
+    - name: Load version profile 2.4
+      ansible.builtin.include_vars:
+        file: "{{ _aap_role_root }}/vars/versions/2.4.yml"
+        name: _p24
+    - name: Load version profile 2.5
+      ansible.builtin.include_vars:
+        file: "{{ _aap_role_root }}/vars/versions/2.5.yml"
+        name: _p25
+    - name: Load version profile 2.6
+      ansible.builtin.include_vars:
+        file: "{{ _aap_role_root }}/vars/versions/2.6.yml"
+        name: _p26
+    - name: Load version profile 2.7
+      ansible.builtin.include_vars:
+        file: "{{ _aap_role_root }}/vars/versions/2.7.yml"
+        name: _p27
+
+    - name: Assert all four version profiles load with the install-method + group contract
+      ansible.builtin.assert:
+        that:
+          # every profile offers exactly the two supported methods, no RPM/bundle
+          - _p24.aap_version_profile.install_methods == ['containerized', 'openshift']
+          - _p25.aap_version_profile.install_methods == ['containerized', 'openshift']
+          - _p26.aap_version_profile.install_methods == ['containerized', 'openshift']
+          - _p27.aap_version_profile.install_methods == ['containerized', 'openshift']
+          # 2.4 is pre-gateway — no automationgateway group; 2.5+ has it
+          - not _p24.aap_version_profile.gateway_era
+          - "'automationgateway' not in _p24.aap_version_profile.containerized.inventory_groups"
+          - _p25.aap_version_profile.gateway_era
+          - _p26.aap_version_profile.gateway_era
+          - _p27.aap_version_profile.gateway_era
+          - "'automationgateway' in _p25.aap_version_profile.containerized.inventory_groups"
+          - "'automationgateway' in _p26.aap_version_profile.containerized.inventory_groups"
+          - "'automationgateway' in _p27.aap_version_profile.containerized.inventory_groups"
+          # controller/hub/eda/database present in every version's group model
+          - "'automationcontroller' in _p24.aap_version_profile.containerized.inventory_groups"
+          - "'database' in _p24.aap_version_profile.containerized.inventory_groups"
+          # OpenShift CR kind is the pre-gateway component CR on 2.4, unified on 2.5+
+          - _p24.aap_version_profile.openshift.cr_kind == 'AutomationController'
+          - _p25.aap_version_profile.openshift.cr_kind == 'AnsibleAutomationPlatform'
+          - _p27.aap_version_profile.openshift.cr_kind == 'AnsibleAutomationPlatform'
+        fail_msg: "version-profile contract not satisfied"
+        success_msg: "PASS — 2.4 pre-gateway + 2.5/2.6/2.7 gateway profiles all load correctly"
+
+    # ------------------------------------------------------------- AAP-FR-001/002
+    - name: Render a 2.5 containerized installer inventory (dry-run, aap_execute false)
+      ansible.builtin.include_role:
+        name: aap
+      vars:
+        action: install
+        aap_version: "2.5"
+        aap_install_method: containerized
+        aap_execute: false
+        aap_manage_subscription: false
+        aap_gateway_hosts: "{{ _aap_sample_gateway }}"
+        aap_controller_hosts: "{{ _aap_sample_controller }}"
+        aap_hub_hosts: "{{ _aap_sample_hub }}"
+        aap_eda_hosts: "{{ _aap_sample_eda }}"
+        aap_database_host: "{{ _aap_sample_db }}"
+        aap_work_dir: "{{ _aap_out }}/c25"
+
+    - name: Render a 2.4 containerized installer inventory (pre-gateway)
+      ansible.builtin.include_role:
+        name: aap
+      vars:
+        action: install
+        aap_version: "2.4"
+        aap_install_method: containerized
+        aap_execute: false
+        aap_manage_subscription: false
+        aap_controller_hosts: "{{ _aap_sample_controller }}"
+        aap_hub_hosts: "{{ _aap_sample_hub }}"
+        aap_eda_hosts: "{{ _aap_sample_eda }}"
+        aap_database_host: "{{ _aap_sample_db }}"
+        aap_work_dir: "{{ _aap_out }}/c24"
+
+    - name: Render a 2.5 OpenShift AAP custom resource (dry-run)
+      ansible.builtin.include_role:
+        name: aap
+      vars:
+        action: install
+        aap_version: "2.5"
+        aap_install_method: openshift
+        aap_execute: false
+        aap_manage_subscription: false
+        aap_openshift_namespace: aap-molecule
+        aap_openshift_cr_name: aap-mol
+        aap_work_dir: "{{ _aap_out }}/o25"

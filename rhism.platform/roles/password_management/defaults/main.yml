@@ -1,0 +1,39 @@
+---
+# roles/password_management/defaults/main.yml
+# Variable contract for the password_management dispatcher role.
+# All variables use the pm_ prefix.
+
+# --- Dispatcher ---
+# pm_action: create | delete | audit | rotate
+pm_action: ""
+# pm_type: ansible | vault | thycotic
+pm_type: ansible
+
+# --- Target identity ---
+# What the password is for (service name, username, system account).
+pm_target: ""
+# Optional parent service or application label (used in audit reports and metadata).
+pm_service: ""
+
+# --- ISM-aligned password policy ---
+# ISM-0406: minimum length — ISM floor is 12; default to 20 for privileged accounts.
+pm_length: 20
+# ISM-0407: at least one character from each class.
+pm_min_uppercase: 1
+pm_min_lowercase: 1
+pm_min_digits: 1
+pm_min_special: 1
+pm_special_chars: "!@#$%^&*()-_=+[]{}|;:,.<>?"
+# ISM-0410: expiry in days — 90 for privileged accounts, 180 for standard.
+pm_expiry_days: 90
+# ISM-0408: number of previous passwords that cannot be reused.
+pm_history_count: 5
+# ISM-0411: lock after N consecutive failed attempts; 30-minute lockout.
+pm_max_attempts: 5
+pm_lockout_minutes: 30
+# ISM-0412: initial/temporary password must be changed on first login.
+pm_first_login_change: true
+
+# --- Audit report ---
+pm_audit_report_path: /tmp/pm_audit_report.txt
+pm_audit_report_format: text   # text | json

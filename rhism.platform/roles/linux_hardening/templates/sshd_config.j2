@@ -1,0 +1,46 @@
+# Managed by Ansible — cx_ansible_galaxy.linux_hardening
+# Manual edits will be overwritten on next role run.
+
+Port {{ linux_hardening_ssh_port }}
+AddressFamily any
+ListenAddress 0.0.0.0
+ListenAddress ::
+
+# Authentication
+PermitRootLogin {{ linux_hardening_ssh_permit_root_login }}
+PasswordAuthentication {{ linux_hardening_ssh_password_auth }}
+MaxAuthTries {{ linux_hardening_ssh_max_auth_tries }}
+PubkeyAuthentication yes
+AuthorizedKeysFile .ssh/authorized_keys
+
+# Session limits
+ClientAliveInterval {{ linux_hardening_ssh_client_alive_interval }}
+ClientAliveCountMax {{ linux_hardening_ssh_client_alive_count_max }}
+LoginGraceTime 60
+MaxSessions 10
+
+# Security hardening
+Protocol 2
+X11Forwarding no
+AllowAgentForwarding no
+AllowTcpForwarding no
+PermitUserEnvironment no
+IgnoreRhosts yes
+HostbasedAuthentication no
+PermitEmptyPasswords no
+UseDNS no
+PrintLastLog yes
+Banner /etc/issue.net
+
+{% if linux_hardening_ssh_allowed_groups | length > 0 %}
+AllowGroups {{ linux_hardening_ssh_allowed_groups | join(' ') }}
+{% endif %}
+
+# Ciphers and MACs (FIPS-aligned, exclude weak algorithms)
+Ciphers aes256-ctr,aes192-ctr,aes128-ctr
+MACs hmac-sha2-256,hmac-sha2-512
+KexAlgorithms curve25519-sha256,diffie-hellman-group14-sha256,diffie-hellman-group16-sha512
+
+{% if linux_hardening_ssh_manage_sftp | bool %}
+Subsystem sftp /usr/libexec/openssh/sftp-server
+{% endif %}

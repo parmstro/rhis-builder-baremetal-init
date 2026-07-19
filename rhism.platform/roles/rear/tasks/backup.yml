@@ -1,0 +1,37 @@
+---
+# backup — run a ReaR backup. Mode selects what gets produced:
+#   mkbackup     — rescue image + data backup (full protection)
+#   mkbackuponly — data backup only
+#   mkrescue     — rescue image only
+# Assumes the config is already rendered (run action: client first, or via baseline).
+
+- name: Validate the backup mode
+  ansible.builtin.assert:
+    that:
+      - backup_rear_backup_mode in ['mkbackup', 'mkbackuponly', 'mkrescue']
+    fail_msg: "backup_rear_backup_mode must be one of mkbackup, mkbackuponly, mkrescue"
+
+- name: Ensure the ReaR configuration is present before backing up
+  ansible.builtin.stat:
+    path: "{{ backup_rear_config_dir }}/local.conf"
+  register: _rear_localconf
+  become: true
+
+- name: Fail if the ReaR configuration has not been rendered
+  ansible.builtin.assert:
+    that:
+      - _rear_localconf.stat.exists
+    fail_msg: >-
+      {{ backup_rear_config_dir }}/local.conf is missing — run the client action
+      (or baseline) to render the ReaR configuration before backing up.
+
+- name: Run ReaR backup ({{ backup_rear_backup_mode }})
+  ansible.builtin.command: "/usr/sbin/rear -v {{ backup_rear_backup_mode }}"  # noqa: command-instead-of-module
+  become: true
+  register: _rear_backup
+  changed_when: _rear_backup.rc == 0
+  failed_when: _rear_backup.rc != 0
+
+- name: Report the backup outcome
+  ansible.builtin.debug:
+    msg: "{{ _rear_backup.stdout_lines | default([]) }}"

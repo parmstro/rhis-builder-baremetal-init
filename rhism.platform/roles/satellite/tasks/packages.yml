@@ -1,0 +1,17 @@
+---
+# --------------------------------------------------------------------------- #
+# Package lifecycle — present / absent                                        #
+# State maps directly to action variable.                                     #
+# --------------------------------------------------------------------------- #
+- name: Manage satellite installer packages
+  ansible.builtin.package:
+    name: "{{ _content_installer_packages }}"
+    state: "{{ action }}"
+  become: true
+
+- name: Manage satellite-cli package
+  ansible.builtin.package:
+    name: satellite-cli
+    state: present
+  become: true
+  when: action == 'present'

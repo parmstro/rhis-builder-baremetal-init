@@ -1,0 +1,22 @@
+---
+# ingress_traefik — standalone-first defaults over the SHARED ingress-backend interface.
+#
+# Every ingress backend (ingress_default / ingress_nginx / ingress_traefik / ingress_haproxy)
+# consumes the SAME variable names, so the container_platform orchestrator selects any of
+# them with one identical call — `include_role: name="ingress_{{ cp_ingress_type }}"` — and
+# never needs per-backend code. Standalone callers set these same vars directly; the defaults
+# below make the role runnable on its own.
+
+# Shared action (all backends): ingress (deploy) | present (alias) | absent (remove).
+# The orchestrator passes `action: ingress` via include_role vars; this default covers
+# standalone use.
+action: ingress
+
+# Shared cluster access + ingress policy (consumed by every backend, set once by the caller).
+cp_kubeconfig_path: /etc/rancher/k3s/k3s.yaml
+cp_type: k3s
+cp_ingress_replicas: 1
+
+# Shared dry-run gate honoured by every backend — false validates dispatch + variable
+# resolution without touching the node or cluster (used by the molecule scenario).
+cp_ingress_execute: true

@@ -1,0 +1,27 @@
+---
+# RHSM registration against the real Red Hat CDN needs a live subscription/entitlement and
+# external network access — genuinely can't run in CI (Tier 1 contract-only is the correct
+# tier here, per docs/testing-efficacy.md). The platform container exists only to satisfy
+# Molecule's driver; converge/verify run entirely on hosts: localhost, same pattern as
+# roles/bareos's contract-only scenario.
+driver:
+  name: docker
+
+platforms:
+  - name: rhel-sub-test
+    image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+    pre_build_image: true
+    override_command: true
+
+provisioner:
+  name: ansible
+
+scenario:
+  test_sequence:
+    - dependency
+    - destroy
+    - syntax
+    - create
+    - converge
+    - verify
+    - destroy

@@ -1,0 +1,14 @@
+---
+- name: pm_vault - restart
+  ansible.builtin.service:
+    name: vault
+    state: restarted
+  become: true
+  when: pm_vault_manage_service | bool
+
+- name: pm_vault - reload
+  ansible.builtin.service:
+    name: vault
+    state: reloaded
+  become: true
+  when: pm_vault_manage_service | bool

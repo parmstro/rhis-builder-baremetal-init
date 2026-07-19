@@ -1,0 +1,34 @@
+---
+# Molecule fixture — an EXTRA bundle that re-declares objects rhel9_soe already
+# owns (the SOE9 content view + the RHEL 9 BaseOS repository set) to prove the
+# aggregate action deduplicates shared objects by name (soe_bundle_model §3.2).
+name: rhel9_soe_extra
+description: "RHEL 9 middleware add-on SOE sharing SOE9 base content"
+lifecycle_state: active
+content:
+  repository_sets:
+    - name: "Red Hat Enterprise Linux 9 for x86_64 - BaseOS (RPMs)"
+      product: "Red Hat Enterprise Linux for x86_64"
+  custom_products:
+    - name: "Internal Middleware Repo"
+      url: "https://repo.internal.example.com/middleware/el9/"
+  content_views:
+    - name: "SOE9"
+      description: "Red Hat Enterprise Linux 9 x86_64 SOE content"
+      repositories:
+        - name: "Red Hat Enterprise Linux 9 for x86_64 - BaseOS RPMs 9"
+          product: "Red Hat Enterprise Linux for x86_64"
+lifecycle:
+  lifecycle_environments:
+    - name: "Development"
+  activation_keys:
+    - name: "SOE9_extra_dev"
+      lifecycle_environment: "Development"
+      content_view: "SOE9"
+  hostgroups:
+    - name: "hg_x86_64_rhel9_middleware"
+      lifecycle_environment: "Development"
+      content_view: "SOE9"
+      activation_keys: "SOE9_extra_dev"
+infrastructure_refs:
+  domain: "soe.example.com"

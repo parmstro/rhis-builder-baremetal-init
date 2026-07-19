@@ -1,0 +1,31 @@
+---
+extends: default
+
+rules:
+  line-length:
+    max: 160
+    level: warning
+  truthy:
+    allowed-values: ["true", "false", "yes", "no"]
+    check-keys: false
+  document-start:
+    present: true
+    level: warning
+  braces:
+    max-spaces-inside: 1
+  octal-values:
+    forbid-implicit-octal: true
+    forbid-explicit-octal: true
+  comments:
+    min-spaces-from-content: 1
+  comments-indentation: disable
+  commas:
+    max-spaces-after: -1
+  new-line-at-end-of-file:
+    level: warning
+
+ignore: |
+  collections/
+  .molecule/
+  .local-*/
+  *.tar

@@ -1,0 +1,179 @@
+---
+# License and subscription collection page.
+# Runs when the chosen profile requires Red Hat subscriptions (the estate
+# profile, and any custom profile that selects rh_idm, satellite, or ocp).
+#
+# Licenses can be:
+#   file   — path to a local file (pre-staged or embedded in the thumbstick)
+#   input  — entered interactively (activation key or pull secret pasted in)
+#   vault  — fetched at deploy-time from Ansible Vault (embedded as variables)
+#   url    — fetched at build/deploy-time from a secure HTTPS endpoint
+
+- name: Select Red Hat license/subscription source
+  ansible.builtin.command:
+    cmd: >-
+      {{ wizard_tui_backend }} --title "{{ wizard_tui_title }}"
+      --radiolist "This profile requires Red Hat subscriptions.\nHow will license credentials be provided?"
+      {{ wizard_tui_height }} {{ wizard_tui_width }} 4
+      "input"  "Enter now  (activation key — embedded in manifest)" ON
+      "file"   "From file  (pre-staged on this system or thumbstick)" OFF
+      "vault"  "Vault      (fetched at deploy-time from Ansible Vault)" OFF
+      "url"    "Secure URL (fetched from customer portal at build/deploy)" OFF
+      3>&1 1>&2 2>&3
+  register: _wizard_license_src_result
+  changed_when: false
+  failed_when: _wizard_license_src_result.rc not in [0, 1]
+  tags: infra_wizard
+
+- name: Handle licensing cancel
+  ansible.builtin.fail:
+    msg: "Wizard cancelled by user at licensing selection."
+  when: _wizard_license_src_result.rc == 1
+  tags: infra_wizard
+
+- name: Collect RHSM activation key (input mode)
+  when: (_wizard_license_src_result.stdout | trim) == 'input'
+  block:
+    - name: Collect RHSM organization ID
+      ansible.builtin.command:
+        cmd: >-
+          {{ wizard_tui_backend }} --title "{{ wizard_tui_title }}"
+          --inputbox "Enter Red Hat organization ID (from access.redhat.com):"
+          8 {{ wizard_tui_width }} ""
+          3>&1 1>&2 2>&3
+      register: _wizard_rhsm_org_result
+      changed_when: false
+      failed_when: _wizard_rhsm_org_result.rc not in [0, 1]
+      tags: infra_wizard
+
+    - name: Handle org ID cancel
+      ansible.builtin.fail:
+        msg: "Wizard cancelled by user at RHSM org ID entry."
+      when: _wizard_rhsm_org_result.rc == 1
+      tags: infra_wizard
+
+    - name: Collect RHSM activation key
+      ansible.builtin.command:
+        cmd: >-
+          {{ wizard_tui_backend }} --title "{{ wizard_tui_title }}"
+          --passwordbox "Enter Red Hat activation key:"
+          8 {{ wizard_tui_width }}
+          3>&1 1>&2 2>&3
+      register: _wizard_rhsm_key_result
+      changed_when: false
+      failed_when: _wizard_rhsm_key_result.rc not in [0, 1]
+      no_log: true
+      tags: infra_wizard
+
+    - name: Handle activation key cancel
+      ansible.builtin.fail:
+        msg: "Wizard cancelled by user at activation key entry."
+      when: _wizard_rhsm_key_result.rc == 1
+      tags: infra_wizard
+
+    - name: Record RHSM credentials
+      ansible.builtin.set_fact:
+        wizard_licensing:
+          source: input
+          rhsm_org_id: "{{ _wizard_rhsm_org_result.stdout | trim }}"
+          rhsm_activation_key: "{{ _wizard_rhsm_key_result.stdout | trim }}"
+      no_log: true
+      tags: infra_wizard
+
+- name: Collect license file paths (file mode)
+  when: (_wizard_license_src_result.stdout | trim) == 'file'
+  block:
+    - name: Collect RHSM credentials file path
+      ansible.builtin.command:
+        cmd: >-
+          {{ wizard_tui_backend }} --title "{{ wizard_tui_title }}"
+          --inputbox "Path to RHSM credentials file (JSON with org_id + activation_key):"
+          8 {{ wizard_tui_width }} "/mnt/licenses/rhsm.json"
+          3>&1 1>&2 2>&3
+      register: _wizard_rhsm_file_result
+      changed_when: false
+      failed_when: _wizard_rhsm_file_result.rc not in [0, 1]
+      tags: infra_wizard
+
+    - name: Handle file path cancel
+      ansible.builtin.fail:
+        msg: "Wizard cancelled by user at license file path entry."
+      when: _wizard_rhsm_file_result.rc == 1
+      tags: infra_wizard
+
+    - name: Record file-mode licensing config
+      ansible.builtin.set_fact:
+        wizard_licensing:
+          source: file
+          rhsm_credentials_file: "{{ _wizard_rhsm_file_result.stdout | trim }}"
+      tags: infra_wizard
+
+- name: Record vault-mode licensing config
+  when: (_wizard_license_src_result.stdout | trim) == 'vault'
+  ansible.builtin.set_fact:
+    wizard_licensing:
+      source: vault
+      note: "RHSM credentials must be in vault as rhsm_org_id and rhsm_activation_key"
+  tags: infra_wizard
+
+- name: Collect secure URL for license fetch (url mode)
+  when: (_wizard_license_src_result.stdout | trim) == 'url'
+  block:
+    - name: Collect license portal URL
+      ansible.builtin.command:
+        cmd: >-
+          {{ wizard_tui_backend }} --title "{{ wizard_tui_title }}"
+          --inputbox "Enter secure URL to fetch license bundle (HTTPS, returns JSON):"
+          8 {{ wizard_tui_width }} "https://licenses.example.com/api/bundle"
+          3>&1 1>&2 2>&3
+      register: _wizard_license_url_result
+      changed_when: false
+      failed_when: _wizard_license_url_result.rc not in [0, 1]
+      tags: infra_wizard
+
+    - name: Handle URL cancel
+      ansible.builtin.fail:
+        msg: "Wizard cancelled by user at license URL entry."
+      when: _wizard_license_url_result.rc == 1
+      tags: infra_wizard
+
+    - name: Record URL-mode licensing config
+      ansible.builtin.set_fact:
+        wizard_licensing:
+          source: url
+          license_bundle_url: "{{ _wizard_license_url_result.stdout | trim }}"
+      tags: infra_wizard
+
+# OpenShift pull secret — required for ocp or okd profile
+- name: Collect OCP pull secret
+  when: >-
+    wizard_components.container_platform is defined
+    and wizard_components.container_platform.enabled
+    and wizard_components.container_platform.type in ['ocp', 'okd']
+    and (_wizard_license_src_result.stdout | trim) == 'input'
+  block:
+    - name: Collect OCP pull secret path or paste
+      ansible.builtin.command:
+        cmd: >-
+          {{ wizard_tui_backend }} --title "{{ wizard_tui_title }}"
+          --inputbox "Path to OpenShift pull secret JSON file (from console.redhat.com):"
+          8 {{ wizard_tui_width }} "/mnt/licenses/pull-secret.txt"
+          3>&1 1>&2 2>&3
+      register: _wizard_pull_secret_result
+      changed_when: false
+      failed_when: _wizard_pull_secret_result.rc not in [0, 1]
+      tags: infra_wizard
+
+    - name: Handle pull secret cancel
+      ansible.builtin.fail:
+        msg: "Wizard cancelled by user at pull secret entry."
+      when: _wizard_pull_secret_result.rc == 1
+      tags: infra_wizard
+
+    - name: Record OCP pull secret path
+      ansible.builtin.set_fact:
+        wizard_licensing: >-
+          {{ wizard_licensing | combine({
+            'ocp_pull_secret_file': _wizard_pull_secret_result.stdout | trim
+          }) }}
+      tags: infra_wizard

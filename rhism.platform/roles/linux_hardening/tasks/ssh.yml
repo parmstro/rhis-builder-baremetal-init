@@ -1,0 +1,37 @@
+---
+# Install is skippable: a container/image-build base bakes the hardened
+# CONFIG only (no running sshd; RPM keeps a pre-existing modified
+# sshd_config if the package is layered on later) — and on EL8 the package
+# module cannot run at all under python3.11 (BUG-018 class, no dnf bindings).
+- name: Ensure openssh-server is installed
+  ansible.builtin.package:
+    name: openssh-server
+    state: present
+  when:
+    - linux_hardening_manage_ssh | bool
+    - linux_hardening_ssh_install_server | bool
+
+- name: Ensure /etc/ssh exists (config-only install)
+  ansible.builtin.file:
+    path: /etc/ssh
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when:
+    - linux_hardening_manage_ssh | bool
+    - not (linux_hardening_ssh_install_server | bool)
+
+# validate is skippable (BUG-104): `sshd -t` requires host keys, which don't
+# exist where sshd-keygen has never run (image builds, containers) — and
+# generating them there would bake identical host keys into a shared base.
+- name: Deploy hardened sshd_config
+  ansible.builtin.template:
+    src: sshd_config.j2
+    dest: /etc/ssh/sshd_config
+    owner: root
+    group: root
+    mode: "0600"
+    validate: "{{ (linux_hardening_ssh_validate | bool) | ternary('/usr/sbin/sshd -t -f %s', omit) }}"
+  notify: linux_hardening - reload sshd
+  when: linux_hardening_manage_ssh | bool

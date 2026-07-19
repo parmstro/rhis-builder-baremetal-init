@@ -1,0 +1,16 @@
+---
+- name: Install GitLab
+  ansible.builtin.include_tasks: install.yml
+  when: scm_apply_install | bool
+
+- name: Configure GitLab
+  ansible.builtin.include_tasks: configure.yml
+  when: scm_apply_configure | bool
+
+- name: Register runners
+  ansible.builtin.include_tasks: runners.yml
+  when: scm_apply_runners | bool and scm_runners | length > 0
+
+- name: Configure backup
+  ansible.builtin.include_tasks: backup.yml
+  when: scm_apply_backup | bool

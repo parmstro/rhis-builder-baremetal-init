@@ -1,0 +1,130 @@
+---
+# Functional requirements — rear (requirements→test-case layer, owner rule
+# 2026-07-12; user-story schema, owner rule 2026-07-16). Renderer contract:
+# see roles/cmdb/templates/requirements_traceability.md.j2 — a molecule verifier
+# is checked on disk; a lab verifier is checked against a repo-relative playbook
+# path; a requirement with no live verifier renders UNCOVERED.
+functional_requirements:
+  - req_id: REAR-FR-001
+    persona: administrator
+    capability: >-
+      recoverable bare-metal disaster recovery for a Linux system — a bootable
+      rescue image plus a matching data backup — driven either on its own or
+      through the site's single backup selection point, so DR is provisioned the
+      same way whichever backup product a site standardises on
+    benefit: >-
+      an operator can rebuild a failed or destroyed host onto replacement
+      hardware from a known-good rescue image and backup, without hand-crafting
+      a per-product integration
+    acceptance:
+      - given: a host with no disaster-recovery protection configured
+        when: the backup capability is applied for that host
+        then: a rescue image and data backup are configured against the chosen
+          storage target and the host reports as recoverable
+    statement: >-
+      As an administrator, I want recoverable bare-metal disaster recovery for a
+      Linux system driven either standalone or through the site's single backup
+      selection point, so that a failed host can be rebuilt onto replacement
+      hardware from a known-good rescue image and backup.
+    tier: 1
+    verified_by:
+      - molecule: default
+      - molecule: backup_management/default
+
+  - req_id: REAR-FR-002
+    persona: administrator
+    capability: >-
+      a genuinely restorable protection set — the rescue image and data backup
+      together reconstruct the system, proven by producing and inspecting the
+      real recovery artifacts, not merely by a job exiting successfully
+    benefit: >-
+      the organisation has evidence the DR artifacts exist and are usable before
+      a real disaster, rather than discovering an empty or unbootable backup at
+      recovery time
+    acceptance:
+      - given: a host configured for disaster-recovery protection
+        when: protection is run against a reachable storage target
+        then: a real recovery artifact (rescue image and/or data archive) exists
+          at the target and the effective recovery configuration resolves
+    statement: >-
+      As an administrator, I want a genuinely restorable protection set whose
+      artifacts I can produce and inspect, so that the organisation has evidence
+      the DR set is usable before a real disaster rather than at recovery time.
+    tier: 2
+    verified_by:
+      - molecule: functional
+
+  - req_id: REAR-FR-003
+    persona: operator
+    capability: >-
+      unattended, scheduled recurrence of disaster-recovery protection on a
+      defined cadence, with control over how many prior copies are retained
+    benefit: >-
+      protection stays current without manual intervention and storage does not
+      grow unbounded, so a recent recovery point always exists
+    acceptance:
+      - given: a host configured for disaster-recovery protection
+        when: scheduled protection is enabled with a cadence
+        then: an unattended timer runs the protection on that cadence and the
+          retention setting governs how many prior copies are kept
+    statement: >-
+      As an operator, I want unattended scheduled disaster-recovery protection
+      with retention control, so that a recent recovery point always exists
+      without manual effort and storage stays bounded.
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: REAR-FR-004
+    persona: administrator
+    capability: >-
+      a safe, read-only recovery-readiness check that confirms the recovery
+      configuration resolves, detects when the disk layout has drifted from the
+      last rescue image, and confirms a recovery artifact is actually present
+    benefit: >-
+      drift between the live system and its rescue image is caught before a real
+      recovery attempt, avoiding a failed restore onto a stale layout
+    acceptance:
+      - given: a host configured for disaster-recovery protection
+        when: a recovery-readiness check is run
+        then: the effective configuration is reported, any layout drift from the
+          current rescue image is flagged, and the presence of a recovery
+          artifact is confirmed — with no change to the system
+    statement: >-
+      As an administrator, I want a safe read-only recovery-readiness check, so
+      that drift from the last rescue image is caught before a real recovery
+      attempt rather than during one.
+    tier: 2
+    verified_by:
+      - molecule: functional
+
+  - req_id: REAR-FR-005
+    persona: administrator
+    capability: >-
+      a full bare-metal recovery of a system from its rescue image and data
+      backup that cannot be triggered accidentally, since it repartitions disks
+      and reinstalls the bootloader
+    benefit: >-
+      a destroyed host is fully rebuilt onto replacement hardware, while the
+      irreversible operation is protected by an explicit, deliberate confirmation
+      so it can never run by accident
+    acceptance:
+      - given: replacement hardware booted from the rescue image with the data
+          backup reachable, and both irreversible-recovery confirmations set
+        when: recovery is run
+        then: the disks are repartitioned, the system and bootloader are restored,
+          and the host boots as the original system
+      - given: the same host without both confirmations set
+        when: recovery is requested
+        then: it refuses to run and makes no change
+    statement: >-
+      As an administrator, I want a full bare-metal recovery that cannot be
+      triggered accidentally, so that a destroyed host is rebuilt onto
+      replacement hardware while the irreversible operation stays protected
+      behind an explicit, deliberate confirmation.
+    tier: 3
+    verified_by:
+      - manual: >-
+          rear recover repartitions disks and reinstalls the bootloader with no
+          rollback; verified in a Tier-3 KVM lab against a throwaway target, not
+          in CI. Not yet executed.

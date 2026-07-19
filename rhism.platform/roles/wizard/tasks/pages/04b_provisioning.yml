@@ -1,0 +1,35 @@
+---
+# PXE / provisioning services page — only shown when Satellite/Foreman are not
+# selected. Both platforms include an integrated Smart Proxy (TFTP + DHCP + DNS).
+# Without them, bare-metal targets need a standalone provisioning service.
+- name: Select provisioning service
+  ansible.builtin.command:
+    cmd: >-
+      {{ wizard_tui_backend }} --title "{{ wizard_tui_title }}"
+      --radiolist "No content management platform selected.\nSelect a PXE / provisioning service for bare-metal targets:"
+      {{ wizard_tui_height }} {{ wizard_tui_width }} 3
+      "dnsmasq" "dnsmasq (DHCP + TFTP + DNS — lightweight, single process)" ON
+      "cobbler"  "Cobbler  (full provisioning server, Satellite upstream)"   OFF
+      "none"     "None     — targets are pre-provisioned (VMs / cloud only)" OFF
+      3>&1 1>&2 2>&3
+  register: _wizard_prov_result
+  changed_when: false
+  failed_when: _wizard_prov_result.rc not in [0, 1]
+  tags: infra_wizard
+
+- name: Handle provisioning cancel
+  ansible.builtin.fail:
+    msg: "Wizard cancelled by user at provisioning selection."
+  when: _wizard_prov_result.rc == 1
+  tags: infra_wizard
+
+- name: Record provisioning choice
+  ansible.builtin.set_fact:
+    wizard_components: >-
+      {{ wizard_components | combine({
+        'provisioning': {
+          'enabled': (_wizard_prov_result.stdout | trim) != 'none',
+          'type': _wizard_prov_result.stdout | trim
+        }
+      }) }}
+  tags: infra_wizard

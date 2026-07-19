@@ -1,0 +1,21 @@
+---
+# configure — deliberately a documented no-op. Unlike Quay (organizations /
+# robot accounts / repositories managed via its own REST API), rhis-builder-ui
+# has no post-deploy administrative surface to manage via Ansible: its only
+# state is the single-operator session (site_config / components_config /
+# soe_selections — see backend/src/routes/deployment.js), which is set BY the
+# operator THROUGH the UI itself, not provisioned ahead of time by automation.
+#
+# Kept as a real dispatcher action (not omitted) for interface parity with
+# install/status, and as a stable extension point if a genuine post-deploy
+# configuration surface appears later (e.g. seeding a default catalog entry
+# set, or pre-loading a site_config template via the REST API the same way
+# roles/quay's configure action manages organizations).
+
+- name: Report configure is a documented no-op
+  ansible.builtin.debug:
+    msg: >-
+      rhism_ui_action=configure is a documented no-op — rhism-ui has
+      no post-deploy administrative API surface; its session state is set by
+      the operator through the UI itself, not by Ansible. See this role's
+      tasks/configure.yml for the full rationale.

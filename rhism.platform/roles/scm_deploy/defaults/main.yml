@@ -1,0 +1,71 @@
+---
+# Role control
+scm_action: baseline
+scm_type: gitlab_ce
+
+# Install gate — dry-run by default
+scm_install_execute: false
+
+# GitLab URL and identity
+scm_external_url: "https://{{ ansible_fqdn | default('localhost') }}"
+scm_admin_email: "root@localhost"
+
+# RHSM (gitlab_ee type — requires valid subscription)
+scm_rhsm_org_id: ""
+scm_rhsm_activation_key: ""     # vault-backed
+scm_rhsm_skip_registration: false
+
+# TLS — GitLab omnibus manages its own nginx; provide cert or use Let's Encrypt
+scm_tls_cert_file: ""           # path to PEM cert; empty = Let's Encrypt
+scm_tls_key_file: ""
+scm_tls_letsencrypt: false      # enable Let's Encrypt auto-cert
+
+# Database (postgresql bundled by default)
+scm_db_adapter: postgresql
+scm_db_host: ""                 # empty = use bundled PostgreSQL
+scm_db_port: 5432
+scm_db_name: gitlabhq_production
+scm_db_username: gitlab
+scm_db_password: ""             # vault-backed if using external DB
+
+# SMTP
+scm_smtp_enabled: false
+scm_smtp_address: ""
+scm_smtp_port: 587
+scm_smtp_user_name: ""
+scm_smtp_password: ""           # vault-backed
+scm_smtp_tls: true
+scm_smtp_from: "gitlab@{{ ansible_domain | default('localhost') }}"
+
+# Performance tuning
+scm_puma_workers: 2             # Puma web server workers
+scm_sidekiq_concurrency: 5
+scm_pg_shared_buffers: 256MB
+
+# Backup
+scm_backup_enabled: true
+scm_backup_path: /var/opt/gitlab/backups
+scm_backup_keep_time: 604800    # 7 days in seconds
+scm_restore_file: ""            # path to backup .tar to restore
+
+# Runners
+scm_runners: []
+# - name: "docker-runner"
+#   url: "{{ scm_external_url }}"
+#   token: ""            # vault-backed; obtain from GitLab CI/CD settings
+#   executor: docker     # docker | shell | ssh
+#   docker_image: "ruby:latest"
+#   tags: []
+#   run_untagged: true
+#   locked: false
+
+# Firewall
+scm_open_http: true
+scm_open_https: true
+scm_open_ssh: true
+
+# Baseline toggles
+scm_apply_install: false
+scm_apply_configure: false
+scm_apply_runners: false
+scm_apply_backup: false

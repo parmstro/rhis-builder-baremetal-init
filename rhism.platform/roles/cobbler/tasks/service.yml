@@ -1,0 +1,19 @@
+---
+# Handles started, stopped, restarted via state: "{{ action }}".
+# Gated by prov_manage_service (provisioning-family convention) so non-systemd
+# contexts (containers) can skip service management.
+- name: Manage cobblerd service
+  ansible.builtin.service:
+    name: "{{ _prov_service_name }}"
+    state: "{{ action }}"
+    enabled: "{{ action == 'started' }}"
+  become: true
+  when: prov_manage_service | bool
+
+- name: Manage httpd service
+  ansible.builtin.service:
+    name: httpd
+    state: "{{ action }}"
+    enabled: "{{ action == 'started' }}"
+  become: true
+  when: prov_manage_service | bool

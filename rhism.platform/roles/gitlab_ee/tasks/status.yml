@@ -1,0 +1,16 @@
+---
+# gitlab_ee — status
+# Show gitlab-ctl status output.
+
+- name: Get GitLab EE status
+  become: true
+  block:
+    - name: Run gitlab-ctl status
+      ansible.builtin.command:
+        cmd: "{{ _scm_ctl_cmd }} status"
+      changed_when: false
+      register: _gitlab_ee_status
+
+    - name: Display GitLab EE status
+      ansible.builtin.debug:
+        msg: "{{ _gitlab_ee_status.stdout_lines }}"

@@ -1,0 +1,14 @@
+---
+- name: scm_deploy - reconfigure gitlab
+  ansible.builtin.command:
+    cmd: gitlab-ctl reconfigure
+  become: true
+  listen: scm_deploy - reconfigure gitlab
+  changed_when: true
+
+- name: scm_deploy - restart gitlab
+  ansible.builtin.command:
+    cmd: gitlab-ctl restart
+  become: true
+  listen: scm_deploy - restart gitlab
+  changed_when: true

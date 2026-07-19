@@ -1,0 +1,10 @@
+---
+_mail_valid_actions:
+  - install
+  - configure
+  - secure
+  - baseline
+
+_mail_valid_types:
+  - relay
+  - full

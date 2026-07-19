@@ -1,0 +1,71 @@
+---
+# okd — standalone-first defaults over the SHARED container-platform interface.
+#
+# Every Kubernetes-distro product role (k3s / rke2 / okd / ocp) consumes the SAME
+# variable names (bare `action` + cp_* vars), so the container_platform dispatcher selects
+# any of them with one identical call — `include_role: name="{{ cp_type }}"` — and never
+# needs per-distro code. Standalone callers set these same vars directly; the defaults below
+# make the role runnable on its own.
+
+# Shared action — the dispatcher passes it via include_role vars; this default covers
+# standalone use. Actions: present | absent | configure | install | destroy |
+# add_node | remove_node | backup | restore | upgrade | status.
+action: present
+
+# ── Shared container-platform interface (consumed by every distro) ────────────────
+# OKD release tag used in the GitHub download URLs (e.g. 4.15.0-0.okd-...).
+cp_ocp_version: ""
+# Cluster identity — used to build console/API URLs and (via install-config) DNS.
+cp_cluster_name: okd
+cp_base_domain: example.com
+# Pull secret + SSH key are consumed by the install-config template when present.
+cp_pull_secret: ""
+cp_ssh_pub_key: ""
+# install-config.yaml topology + networking knobs (consumed by the install-config template).
+cp_control_plane_replicas: 3
+cp_compute_replicas: 3
+cp_cluster_network_cidr: 10.128.0.0/14
+cp_cluster_network_host_prefix: 23
+cp_service_network_cidr: 172.30.0.0/16
+cp_machine_network_cidr: 10.0.0.0/16
+
+# ── OKD-specific interface ────────────────────────────────────────────────────────
+# Installer working directory (holds install-config.yaml, auth/kubeconfig, state).
+cp_install_dir: /opt/openshift-install
+# etcd backup/restore directories.
+cp_backup_dir: /var/backup/etcd
+cp_restore_dir: /var/backup/etcd
+# MachineSet scaling for add_node / remove_node.
+cp_node_machineset: ""
+cp_node_replicas: 1
+# Target version for the upgrade action (empty → --to-latest).
+cp_upgrade_version: ""
+
+# Install/destroy gates (dry-run by default — set true to execute).
+cp_install_execute: false
+cp_destroy_confirm: false
+
+# ── OKD distribution facts (private; also provided by container_platform vars/okd.yml) ──
+_cp_install_script_url: ""
+_cp_packages:
+  - openshift-clients
+_cp_config_dir: /etc/kubernetes
+_cp_config_file: /etc/kubernetes/kubeconfig
+_cp_kubeconfig_path: "{{ cp_install_dir }}/auth/kubeconfig"
+_cp_service_name: ""
+_cp_service_name_agent: ""
+_cp_binary: openshift-install
+_cp_kubectl_cmd: /usr/local/bin/oc
+_cp_rhsm_required: false
+_cp_has_builtin_registry: true
+_cp_has_builtin_ingress: true
+_cp_builtin_ingress_name: default-ingress-controller
+_cp_firewall_ports:
+  - 6443/tcp
+  - 22623/tcp
+  - 443/tcp
+  - 80/tcp
+  - 22/tcp
+
+# OKD GitHub releases base URL.
+_cp_okd_releases_url: https://github.com/okd-project/okd/releases/download

@@ -1,0 +1,23 @@
+---
+galaxy_info:
+  namespace: rhism
+  role_name: bareos
+  author: rhism
+  description: >-
+    Install and operate a Bareos backup solution — Director, Storage Daemon, and File Daemon
+    — with bconsole-driven client/job management and the full backup lifecycle (schedule,
+    run, restore, verify, prune, purge, status). Standalone-first product role, also
+    selectable by the backup_management dispatcher (backup_type: bareos).
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: EL
+      versions:
+        - "9"
+  galaxy_tags:
+    - backup
+    - bareos
+    - restore
+    - disasterrecovery
+    - enterprise
+dependencies: []

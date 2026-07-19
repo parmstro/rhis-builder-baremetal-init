@@ -1,0 +1,97 @@
+---
+# Functional requirements — monitoring_stack (requirements->test-case layer +
+# Tier-3 elevation, wave-3+ standard). This is the DISPATCHER/orchestrator role:
+# its FRs are about correct component SELECTION and shared orchestration
+# (dispatch of the chosen component, baseline toggle-gating, template contract),
+# not any single product's deployment behaviour — nagios/splunk/elastic carry
+# their own REQUIREMENTS.yml. NOTE: monitoring_stack currently INLINES its
+# component logic as tasks/<component>.yml files (a known dispatcher-sprawl
+# carry-over from before nagios/splunk/elastic were extracted to standalone
+# roles), so "selection" here is include_tasks of the component file. Capability
+# fact-checked against Nagios Core, Splunk Enterprise, and Elastic Stack official
+# docs and Event-Driven Ansible; curated from README + meta/argument_specs.yml +
+# tasks/. Family lab: playbooks/monitoring_stack.yml.
+functional_requirements:
+  - req_id: MONITORING_STACK-FR-001
+    statement: >-
+      The role SHALL validate mon_action against the eight supported values
+      (nagios_server, nagios_client, splunk_server, splunk_forwarder,
+      elastic_server, elastic_agent, eda_rulebooks, baseline) and reject any
+      invalid value (arg-spec negative test).
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: MONITORING_STACK-FR-002
+    statement: >-
+      The role SHALL dispatch the selected component by including its task file
+      ({{ mon_action }}.yml) — a dispatch file existing for every declared action.
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: MONITORING_STACK-FR-003
+    statement: >-
+      The role SHALL render each component's configuration from the variable
+      contract without deploying services — Nagios contacts/templates/services +
+      NRPE, Splunk savedsearches/inputs, Elasticsearch/Kibana/Filebeat, and the
+      three EDA rulebooks — proving the variable contract and template correctness.
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: MONITORING_STACK-FR-004
+    statement: >-
+      The baseline orchestrator SHALL run every enabled component in one pass,
+      each gated by its mon_apply_* boolean toggle (selective baseline skips a
+      component when its toggle is false).
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: MONITORING_STACK-FR-005
+    statement: >-
+      Selecting mon_action=nagios_server SHALL deploy a Nagios Core monitoring
+      server with the configured host templates (linux-server/windows-server/
+      network-device) and service checks, and nagios_client SHALL install the
+      NRPE agent on a monitored host.
+    tier: 3
+    verified_by:
+      - lab: playbooks/monitoring_stack.yml#nagios
+
+  - req_id: MONITORING_STACK-FR-006
+    statement: >-
+      Selecting mon_action=splunk_server SHALL deploy Splunk Enterprise with
+      indexes, an HTTP Event Collector token, and saved-search alerts, and
+      splunk_forwarder SHALL install a Universal Forwarder pointed at the indexer.
+    tier: 3
+    verified_by:
+      - lab: playbooks/monitoring_stack.yml#splunk
+
+  - req_id: MONITORING_STACK-FR-007
+    statement: >-
+      Selecting mon_action=elastic_server SHALL deploy Elasticsearch with Kibana
+      and ILM, and elastic_agent SHALL install Filebeat shipping to the
+      Elasticsearch host.
+    tier: 3
+    verified_by:
+      - lab: playbooks/monitoring_stack.yml#elastic
+
+  - req_id: MONITORING_STACK-FR-008
+    statement: >-
+      mon_action=eda_rulebooks SHALL deploy the three Event-Driven Ansible
+      rulebooks (security_events, infrastructure_events, service_health) that
+      accept webhooks from Nagios, Splunk, and Elasticsearch with source-aware
+      matching and trigger the matching playbooks/event_response.yml action.
+    tier: 3
+    verified_by:
+      - lab: playbooks/monitoring_stack.yml#eda_rulebooks
+
+  - req_id: MONITORING_STACK-FR-009
+    statement: >-
+      A full baseline SHALL stand up Nagios, Splunk, Elastic, and the EDA
+      rulebooks together on real hosts so an event detected by any source drives
+      an automated response — the end-to-end integration only a live lab exercises.
+    tier: 3
+    verified_by:
+      - lab: playbooks/monitoring_stack.yml#baseline

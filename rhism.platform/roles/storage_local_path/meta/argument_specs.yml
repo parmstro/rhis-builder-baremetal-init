@@ -1,0 +1,35 @@
+---
+argument_specs:
+  main:
+    short_description: Configure the K3s built-in local-path StorageClass.
+    description: >-
+      Standalone-first storage backend for container_platform. Verifies the K3s built-in
+      local-path StorageClass and optionally makes it the cluster default. Consumes the shared
+      storage-backend interface (action, cp_* vars) so the container_platform dispatcher can
+      select any backend with identical code.
+    options:
+      action:
+        description: >-
+          Lifecycle action, shared across all storage backends. 'storage' (and its alias
+          'present') configure local-path; 'absent' is informational (local-path is built in
+          to K3s and is not removed automatically).
+        type: str
+        default: storage
+        choices:
+          - storage
+          - present
+          - absent
+      cp_kubeconfig_path:
+        description: Path to the cluster kubeconfig. Shared storage-interface var.
+        type: str
+        default: /etc/rancher/k3s/k3s.yaml
+      cp_storage_make_default:
+        description: Make local-path the default StorageClass. Shared storage-interface var.
+        type: bool
+        default: true
+      cp_storage_execute:
+        description: >-
+          Dry-run gate honoured by every storage backend. false validates action dispatch and
+          variable resolution without changing the node or cluster (used by molecule).
+        type: bool
+        default: true

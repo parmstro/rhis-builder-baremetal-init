@@ -1,0 +1,113 @@
+---
+# Smart card / PIV / CAC authentication for FreeIPA/IDM.
+# Supports: YubiKey PIV, standard PIV/CAC cards, any PKCS#11 token.
+# Configures: certmonger CA trust, pam_pkcs11 / SSSD PKCS#11, FreeIPA cert mapping.
+#
+# Physical token support:
+#   PIV/CAC    — any NIST SP 800-73 compliant card (CAC, PIV, YubiKey PIV mode)
+#   YubiKey    — use PIV mode (ykman piv commands) not OTP/FIDO2 mode
+#   FIDO2      — WebAuthn path; FreeIPA 4.9+ / RHEL 9 IdM supports FIDO2 passkeys
+
+- name: Validate smart_card action applies to this idm_type
+  ansible.builtin.assert:
+    that:
+      - idm_type in ['freeipa', 'rh_idm']
+    fail_msg: >-
+      idm_action: smart_card requires a FreeIPA/IDM server (idm_type: freeipa or rh_idm).
+
+- name: Validate smart card CA certificate
+  ansible.builtin.assert:
+    that:
+      - idm_smart_card_ca_cert | length > 0
+        or idm_smart_card_ca_cert_file | length > 0
+    fail_msg: >-
+      Either idm_smart_card_ca_cert (PEM string) or
+      idm_smart_card_ca_cert_file (path) must be set.
+
+- name: Install smart card support packages on server
+  ansible.builtin.package:
+    name:
+      - ipa-smartcard-server
+      - opensc
+      - pcsc-lite
+      - pcsc-lite-ccid
+    state: present
+  become: true
+
+- name: Start PC/SC daemon
+  ansible.builtin.service:
+    name: pcscd
+    enabled: true
+    state: started
+  become: true
+
+- name: Read CA cert from file when provided as path
+  ansible.builtin.slurp:
+    src: "{{ idm_smart_card_ca_cert_file }}"
+  register: _idm_sc_ca_cert_raw
+  when: idm_smart_card_ca_cert_file | length > 0
+
+- name: Set CA cert fact
+  ansible.builtin.set_fact:
+    _idm_sc_ca_cert_pem: >-
+      {{ idm_smart_card_ca_cert if idm_smart_card_ca_cert | length > 0
+         else (_idm_sc_ca_cert_raw.content | b64decode) }}
+
+- name: Write CA cert to temp file
+  ansible.builtin.copy:
+    content: "{{ _idm_sc_ca_cert_pem }}"
+    dest: /tmp/idm-sc-ca.pem
+    mode: "0644"
+  become: true
+
+- name: Enable smart card authentication in FreeIPA
+  ansible.builtin.command:
+    cmd: >-
+      ipa-advise config-server-for-smart-card-auth
+      | bash -s -- /tmp/idm-sc-ca.pem
+  register: _idm_sc_server_enable
+  changed_when: _idm_sc_server_enable.rc == 0
+  become: true
+  when: idm_smart_card_server_configure | bool
+
+- name: Configure user certificate mapping rules
+  freeipa.ansible_freeipa.ipacertmaprule:
+    ipaadmin_password: "{{ idm_admin_password }}"
+    name: "{{ item.name }}"
+    description: "{{ item.description | default('Smart card mapping rule') }}"
+    maprule: "{{ item.maprule }}"
+    matchrule: "{{ item.matchrule | default(omit) }}"
+    domain: "{{ item.domain | default(idm_domain) }}"
+    state: "{{ item.state | default('present') }}"
+  loop: "{{ idm_smart_card_cert_map_rules }}"
+  when: idm_smart_card_cert_map_rules | length > 0
+
+- name: Set users to require smart card authentication
+  freeipa.ansible_freeipa.ipauser:
+    ipaadmin_password: "{{ idm_admin_password }}"
+    name: "{{ item }}"
+    userauthtype:
+      - "{{ 'disabled' if idm_smart_card_password_fallback else '' }}"
+      - password
+      - otp
+    state: present
+  loop: "{{ idm_smart_card_required_users }}"
+  when: idm_smart_card_required_users | length > 0
+  loop_control:
+    label: "{{ item }}"
+
+- name: Configure client hosts for smart card login
+  ansible.builtin.command:
+    cmd: >-
+      ipa-advise config-client-for-smart-card-auth
+      | bash -s -- /tmp/idm-sc-ca.pem
+  register: _idm_sc_client_enable
+  changed_when: _idm_sc_client_enable.rc == 0
+  become: true
+  when: idm_smart_card_configure_clients | bool
+
+- name: Remove temp CA cert file
+  ansible.builtin.file:
+    path: /tmp/idm-sc-ca.pem
+    state: absent
+  become: true

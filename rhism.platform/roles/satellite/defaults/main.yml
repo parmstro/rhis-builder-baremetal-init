@@ -1,0 +1,97 @@
+---
+# satellite — standalone-first defaults over the SHARED content-management interface.
+#
+# Both content product roles (foreman / satellite) consume the SAME variable names, so the
+# content_management dispatcher selects either with one identical call —
+# `include_role: name="{{ content_type }}"` — and never needs per-product code. Standalone
+# callers set these same vars directly; the defaults below make the role runnable on its own.
+# Satellite is the Red Hat subscription product — it adds RHSM registration, manifest upload,
+# and CDN repository sets on top of the shared interface.
+
+# --------------------------------------------------------------------------- #
+# Product-internal constants (this product's identity — not meant to be tuned) #
+# --------------------------------------------------------------------------- #
+_content_collection: theforeman.foreman
+_content_installer_cmd: satellite-installer
+_content_installer_packages:
+  - satellite
+  - satellite-installer
+_content_rhsm_required: true
+_content_service_name: foreman
+_content_installer_scenario: satellite
+_content_cdn_supported: true
+
+# --------------------------------------------------------------------------- #
+# Shared action — passed in by the dispatcher; this default covers standalone. #
+# --------------------------------------------------------------------------- #
+action: status
+
+# --------------------------------------------------------------------------- #
+# Shared server connection (consumed by every API action).                    #
+# --------------------------------------------------------------------------- #
+content_server_url: "https://{{ ansible_fqdn | default('localhost') }}"
+content_username: admin
+content_password: ""
+content_validate_certs: true
+content_no_log: true       # set false in dev to see API task output
+
+# --------------------------------------------------------------------------- #
+# Shared scope.                                                                #
+# --------------------------------------------------------------------------- #
+content_organization: "Default Organization"
+content_location: "Default Location"
+
+# --------------------------------------------------------------------------- #
+# Shared install gate — dry-run by default. false shows the installer command  #
+# instead of running it (used by the molecule scenario).                       #
+# --------------------------------------------------------------------------- #
+content_install_execute: false
+
+# Extra args passed verbatim to satellite-installer.
+content_installer_extra_args: []
+
+# --------------------------------------------------------------------------- #
+# RHSM (satellite-only) — registration + manifest.                            #
+# --------------------------------------------------------------------------- #
+content_rhsm_org_id: ""
+content_rhsm_activation_key: ""
+content_rhsm_skip_registration: false
+content_rhsm_manifest_path: ""      # path to RHSM manifest .zip
+
+# --------------------------------------------------------------------------- #
+# Smart proxy — enable integrated DNS/DHCP/TFTP in the installer / firewall.   #
+# --------------------------------------------------------------------------- #
+content_proxy_dns: false
+content_proxy_dhcp: false
+content_proxy_tftp: false
+
+# --------------------------------------------------------------------------- #
+# Content data (all list-guarded — empty means the action is a no-op).         #
+# --------------------------------------------------------------------------- #
+content_products: []
+content_cdn_repository_sets: []     # satellite-only — RHSM subscription required
+content_lifecycle_environments: []
+content_sync_plans: []
+content_sync_now: false
+content_sync_products: []
+content_views: []
+content_views_publish: true
+content_views_promote: true
+content_host_collections: []
+content_activation_keys: []
+content_settings: []
+content_proxies: []
+content_compute_resources: []
+content_hosts: []
+content_host_execute: false
+
+# --- Disconnected content transfer (rhism Phase C item 3) -------------------
+content_exports: []
+content_pulp_export_dir: /var/lib/pulp/exports
+content_transfer_media_path: ""
+content_transfer_source_dir: "{{ content_pulp_export_dir }}"
+content_imports: []
+
+# --- SOE bundle model (rhism alignment plan reuse-map item 1) ---------------
+content_soe_bundles: []
+content_soe_bundles_execute: true

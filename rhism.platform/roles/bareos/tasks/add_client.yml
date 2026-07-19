@@ -1,0 +1,32 @@
+---
+# ---------------------------------------------------------------------------
+# add_client.yml — Register a new client resource with the director
+# ---------------------------------------------------------------------------
+
+- name: Validate add_client requirements
+  ansible.builtin.assert:
+    that:
+      - backup_bareos_client_name | length > 0
+      - backup_bareos_client_address | length > 0
+      - backup_bareos_client_password | length > 0
+    fail_msg: "backup_bareos_client_name, backup_bareos_client_address, and backup_bareos_client_password are required for add_client"
+
+- name: Register client with bareos director via bconsole
+  ansible.builtin.include_tasks: bconsole.yml
+  vars:
+    _bconsole_name: Register client with bareos director via bconsole
+    _bconsole_commands:
+      - >-
+        configure add client name={{ backup_bareos_client_name }}
+        address={{ backup_bareos_client_address }}
+        password={{ backup_bareos_client_password }}
+        fdport={{ backup_bareos_client_fd_port }}
+    _bconsole_no_log: true
+
+- name: Fail if client registration failed
+  ansible.builtin.fail:
+    msg: "Failed to register client '{{ backup_bareos_client_name }}' with bareos director"
+  when:
+    - _bconsole_result.rc is defined
+    - _bconsole_result.rc != 0
+    - "'successfully' not in _bconsole_result.stdout | lower"

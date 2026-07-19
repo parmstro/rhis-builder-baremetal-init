@@ -1,0 +1,308 @@
+---
+# Verify — re-proves every one of the 8 real HTTP behaviors from the manual
+# pre-flight verification (throwaway UBI9 nodejs-22 container, node
+# src/index.js, RHISM_UI_ADMIN_SECRET=test-secret-123) against the container
+# actually built and started by converge.yml, with real HTTP calls — not
+# just "the role deployed successfully".
+#
+# hosts: all targets the SAME nested-podman host converge.yml deployed onto
+# (builder-ui-el9). Every HTTP check below runs via `podman exec
+# rhism-ui curl ...` (curl executing INSIDE the app container's own
+# network namespace), NOT ansible.builtin.uri from the molecule host —
+# BUG-170: this specific triple-nested test topology (rootful podman inside
+# a --privileged container inside the EE inside the Podman Machine VM)
+# cannot complete a TCP connection through the loopback-published port's
+# hairpin-NAT path. Confirmed by direct investigation: the DNAT rule
+# (127.0.0.1:3001 -> container IP:3001) and route_localnet=1 on the bridge
+# are both correctly present, the app is confirmed listening on 0.0.0.0:3001
+# inside its own namespace, yet a SYN sent to 127.0.0.1:3001 from the SAME
+# host namespace the DNAT rule lives in is never forwarded — a kernel/
+# conntrack limitation specific to this nesting depth, not a defect in the
+# role, roles/podman, or the app. Running curl in the SAME namespace as the
+# listener sidesteps the hairpin path entirely. This does NOT weaken what's
+# actually being verified: the loopback-only PUBLISH itself (the real
+# security property `rhism_ui_port` protects) is independently proven
+# below by real behavior 9, a static `podman port` check with no network
+# traffic involved at all.
+#
+# Test constants below MUST match the identical literals in converge.yml —
+# set_fact does not carry state between molecule's converge.yml and
+# verify.yml (separate ansible-playbook runs).
+- name: Verify — real HTTP behaviors against the live rhism-ui container
+  hosts: all
+  gather_facts: false
+  vars:
+    _rhism_ui_admin_secret: "molecule-test-secret-do-not-reuse"          # pragma: allowlist secret
+    _rhism_ui_wrong_secret: "definitely-not-the-secret"                  # pragma: allowlist secret
+    _rhism_ui_deployment_path: /tmp/rhism_ui_deployment
+    _rhism_ui_traversal_domain: "../../../../tmp/pwned"
+    # -i so stdin forwards through to curl for behavior 7a's JSON body
+    # (avoids shell-quoting a JSON payload containing double quotes into a
+    # single cmd: string — command's own stdin: param is safer).
+    _rhism_ui_curl_exec: podman exec -i rhism-ui curl -s
+    _rhism_ui_url: http://127.0.0.1:3001
+
+  tasks:
+    - name: "Real behavior 1 — POST /api/session/claim with no X-Admin-Secret returns 401"
+      ansible.builtin.command:
+        cmd: >-
+          {{ _rhism_ui_curl_exec }} -o /dev/null -w '%{http_code}'
+          -X POST {{ _rhism_ui_url }}/api/session/claim
+      register: _v1
+      changed_when: false
+
+    - name: Assert behavior 1 — unauthenticated claim rejected
+      ansible.builtin.assert:
+        that:
+          - _v1.stdout == '401'
+        fail_msg: "unauthenticated claim returned {{ _v1.stdout }}, expected 401"
+        success_msg: "PASS — unauthenticated claim rejected with 401"
+
+    - name: "Real behavior 2 — POST /api/session/claim with the correct X-Admin-Secret returns 200 with a real token"
+      ansible.builtin.command:
+        cmd: >-
+          {{ _rhism_ui_curl_exec }} -o /tmp/_v2_body.json -w '%{http_code}'
+          -X POST -H "X-Admin-Secret: {{ _rhism_ui_admin_secret }}"
+          {{ _rhism_ui_url }}/api/session/claim
+      register: _v2
+      changed_when: false
+
+    - name: Read behavior 2's response body
+      ansible.builtin.command:
+        cmd: podman exec rhism-ui cat /tmp/_v2_body.json
+      register: _v2_body_raw
+      changed_when: false
+
+    - name: Assert behavior 2 returned a real JSON token
+      vars:
+        _v2_json: "{{ _v2_body_raw.stdout | from_json }}"
+      ansible.builtin.assert:
+        that:
+          - _v2.stdout == '200'
+          - _v2_json.token is defined
+          - _v2_json.token | length > 0
+        fail_msg: "claim with the correct secret did not return a real token: status={{ _v2.stdout }} body={{ _v2_body_raw.stdout }}"
+        success_msg: "PASS — claim with the correct secret returned a real token"
+
+    - name: Capture behavior 2's token for the later reconnect/deployment behaviors
+      ansible.builtin.set_fact:
+        _v2_token: "{{ (_v2_body_raw.stdout | from_json).token }}"
+
+    - name: "Real behavior 3 — POST /api/session/claim with a WRONG X-Admin-Secret returns 401"
+      ansible.builtin.command:
+        cmd: >-
+          {{ _rhism_ui_curl_exec }} -o /dev/null -w '%{http_code}'
+          -X POST -H "X-Admin-Secret: {{ _rhism_ui_wrong_secret }}"
+          {{ _rhism_ui_url }}/api/session/claim
+      register: _v3
+      changed_when: false
+
+    - name: Assert behavior 3 — wrong-secret claim rejected
+      ansible.builtin.assert:
+        that:
+          - _v3.stdout == '401'
+        fail_msg: "claim with a wrong secret returned {{ _v3.stdout }}, expected 401"
+        success_msg: "PASS — claim with a wrong secret rejected with 401"
+
+    - name: "Real behavior 4 — POST /api/session/steal with no X-Admin-Secret returns 401"
+      ansible.builtin.command:
+        cmd: >-
+          {{ _rhism_ui_curl_exec }} -o /dev/null -w '%{http_code}'
+          -X POST {{ _rhism_ui_url }}/api/session/steal
+      register: _v4
+      changed_when: false
+
+    - name: Assert behavior 4 — unauthenticated steal rejected
+      ansible.builtin.assert:
+        that:
+          - _v4.stdout == '401'
+        fail_msg: "unauthenticated steal returned {{ _v4.stdout }}, expected 401"
+        success_msg: "PASS — unauthenticated steal rejected with 401"
+
+    - name: "Real behavior 5 — GET /healthz with no CORS origin configured has no Access-Control-Allow-Origin header"
+      ansible.builtin.command:
+        cmd: >-
+          {{ _rhism_ui_curl_exec }} -D /tmp/_v5_headers.txt -o /dev/null -w '%{http_code}'
+          -H "Origin: http://evil.example.com"
+          {{ _rhism_ui_url }}/healthz
+      register: _v5
+      changed_when: false
+
+    - name: Read behavior 5's response headers
+      ansible.builtin.command:
+        cmd: podman exec rhism-ui cat /tmp/_v5_headers.txt
+      register: _v5_headers
+      changed_when: false
+
+    - name: Assert behavior 5 — no CORS header present
+      ansible.builtin.assert:
+        that:
+          - _v5.stdout == '200'
+          - "'access-control-allow-origin' not in (_v5_headers.stdout | lower)"
+        fail_msg: >-
+          Access-Control-Allow-Origin was present even though
+          rhism_ui_allowed_origin is unset — CORS should be fully
+          disabled. Headers: {{ _v5_headers.stdout }}
+        success_msg: "PASS — no Access-Control-Allow-Origin header; CORS is genuinely disabled"
+
+    - name: "Real behavior 6 — reconnect: POST /api/session/claim with a valid X-Session-Token (no secret) returns 200"
+      ansible.builtin.command:
+        cmd: >-
+          {{ _rhism_ui_curl_exec }} -o /tmp/_v6_body.json -w '%{http_code}'
+          -X POST -H "X-Session-Token: {{ _v2_token }}"
+          {{ _rhism_ui_url }}/api/session/claim
+      register: _v6
+      changed_when: false
+
+    - name: Read behavior 6's response body
+      ansible.builtin.command:
+        cmd: podman exec rhism-ui cat /tmp/_v6_body.json
+      register: _v6_body_raw
+      changed_when: false
+
+    - name: Assert behavior 6 — reconnect returned a valid token without presenting the secret
+      vars:
+        _v6_json: "{{ _v6_body_raw.stdout | from_json }}"
+      ansible.builtin.assert:
+        that:
+          - _v6.stdout == '200'
+          - _v6_json.token is defined
+          - _v6_json.token | length > 0
+        fail_msg: "reconnect via a valid X-Session-Token did not return a valid token: status={{ _v6.stdout }} body={{ _v6_body_raw.stdout }}"
+        success_msg: "PASS — reconnect via a valid X-Session-Token worked without re-presenting the admin secret"
+
+    - name: "Real behavior 7a — PUT /api/deployment/site with a path-traversal domain value succeeds (state set, not yet exported)"
+      # Body is piped via stdin (command's stdin: param + curl's --data-binary
+      # @-) rather than embedded in the cmd string — a JSON payload's own
+      # double quotes would otherwise collide with command's shlex-style
+      # parsing of the cmd string.
+      ansible.builtin.command:
+        cmd: >-
+          {{ _rhism_ui_curl_exec }} -o /dev/null -w '%{http_code}'
+          -X PUT -H "X-Session-Token: {{ _v2_token }}"
+          -H "Content-Type: application/json"
+          --data-binary @-
+          {{ _rhism_ui_url }}/api/deployment/site
+        stdin: "{{ {'basevars_global_domain_name': _rhism_ui_traversal_domain} | to_json }}"
+      register: _v7a
+      changed_when: false
+
+    - name: Assert behavior 7a — site update accepted (state set, not yet exported)
+      ansible.builtin.assert:
+        that:
+          - _v7a.stdout == '200'
+        fail_msg: "PUT /api/deployment/site returned {{ _v7a.stdout }}, expected 200"
+        success_msg: "PASS — traversal domain value accepted at the state-setting step (export is where it must be rejected)"
+
+    - name: "Real behavior 7b — POST /api/deployment/export rejects the unsafe domain with 400"
+      ansible.builtin.command:
+        cmd: >-
+          {{ _rhism_ui_curl_exec }} -o /tmp/_v7b_body.json -w '%{http_code}'
+          -X POST -H "X-Session-Token: {{ _v2_token }}"
+          {{ _rhism_ui_url }}/api/deployment/export
+      register: _v7b
+      changed_when: false
+
+    - name: Read behavior 7b's response body
+      ansible.builtin.command:
+        cmd: podman exec rhism-ui cat /tmp/_v7b_body.json
+      register: _v7b_body_raw
+      changed_when: false
+
+    - name: Assert behavior 7b — error mentions "Invalid domain value"
+      vars:
+        _v7b_json: "{{ _v7b_body_raw.stdout | from_json }}"
+      ansible.builtin.assert:
+        that:
+          - _v7b.stdout == '400'
+          - "'Invalid domain value' in _v7b_json.error"
+        fail_msg: "export did not reject the unsafe domain with the expected error: status={{ _v7b.stdout }} body={{ _v7b_body_raw.stdout }}"
+        success_msg: "PASS — export rejected the path-traversal domain with 'Invalid domain value'"
+
+    - name: "Real behavior 7c — the resolved-away path was never created INSIDE the container's own filesystem"
+      # utils.js's assertSafeSegment/resolve() run inside the Node process,
+      # which sees the CONTAINER's filesystem — a traversal escaping
+      # DEPLOYMENT_PATH (/deployments in-container) resolves to /tmp/pwned
+      # inside the container's own root, not onto the host bind-mount (that
+      # would only happen if DEPLOYMENT_PATH itself were the escape target).
+      # This is the technically-precise check for where the exploit would
+      # actually have landed had the guard failed.
+      ansible.builtin.command:
+        cmd: podman exec rhism-ui test -e /tmp/pwned
+      register: _v7c_container
+      failed_when: false
+      changed_when: false
+
+    - name: Assert behavior 7c — traversal target does not exist inside the container
+      ansible.builtin.assert:
+        that:
+          - _v7c_container.rc != 0
+        fail_msg: >-
+          /tmp/pwned exists inside the rhism-ui container — the
+          path-traversal guard in utils.js did not hold.
+        success_msg: "PASS — no file was written to the resolved-away path inside the container"
+
+    - name: "Real behavior 7d — the DEPLOYMENT_PATH bind-mount tree itself also shows nothing escaped onto the host"
+      # Literal host-side check of the resolved-away path under the
+      # bind-mounted DEPLOYMENT_PATH, as an additional negative control (see
+      # 7c above for the technically-precise in-container check of where the
+      # exploit target actually resolves).
+      ansible.builtin.stat:
+        path: "{{ _rhism_ui_deployment_path }}/../../../../tmp/pwned"
+      register: _v7d
+
+    - name: Assert behavior 7d — resolved-away host path does not exist
+      ansible.builtin.assert:
+        that:
+          - not _v7d.stat.exists
+        fail_msg: >-
+          {{ _rhism_ui_deployment_path }}/../../../../tmp/pwned exists on
+          the host — something wrote outside the intended deployment tree.
+        success_msg: "PASS — nothing was written to the resolved-away path on the host either"
+
+    - name: "Real behavior 8 — GET /healthz returns 200 with real liveness JSON"
+      ansible.builtin.command:
+        cmd: >-
+          {{ _rhism_ui_curl_exec }} -o /tmp/_v8_body.json -w '%{http_code}'
+          {{ _rhism_ui_url }}/healthz
+      register: _v8
+      changed_when: false
+
+    - name: Read behavior 8's response body
+      ansible.builtin.command:
+        cmd: podman exec rhism-ui cat /tmp/_v8_body.json
+      register: _v8_body_raw
+      changed_when: false
+
+    - name: Assert behavior 8 — real liveness JSON
+      vars:
+        _v8_json: "{{ _v8_body_raw.stdout | from_json }}"
+      ansible.builtin.assert:
+        that:
+          - _v8.stdout == '200'
+          - _v8_json.service == 'rhis-builder-ui'
+          - _v8_json.status == 'ok'
+        fail_msg: "/healthz did not return the expected liveness JSON: {{ _v8_body_raw.stdout }}"
+        success_msg: "PASS — /healthz reports {{ _v8_json.service }}/{{ _v8_json.status }}"
+
+    - name: "Bonus real behavior 9 — the published port is bound to 127.0.0.1 only, not 0.0.0.0"
+      # Beyond the 8 required assertions: directly proves the loopback-only
+      # design guarantee documented in index.js/run_container.sh (both the
+      # app-layer HOST bind and podman's own -p 127.0.0.1:... publish must
+      # agree) using the same live container, not a separate claim. This is
+      # the check that actually verifies the security property BUG-170's
+      # workaround above sidesteps for the functional behaviors — a static
+      # config check needs no network traffic at all, so it is unaffected by
+      # the hairpin-NAT limitation.
+      ansible.builtin.command:
+        cmd: podman port rhism-ui
+      register: _v9
+      changed_when: false
+
+    - name: Assert behavior 9 — publish binding is loopback-only
+      ansible.builtin.assert:
+        that:
+          - "'127.0.0.1:3001' in _v9.stdout"
+          - "'0.0.0.0:3001' not in _v9.stdout"
+        fail_msg: "rhism-ui's port publish is not loopback-only: {{ _v9.stdout }}"
+        success_msg: "PASS — rhism-ui is published on 127.0.0.1 only ({{ _v9.stdout | trim }})"

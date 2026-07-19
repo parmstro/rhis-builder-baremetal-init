@@ -1,0 +1,51 @@
+---
+- name: Enable EPEL repository
+  ansible.builtin.package:
+    name: epel-release
+    state: present
+  when: linux_packages_enable_epel | bool
+
+- name: Install security tooling
+  ansible.builtin.package:
+    name: "{{ linux_packages_install }}"
+    state: present
+
+# AIDE is useless until its baseline database exists; scheduled integrity
+# checks silently do nothing without it. Opt-in via linux_packages_aide_init.
+- name: Initialise the AIDE baseline database # noqa: command-instead-of-module
+  ansible.builtin.command:
+    cmd: aide --init
+    creates: /var/lib/aide/aide.db.new.gz
+  when:
+    - linux_packages_aide_init | bool
+    - "'aide' in linux_packages_install"
+
+- name: Activate the initialised AIDE database # noqa: command-instead-of-module no-changed-when
+  ansible.builtin.command:
+    cmd: mv /var/lib/aide/aide.db.new.gz /var/lib/aide/aide.db.gz
+    creates: /var/lib/aide/aide.db.gz
+    removes: /var/lib/aide/aide.db.new.gz
+  when:
+    - linux_packages_aide_init | bool
+    - "'aide' in linux_packages_install"
+
+# rkhunter needs --update (data files) and --propupd (file-property baseline)
+# before its checks mean anything. rc semantics for --update: 0 = nothing new,
+# 2 = updated, 1 = error — hence the explicit changed/failed mapping.
+- name: Update rkhunter data files # noqa: command-instead-of-module
+  ansible.builtin.command:
+    cmd: rkhunter --update --nocolors
+  register: linux_packages_rkhunter_update
+  changed_when: linux_packages_rkhunter_update.rc == 2
+  failed_when: linux_packages_rkhunter_update.rc not in [0, 2]
+  when:
+    - linux_packages_rkhunter_init | bool
+    - "'rkhunter' in linux_packages_install"
+
+- name: Baseline rkhunter file properties # noqa: command-instead-of-module no-changed-when
+  ansible.builtin.command:
+    cmd: rkhunter --propupd
+  changed_when: true
+  when:
+    - linux_packages_rkhunter_init | bool
+    - "'rkhunter' in linux_packages_install"

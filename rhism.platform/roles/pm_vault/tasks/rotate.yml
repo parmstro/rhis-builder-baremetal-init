@@ -1,0 +1,43 @@
+---
+# pm_vault — rotate action.
+# Generates a new ISM-compliant password and writes it as a new KV version.
+# KV v2 retains the full version history automatically — ISM-0408 is satisfied
+# by Vault's built-in versioning (max_versions controls retention).
+
+- name: Authenticate to Vault
+  ansible.builtin.include_tasks: connect.yml
+
+- name: Generate new ISM-compliant password
+  ansible.builtin.include_tasks: generate.yml
+
+- name: Set new password fact
+  ansible.builtin.set_fact:
+    _pm_password: "{{ _pm_generated.stdout }}"
+  no_log: true
+
+- name: Write new password version to Vault KV
+  community.hashi_vault.vault_kv2_write:
+    url: "{{ pm_vault_url }}"
+    namespace: "{{ pm_vault_namespace | default(omit) }}"
+    token: "{{ _pm_vault_token }}"
+    engine_mount_point: "{{ pm_vault_kv_mount }}"
+    path: "{{ _pm_vault_kv_path }}"
+    data:
+      password: "{{ _pm_password }}"
+      target: "{{ pm_target }}"
+      service: "{{ pm_service | default('') }}"
+      created_by: "ansible/password_management"
+      ism_controls: "ISM-0406,ISM-0407,ISM-0408,ISM-0410,ISM-0411,ISM-0412"
+      expiry_days: "{{ pm_expiry_days }}"
+      length: "{{ _pm_password | length }}"
+  delegate_to: localhost
+  no_log: true
+
+- name: Expose rotated result (no_log on callers)
+  ansible.builtin.set_fact:
+    pm_result:
+      password: "{{ _pm_password }}"
+      target: "{{ pm_target }}"
+      backend: vault
+      vault_path: "{{ pm_vault_kv_mount }}/{{ _pm_vault_kv_path }}"
+  no_log: true

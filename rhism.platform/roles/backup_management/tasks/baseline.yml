@@ -1,0 +1,16 @@
+---
+- name: Install backup server components
+  ansible.builtin.include_tasks: server.yml
+  when: backup_apply_server | bool
+
+- name: Install backup client
+  ansible.builtin.include_tasks: client.yml
+  when: backup_apply_client | bool
+
+- name: Configure backup schedule
+  ansible.builtin.include_tasks: schedule.yml
+  when: backup_apply_schedule | bool
+
+- name: Verify backups
+  ansible.builtin.include_tasks: verify.yml
+  when: backup_apply_verify | bool

@@ -1,0 +1,99 @@
+---
+# Role control
+pb_action: plan
+
+# Manifest path — written by rhism.platform.wizard. Points at the wizard's
+# own default output filename (rhism-deployment-manifest.yml), a deliberately
+# distinct default so that two manifests sharing the same directory on one
+# control host never silently overwrite each other.
+pb_manifest_path: /opt/rhism/manifests/rhism-deployment-manifest.yml
+
+# Execution gate — dry-run by default (passed to all child roles)
+pb_deploy_execute: false
+
+# Component-level overrides (override manifest selection)
+pb_enable_security: ""        # empty = use manifest; true/false = override
+pb_enable_hypervisor: ""      # KVM/libvirt compute substrate (estate: kvm)
+pb_enable_identity: ""
+pb_enable_provisioning: ""
+pb_enable_secrets: ""
+pb_enable_content: ""
+pb_enable_mail: ""
+pb_enable_scm: ""
+pb_enable_backup: ""
+pb_enable_container_platform: ""
+pb_enable_monitoring: ""
+pb_enable_automation: ""       # Ansible Automation Platform (estate: aap)
+
+# Type overrides (override manifest types)
+pb_hypervisor_type: ""        # empty = use manifest; kvm (vmware/proxmox not vendored)
+pb_identity_type: ""          # empty = use manifest; value = override
+pb_provisioning_type: ""
+pb_pm_type: ""                # secrets backend: ansible | vault | thycotic
+pb_content_type: ""
+pb_mail_type: ""
+pb_scm_type: ""
+pb_backup_type: ""
+pb_cp_type: ""
+pb_automation_type: ""        # empty = use manifest; aap
+
+# AAP config-as-code (Step 10 configure) — the controller URL AAP's own
+# configuration engine targets after a real install. Empty (default) skips the
+# configure step entirely; a real controller URL enables it (only when
+# pb_deploy_execute is true — see deploy.yml Step 10).
+pb_aap_controller_host: ""
+
+# Secrets — pm_action for the Step 3.5 dispatch (create is the only sane
+# default for a platform deploy; pm_execute is wired to pb_deploy_execute)
+pb_pm_action: create
+
+# Baseline toggles for component roles (passed to child role baseline actions)
+pb_idm_apply_server: true
+pb_idm_apply_dns: true
+pb_idm_apply_client: false
+# AD trust (rhism Phase D) — manifest-driven like pb_enable_*/pb_*_type: empty
+# string means "use components.identity.ad_trust.enabled from the manifest"
+# (default false when the manifest carries no ad_trust block at all); true/false
+# still overrides the manifest at deploy time, same override semantics as every
+# other pb_enable_<component> var. Off by default either way — this establishes
+# a REAL cross-realm Kerberos trust (freeipa.ansible_freeipa.ipatrust) with an
+# existing AD forest; only applicable when identity.type is freeipa/rh_idm.
+pb_idm_apply_trust: ""
+# AD trust connection details — domain/admin/range_type flow from the manifest's
+# components.identity.ad_trust block; the admin password never does (no secret
+# material in the manifest — same posture as every other credential in this
+# platform). Set via -e/vault at deploy time when pb_idm_apply_trust is true.
+pb_idm_ad_trust_password: ""
+
+pb_content_apply_install: true
+pb_content_apply_configure: true
+pb_content_apply_repos: true
+pb_content_apply_sync: false   # sync is slow — disabled by default
+
+pb_scm_apply_install: true
+pb_scm_apply_configure: true
+pb_scm_apply_runners: false
+
+pb_backup_apply_server: true
+pb_backup_apply_client: true
+
+pb_cp_apply_install: true
+pb_cp_apply_configure: true
+pb_cp_apply_storage: true
+pb_cp_apply_registry: false
+pb_cp_apply_ingress: true
+
+# ===========================================================================
+# Capacity planning — t-shirt sizing for the ORCHESTRATOR ITSELF (docs/
+# capacity-planning.md in the orchestration repo). Named pb_sizing, not
+# builder_sizing — every other variable in this role already uses the pb_
+# prefix (pb_action, pb_manifest_path, pb_enable_*, pb_*_type), so a
+# builder_-prefixed outlier would be inconsistent with the role's own
+# established namespace; this is a deliberate deviation from
+# capacity-planning.md's literal <role>_sizing wording, not an oversight.
+# Trivial and effectively invariant: the orchestrator is pure control-node
+# Ansible logic with no persistent service of its own. ADDITIVE figures, OS
+# baseline excluded (1 vCPU / 2 GB RAM / 20 GB disk, RHEL 9).
+pb_sizing: s
+pb_sizing_profiles:
+  s: {cpu: 1, ram_mb: 512, disk_gb: 1}

@@ -1,0 +1,8 @@
+---
+- name: Basic linux_selinux role test
+  hosts: linux_hosts
+  gather_facts: true
+  roles:
+    - role: linux_selinux
+      vars:
+        linux_selinux_action: enforce

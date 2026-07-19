@@ -1,0 +1,75 @@
+---
+# Functional requirements — satellite_proxy (requirements->test-case layer +
+# Tier-3 elevation, owner rules 2026-07-12). This role is a provisioning_services
+# BACKEND (shared prov_* interface; siblings dnsmasq/cobbler/foreman_proxy),
+# NOT a content_management member — so its family lab is
+# playbooks/provisioning_services.yml (prov_type=satellite_proxy), not
+# content_management.yml. Product capability fact-checked against the official
+# Red Hat Satellite / Foreman Smart Proxy docs (docs.redhat.com Satellite
+# capsule; theforeman.org smart-proxy: DNS, DHCP, TFTP/PXE; registration with a
+# Satellite server via redhat.satellite). Curated against README +
+# meta/argument_specs.yml action set + tasks/. The Satellite server side needs
+# an entitled subscription — so register/status/end-to-end are genuinely
+# uncoverable in CI (honest UNCOVERED).
+functional_requirements:
+  - req_id: SATELLITE_PROXY-FR-001
+    statement: >-
+      The role SHALL consume the shared provisioning_services interface (bare
+      action + prov_* vars) with the prov_execute dry-run gate, and pass its
+      contract scenario — argument-spec validation, standalone default
+      (action=configure), a dispatch task file for every declared action, and
+      the negative (bad-action) path — without touching the host.
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: SATELLITE_PROXY-FR-002
+    statement: >-
+      The 'present'/'absent' actions SHALL install/remove the foreman-proxy
+      package and open/close the firewall for DNS, DHCP, TFTP, and the 8443/tcp
+      API port.
+    tier: 3
+    verified_by:
+      - lab: playbooks/provisioning_services.yml#satellite_proxy
+
+  - req_id: SATELLITE_PROXY-FR-003
+    statement: >-
+      The 'configure' action SHALL render the smart proxy configuration
+      advertising the enabled capabilities
+      (prov_smartproxy_dns/dhcp/tftp/realm).
+    tier: 3
+    verified_by:
+      - lab: playbooks/provisioning_services.yml#satellite_proxy
+
+  - req_id: SATELLITE_PROXY-FR-004
+    statement: >-
+      The 'register' action SHALL register this smart proxy (prov_smartproxy_url)
+      with a Satellite server via the redhat.satellite collection — genuinely
+      uncoverable by CI (needs an entitled Satellite server).
+    tier: 3
+    verified_by: []
+
+  - req_id: SATELLITE_PROXY-FR-005
+    statement: >-
+      The 'status' action SHALL query this proxy's registration state via the
+      Satellite API — genuinely uncoverable by CI (needs an entitled Satellite
+      server).
+    tier: 3
+    verified_by: []
+
+  - req_id: SATELLITE_PROXY-FR-006
+    statement: >-
+      The role SHALL manage the foreman-proxy service lifecycle
+      (started/stopped/restarted).
+    tier: 3
+    verified_by:
+      - lab: playbooks/provisioning_services.yml#satellite_proxy
+
+  - req_id: SATELLITE_PROXY-FR-007
+    statement: >-
+      The registered smart proxy SHALL front DNS, DHCP, and TFTP/PXE for a
+      remote network segment so a lab host PXE-boots through it — genuinely
+      uncoverable by CI (needs an entitled Satellite server + managed subnet +
+      PXE client).
+    tier: 3
+    verified_by: []

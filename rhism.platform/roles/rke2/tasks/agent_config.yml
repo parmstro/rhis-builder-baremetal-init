@@ -1,0 +1,24 @@
+---
+# ── Shared: prepare agent config for cluster join ────────────────────────────
+# Included by add_node.yml — sets up config dir and join credentials.
+
+- name: Ensure rke2 config directory exists for agent
+  ansible.builtin.file:
+    path: "{{ _cp_config_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+
+- name: Write rke2 agent join config
+  ansible.builtin.copy:
+    content: |
+      server: {{ cp_server_url }}
+      token: {{ cp_node_token }}
+    dest: "{{ _cp_config_file }}"
+    owner: root
+    group: root
+    mode: "0600"
+  become: true
+  no_log: true

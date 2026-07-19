@@ -1,0 +1,6 @@
+---
+# Molecule fixture — an INVALID catalogue entry (name only, none of the
+# content/templates/lifecycle sections) used exclusively by the negative
+# validate play: the role must reject it with a clear schema failure.
+name: bad_entry
+notes: "this entry deliberately carries no bundle model section"

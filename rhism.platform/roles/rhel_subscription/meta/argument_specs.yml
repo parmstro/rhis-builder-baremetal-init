@@ -1,0 +1,90 @@
+---
+argument_specs:
+  main:
+    short_description: >-
+      RHSM registration dispatcher (register via activation-key or username/password,
+      or unregister). Standalone-first capability role.
+    description: >-
+      Consolidates the RHSM registration logic previously duplicated near-identically
+      across rh_idm, satellite, gitlab_ee, ocp, and the wizard's licensing page
+      (all activation-key-only). Adds a username/password registration mode alongside
+      the existing activation-key mode. The argument spec enforces the action/method
+      choices at role entry; per-method required-field validation (which fields are
+      required depends on rhel_subscription_method) is a manual assert in
+      tasks/register.yml, since role argument_specs does not support required_if
+      (module argument_spec only — confirmed against ansible-core docs).
+    options:
+      rhel_subscription_action:
+        description: Whether to register or unregister the host.
+        type: str
+        default: register
+        choices:
+          - register
+          - unregister
+      rhel_subscription_method:
+        description: >-
+          Registration method when rhel_subscription_action is register. activation_key
+          uses rhel_subscription_org_id/rhel_subscription_activation_key. username_password
+          uses rhel_subscription_username/rhel_subscription_password.
+        type: str
+        default: activation_key
+        choices:
+          - activation_key
+          - username_password
+      rhel_subscription_org_id:
+        description: Organization ID. Required when rhel_subscription_method is activation_key.
+        type: str
+        default: ""
+      rhel_subscription_activation_key:
+        description: >-
+          Activation key. Required when rhel_subscription_method is activation_key.
+        type: str
+        default: ""
+      rhel_subscription_username:
+        description: >-
+          access.redhat.com / Satellite / Katello username. Required when
+          rhel_subscription_method is username_password.
+        type: str
+        default: ""
+      rhel_subscription_password:
+        description: >-
+          access.redhat.com / Satellite / Katello password. Required when
+          rhel_subscription_method is username_password.
+        type: str
+        default: ""
+      rhel_subscription_pool_ids:
+        description: >-
+          Subscription pool IDs to consume. Meaningful for either method; commonly used
+          with username_password when auto-attach isn't desired or isn't sufficient.
+        type: list
+        elements: str
+        default: []
+      rhel_subscription_auto_attach:
+        description: >-
+          Auto-consume available subscriptions on successful registration. Passed through
+          to community.general.redhat_subscription's auto_attach parameter unchanged when
+          set; left unset (module default) when not overridden.
+        type: bool
+        required: false
+      rhel_subscription_consumer_name:
+        description: Name of the system to register. Defaults to the hostname (module default) when empty.
+        type: str
+        default: ""
+      rhel_subscription_server_hostname:
+        description: >-
+          Alternative RHSM server (e.g. an on-prem Satellite) instead of the public CDN.
+          Empty uses the module/subscription-manager default.
+        type: str
+        default: ""
+      rhel_subscription_force_register:
+        description: Register even if the host is already registered.
+        type: bool
+        default: false
+      rhel_subscription_skip:
+        description: >-
+          Master off switch — when true, no real RHSM call is made for either register or
+          unregister. Mirrors the *_rhsm_skip_registration gate the 5 consolidated callers
+          used individually before this role existed. Used by molecule to keep CI safe on
+          containers with no subscription-manager / no real Red Hat entitlement.
+        type: bool
+        default: false

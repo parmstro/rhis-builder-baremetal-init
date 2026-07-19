@@ -1,0 +1,26 @@
+---
+# k3s product role — action-driven dispatch
+#
+# Called exclusively via include_role from container_platform dispatcher.
+# Action is passed via vars: {action: "<action>"}.
+#
+# Actions:
+#   present / absent       — install or remove k3s
+#   configure              — deploy config.yaml, validate, kubeconfig symlink
+#   started / stopped / restarted — manage k3s service state
+#   add_node / remove_node — join or evict a worker node
+#   upgrade                — in-place upgrade via install script
+#   backup / restore       — etcd snapshot save / restore
+#   reset                  — confirmed full teardown
+#   status                 — report cluster node list and config check
+#
+# The action + variable interface is validated by meta/argument_specs.yml (ansible-core
+# runs the validation automatically at role entry — no manual assert needed).
+
+# ── dispatch ──────────────────────────────────────────────────────────────────
+
+- name: "k3s — {{ action }}"
+  ansible.builtin.include_tasks: "{{ _k3s_task_file }}"
+  vars:
+    _k3s_task_file: >-
+      {{ 'service.yml' if action in ['started', 'stopped', 'restarted'] else action ~ '.yml' }}

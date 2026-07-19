@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+CLAUDE.md
+
+# Ansible
+*.retry
+.ansible/
+fact_cache/
+
+# Molecule
+.molecule/
+
+# Local secrets / env overrides (never commit real creds)
+*_passwords.yml
+.env
+# RHSM activation key — secret-mount pattern, never committed (0600, secret-mounted)
+activation-key
+activation-key.*
+*.activation-key
+
+# Test logs (written by pre-commit hook)
+logs/
+
+# Editor artifacts
+*.swp
+*.swo
+*~
+
+# Local CI runtime state
+.local-*
+
+# Generated output
+output/
+
+# Build artifacts
+*.tar.gz

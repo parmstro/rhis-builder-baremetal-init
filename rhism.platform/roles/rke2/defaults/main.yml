@@ -1,0 +1,60 @@
+---
+# rke2 — standalone-first defaults over the SHARED container-platform interface.
+#
+# Every Kubernetes-distro product role (k3s / rke2 / okd / ocp) consumes the SAME
+# variable names (bare `action` + cp_* vars), so the container_platform dispatcher selects
+# any of them with one identical call — `include_role: name="{{ cp_type }}"` — and never
+# needs per-distro code. Standalone callers set these same vars directly; the defaults below
+# make the role runnable on its own.
+
+# Shared action — the dispatcher passes it via include_role vars; this default covers
+# standalone use. Actions: present | absent | configure | started | stopped | restarted |
+# add_node | remove_node | upgrade | backup | restore | reset | status.
+action: present
+
+# ── Shared container-platform interface (consumed by every distro) ────────────────
+# Node role — control_plane installs an rke2-server, worker installs an rke2-agent.
+cp_node_role: control_plane
+# Version pin (empty → latest). Passed as INSTALL_RKE2_VERSION.
+cp_install_version: ""
+# Worker join parameters (written to the agent config for add_node / worker installs).
+cp_server_url: ""
+cp_node_token: ""
+# Standard-path kubeconfig symlink target (created only when set and != the on-node path).
+cp_kubeconfig_path: /etc/rancher/rke2/rke2.yaml
+# Server config knobs consumed by templates/rke2-config.yaml.j2 (all optional).
+# Additional TLS SANs for the API server cert (host/IP the kubeconfig will be reached at).
+cp_tls_sans: []
+# Bundled components to disable on the server (e.g. rke2-ingress-nginx, rke2-metrics-server).
+cp_disable_components: []
+# Pod / service network CIDRs (empty → rke2 defaults 10.42.0.0/16 and 10.43.0.0/16).
+cp_cluster_cidr: ""
+cp_service_cidr: ""
+# etcd snapshot names for backup / restore.
+cp_backup_snapshot_name: "{{ inventory_hostname }}-rke2"
+cp_restore_snapshot_name: ""
+# Safety confirmation required before the destructive reset (teardown) action.
+cp_reset_confirm: false
+
+# ── rke2 distribution facts (private; also provided by container_platform vars/rke2.yml) ──
+_cp_install_script_url: https://get.rke2.io
+_cp_packages: []
+_cp_config_dir: /etc/rancher/rke2
+_cp_config_file: /etc/rancher/rke2/config.yaml
+_cp_kubeconfig_path: /etc/rancher/rke2/rke2.yaml
+_cp_service_name: rke2-server
+_cp_service_name_agent: rke2-agent
+_cp_binary: /usr/local/bin/rke2
+_cp_kubectl_cmd: /var/lib/rancher/rke2/bin/kubectl
+_cp_rhsm_required: false
+_cp_has_builtin_registry: false
+_cp_has_builtin_ingress: true
+_cp_builtin_ingress_name: rke2-ingress-nginx
+_cp_firewall_ports:
+  - 6443/tcp
+  - 9345/tcp
+  - 10250/tcp
+  - 8472/udp
+  - 4789/udp
+  - 2379/tcp
+  - 2380/tcp

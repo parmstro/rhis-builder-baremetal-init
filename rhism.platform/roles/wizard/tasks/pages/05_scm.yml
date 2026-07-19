@@ -1,0 +1,31 @@
+---
+- name: Select SCM platform
+  ansible.builtin.command:
+    cmd: >-
+      {{ wizard_tui_backend }} --title "{{ wizard_tui_title }}"
+      --radiolist "Select source control and CI platform:" {{ wizard_tui_height }} {{ wizard_tui_width }} 3
+      "gitlab_ce" "GitLab CE (free, self-hosted)"            ON
+      "gitlab_ee" "GitLab EE (enterprise, licence required)" OFF
+      "none"      "None — use existing SCM"                  OFF
+      3>&1 1>&2 2>&3
+  register: _wizard_scm_result
+  changed_when: false
+  failed_when: _wizard_scm_result.rc not in [0, 1]
+  tags: infra_wizard
+
+- name: Handle SCM cancel
+  ansible.builtin.fail:
+    msg: "Wizard cancelled by user at SCM selection."
+  when: _wizard_scm_result.rc == 1
+  tags: infra_wizard
+
+- name: Record SCM choice
+  ansible.builtin.set_fact:
+    wizard_components: >-
+      {{ wizard_components | combine({
+        'scm': {
+          'enabled': (_wizard_scm_result.stdout | trim) != 'none',
+          'type': _wizard_scm_result.stdout | trim
+        }
+      }) }}
+  tags: infra_wizard

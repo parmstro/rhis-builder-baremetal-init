@@ -1,0 +1,24 @@
+---
+galaxy_info:
+  namespace: rhism
+  role_name: satellite
+  author: rhism
+  description: >-
+    Deploy and manage Red Hat Satellite content management: RHSM registration, install via
+    satellite-installer, subscription manifest upload, and management of organizations, CDN
+    repository sets, products, sync plans, content views, activation keys, smart proxies, and
+    compute resources via the theforeman.foreman collection. Standalone-first product role,
+    also selectable by the content_management dispatcher (content_type: satellite).
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: EL
+      versions:
+        - "9"
+  galaxy_tags:
+    - satellite
+    - rhsm
+    - content
+    - repositories
+    - redhat
+dependencies: []

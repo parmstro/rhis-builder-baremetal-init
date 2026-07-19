@@ -1,0 +1,21 @@
+---
+- name: Validate linux_selinux_action
+  ansible.builtin.assert:
+    that:
+      - linux_selinux_action is defined
+      - linux_selinux_action in ['enforce', 'booleans', 'fcontexts', 'all']
+    fail_msg: >-
+      linux_selinux_action must be one of: enforce, booleans, fcontexts, all
+      (got '{{ linux_selinux_action | default("undefined") }}')
+
+- name: Set SELinux enforcement mode
+  ansible.builtin.include_tasks: enforce.yml
+  when: linux_selinux_action in ['enforce', 'all']
+
+- name: Manage SELinux booleans
+  ansible.builtin.include_tasks: booleans.yml
+  when: linux_selinux_action in ['booleans', 'all']
+
+- name: Manage SELinux file contexts
+  ansible.builtin.include_tasks: fcontexts.yml
+  when: linux_selinux_action in ['fcontexts', 'all']

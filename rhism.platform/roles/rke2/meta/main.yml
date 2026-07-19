@@ -1,0 +1,22 @@
+---
+galaxy_info:
+  namespace: rhism
+  role_name: rke2
+  author: rhism
+  description: >-
+    Install and manage an RKE2 Kubernetes cluster (server/agent, config, service, node
+    join/eviction, upgrade, etcd backup/restore, teardown). Standalone-first product role,
+    also selectable by the container_platform dispatcher (cp_type: rke2).
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: EL
+      versions:
+        - "9"
+  galaxy_tags:
+    - kubernetes
+    - rke2
+    - k8s
+    - cluster
+    - rancher
+dependencies: []

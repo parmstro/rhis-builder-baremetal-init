@@ -1,0 +1,69 @@
+---
+- name: Stat deployed rules file
+  ansible.builtin.stat:
+    path: /etc/audit/rules.d/linux_auditing.rules
+  register: _la_rules_stat
+
+- name: Assert rules file exists
+  ansible.builtin.assert:
+    that: _la_rules_stat.stat.exists
+    fail_msg: "/etc/audit/rules.d/linux_auditing.rules not found — run configure first"
+
+- name: Slurp deployed rules
+  ansible.builtin.slurp:
+    src: /etc/audit/rules.d/linux_auditing.rules
+  register: _la_rules_content
+
+- name: Set rules text fact
+  ansible.builtin.set_fact:
+    _la_rules_text: "{{ _la_rules_content.content | b64decode }}"
+
+- name: Assert required CIS rule keys are present
+  ansible.builtin.assert:
+    that:
+      - "'-k sudoers' in _la_rules_text"
+      - "'-k identity' in _la_rules_text"
+      - "'-k time-change' in _la_rules_text"
+      - "'-k privileged' in _la_rules_text"
+      - "'-k modules' in _la_rules_text"
+    fail_msg: >-
+      One or more required audit rule keys are missing from
+      /etc/audit/rules.d/linux_auditing.rules.
+      Expected: sudoers, identity, time-change, privileged, modules.
+
+- name: Gather service facts (service-managed hosts only)
+  ansible.builtin.service_facts:
+  when: linux_auditing_start_service | bool
+
+- name: Assert auditd is active
+  ansible.builtin.assert:
+    that: ansible_facts.services['auditd.service'].state == 'running'
+    fail_msg: "auditd.service is not running — check journalctl -u auditd for details"
+  when:
+    - linux_auditing_start_service | bool
+    - "'auditd.service' in ansible_facts.services"
+
+- name: List loaded audit rules
+  ansible.builtin.command: auditctl -l
+  register: _la_auditctl_list
+  changed_when: false
+  when: linux_auditing_start_service | bool
+
+- name: Record verify result
+  ansible.builtin.set_fact:
+    linux_auditing_verify_result:
+      rules_file_exists: true
+      rules_file_bytes: "{{ _la_rules_stat.stat.size }}"
+      keys_verified:
+        - sudoers
+        - identity
+        - time-change
+        - privileged
+        - modules
+      service_running: "{{ linux_auditing_start_service | bool }}"
+      loaded_rules: "{{ _la_auditctl_list.stdout_lines | default([]) }}"
+      status: passed
+
+- name: Display verify result
+  ansible.builtin.debug:
+    var: linux_auditing_verify_result

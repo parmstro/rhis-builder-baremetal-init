@@ -1,0 +1,41 @@
+---
+- name: Verify type vars loading
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Load dnsmasq vars
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../../vars/dnsmasq.yml"
+      delegate_to: localhost
+
+    - name: Assert dnsmasq has no smart proxy
+      ansible.builtin.assert:
+        that:
+          - _prov_has_smartproxy is defined
+          - _prov_has_smartproxy == false
+          - _prov_service_name == 'dnsmasq'
+        fail_msg: "dnsmasq.yml did not load expected vars"
+      delegate_to: localhost
+
+    - name: Load foreman_proxy vars
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../../vars/foreman_proxy.yml"
+      delegate_to: localhost
+
+    - name: Assert foreman_proxy has smart proxy support
+      ansible.builtin.assert:
+        that:
+          - _prov_has_smartproxy is defined
+          - _prov_has_smartproxy == true
+          - _prov_smartproxy_module == 'theforeman.foreman.smart_proxy'
+          - _prov_content_collection == 'theforeman.foreman'
+        fail_msg: "foreman_proxy.yml did not load expected vars"
+      delegate_to: localhost
+
+    - name: Report verification passed
+      ansible.builtin.debug:
+        msg: >-
+          PASS — provisioning_services type vars verified.
+          dnsmasq: no smart proxy.
+          foreman_proxy: theforeman.foreman.smart_proxy
+      delegate_to: localhost

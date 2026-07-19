@@ -1,0 +1,22 @@
+---
+galaxy_info:
+  namespace: rhism
+  role_name: storage_local_path
+  author: rhism
+  description: >-
+    Configure the K3s built-in local-path StorageClass on a Kubernetes cluster and optionally
+    set it as the cluster default. Standalone-first product role, also selectable by the
+    container_platform dispatcher (cp_storage_type: local-path).
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: EL
+      versions:
+        - "9"
+  galaxy_tags:
+    - kubernetes
+    - storage
+    - localpath
+    - k3s
+    - csi
+dependencies: []

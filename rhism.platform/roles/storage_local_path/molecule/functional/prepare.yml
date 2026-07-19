@@ -1,0 +1,16 @@
+---
+- name: Prepare
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Install sudo, firewalld + python3-firewall (k3s opens ports), EPEL
+      ansible.builtin.raw: dnf install -y sudo firewalld python3-firewall epel-release 2>/dev/null
+      changed_when: false
+
+    - name: Install python3-kubernetes (kubernetes.core runs on this node)
+      ansible.builtin.raw: dnf install -y python3-kubernetes 2>/dev/null || pip3 install kubernetes 2>/dev/null
+      changed_when: false
+
+    - name: Start firewalld so the k3s role's firewalld tasks succeed
+      ansible.builtin.raw: systemctl start firewalld
+      changed_when: false

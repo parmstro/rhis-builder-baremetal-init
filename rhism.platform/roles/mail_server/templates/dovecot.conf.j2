@@ -1,0 +1,33 @@
+# Managed by Ansible — rhism mail_server (full)
+protocols = {{ mail_dovecot_protocols | join(' ') }}
+mail_location = {{ mail_dovecot_mail_location }}
+
+ssl = {{ mail_dovecot_ssl }}
+ssl_cert = </etc/pki/tls/certs/mail.crt
+ssl_key = </etc/pki/tls/private/mail.key
+
+auth_mechanisms = plain login
+passdb {
+  driver = passwd-file
+  args = /etc/dovecot/passwd
+}
+userdb {
+  driver = passwd-file
+  args = /etc/dovecot/passwd
+}
+
+service lmtp {
+  unix_listener /var/spool/postfix/private/dovecot-lmtp {
+    mode = 0600
+    user = postfix
+    group = postfix
+  }
+}
+
+service auth {
+  unix_listener /var/spool/postfix/private/auth {
+    mode = 0660
+    user = postfix
+    group = postfix
+  }
+}

@@ -1,0 +1,37 @@
+---
+# Default scenario — Tier-1 contract converge. Validates standalone dispatch + the OADP
+# variable contract on the control host. OADP needs a real OpenShift cluster (OLM +
+# reachable object storage); it cannot run in a plain CI container, so nothing here applies
+# any CR — the real effect is a Tier-3 lab concern.
+#
+# Collection-hosted scenario: molecule's collection-under-test auto-install (prerun) would
+# try to ansible-galaxy-install this collection and its dependency into the workspace
+# collections path, clobbering the loader symlink at
+# collections/ansible_collections/rhism/<name> ("Cannot call rmtree on a symbolic link").
+# Disabled — local collection checkouts already resolve via ANSIBLE_COLLECTIONS_PATH.
+prerun: false
+
+dependency:
+  name: galaxy
+  enabled: false
+
+driver:
+  name: docker
+
+platforms:
+  - name: oadp-el9
+    image: registry.access.redhat.com/ubi9/ubi:latest
+    pre_build_image: true
+
+provisioner:
+  name: ansible
+
+scenario:
+  test_sequence:
+    - dependency
+    - destroy
+    - syntax
+    - create
+    - converge
+    - verify
+    - destroy

@@ -1,0 +1,38 @@
+---
+namespace: rhism
+name: platform
+version: 1.0.0
+readme: README.md
+authors:
+  # rhism.platform aligns RHIS to current versions + integrates additional
+  # capabilities — full credit to its original author.
+  - "Paul Armstrong (parmstro) — original author of RHIS (Red Hat Infrastructure Standard), github.com/parmstro"
+  - "rhism contributors — version alignment + additional integrations (wizard -> builder -> deployer flow)"
+description: >-
+  rhism.platform — a fully self-contained collection for standing up and
+  running a governed Red Hat Enterprise Linux estate: an interactive estate
+  wizard, a dependency-ordered builder/orchestrator, a security-hardened web
+  UI, and every component role the estate needs (identity, content,
+  provisioning, NBDE/Tang key escrow, Linux security hardening, plus the full
+  set of optional day-2 components) vendored in-collection. No external
+  collection dependency — every role resolves as rhism.platform.<name>.
+  Built on RHIS (Red Hat Infrastructure Standard) by Paul Armstrong (parmstro),
+  aligned to current versions and integrated into a manifest-driven
+  wizard -> builder -> deployer flow.
+license:
+  - MIT
+tags:
+  - rhism
+  - rhis
+  - infrastructure
+  - platform
+  - rhel
+  - redhat
+dependencies: {}
+# repository/issues: deliberately unset — the collection's public home is an
+# open owner decision; set both here when one exists.
+build_ignore:
+  - ci
+  - tests/output
+  - "*.tar.gz"
+  - ".gitignore"

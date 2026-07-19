@@ -1,0 +1,298 @@
+---
+argument_specs:
+  main:
+    short_description: Red Hat Satellite content management — install and lifecycle.
+    description: >-
+      Standalone-first content-management product role for Red Hat Satellite. Registers with
+      RHSM, installs Satellite via satellite-installer, uploads the subscription manifest, and
+      manages organizations, CDN repository sets, products/repositories, sync plans, content
+      views, activation keys, smart proxies, and compute resources through the
+      theforeman.foreman collection. Consumes the shared content-management interface (action,
+      content_* vars) so the content_management dispatcher can select either product
+      (foreman | satellite) with identical code.
+    options:
+      action:
+        description: >-
+          Lifecycle action, shared across both content products. Package lifecycle
+          (present/absent), service lifecycle (started/stopped/restarted), full install,
+          and per-concern API actions. cdn_repos is Satellite-only (Red Hat CDN repository
+          sets, requires RHSM).
+        type: str
+        default: status
+        choices:
+          - present
+          - absent
+          - started
+          - stopped
+          - restarted
+          - install
+          - configure
+          - cdn_repos
+          - repos
+          - sync
+          - content_views
+          - activation_keys
+          - lifecycle
+          - smart_proxy
+          - compute_resource
+          - host
+          - export_content
+          - transfer_media
+          - import_content
+          - soe_bundles
+          - status
+      content_server_url:
+        description: Satellite API base URL. Shared content-interface var.
+        type: str
+        default: "https://{{ ansible_fqdn | default('localhost') }}"
+      content_username:
+        description: Satellite admin username for API calls. Shared interface var.
+        type: str
+        default: admin
+      content_password:
+        description: Satellite admin password for API calls. Shared interface var.
+        type: str
+        default: ""
+      content_validate_certs:
+        description: Validate TLS certs on API calls. Shared interface var.
+        type: bool
+        default: true
+      content_no_log:
+        description: Suppress task output containing credentials. Shared interface var.
+        type: bool
+        default: true
+      content_organization:
+        description: Default organization name. Shared interface var.
+        type: str
+        default: "Default Organization"
+      content_location:
+        description: Default location name. Shared interface var.
+        type: str
+        default: "Default Location"
+      content_install_execute:
+        description: >-
+          Dry-run gate for the installer command. false prints the satellite-installer command
+          instead of running it (used by molecule to validate dispatch without installing).
+        type: bool
+        default: false
+      content_installer_extra_args:
+        description: Extra args passed verbatim to satellite-installer.
+        type: list
+        elements: str
+        default: []
+      content_rhsm_org_id:
+        description: RHSM organization id for subscription-manager registration.
+        type: str
+        default: ""
+      content_rhsm_activation_key:
+        description: RHSM activation key for subscription-manager registration.
+        type: str
+        default: ""
+      content_rhsm_skip_registration:
+        description: Skip RHSM registration and repo enablement (host already registered).
+        type: bool
+        default: false
+      content_rhsm_manifest_path:
+        description: Path to the RHSM subscription manifest .zip to upload. Empty = skip.
+        type: str
+        default: ""
+      content_proxy_dns:
+        description: Open the firewall for DNS (smart proxy). Shared interface var.
+        type: bool
+        default: false
+      content_proxy_dhcp:
+        description: Open the firewall for DHCP (smart proxy). Shared interface var.
+        type: bool
+        default: false
+      content_proxy_tftp:
+        description: Open the firewall for TFTP (smart proxy). Shared interface var.
+        type: bool
+        default: false
+      content_products:
+        description: Products and their repositories to manage. Empty = no-op.
+        type: list
+        elements: dict
+        default: []
+      content_cdn_repository_sets:
+        description: Red Hat CDN repository sets to enable (Satellite-only). Empty = no-op.
+        type: list
+        elements: dict
+        default: []
+      content_lifecycle_environments:
+        description: Lifecycle environments to create (in dependency order). Empty = no-op.
+        type: list
+        elements: dict
+        default: []
+      content_sync_plans:
+        description: Sync plans to manage. Empty = no-op.
+        type: list
+        elements: dict
+        default: []
+      content_sync_now:
+        description: Trigger an immediate sync after plan setup.
+        type: bool
+        default: false
+      content_sync_products:
+        description: Products to sync immediately when content_sync_now is true.
+        type: list
+        elements: str
+        default: []
+      content_views:
+        description: Content views to manage, publish, and promote. Empty = no-op.
+        type: list
+        elements: dict
+        default: []
+      content_views_publish:
+        description: Publish a new content view version after managing it.
+        type: bool
+        default: true
+      content_views_promote:
+        description: Promote the new version to its lifecycle environments.
+        type: bool
+        default: true
+      content_host_collections:
+        description: Host collections to manage. Empty = no-op.
+        type: list
+        elements: dict
+        default: []
+      content_activation_keys:
+        description: Activation keys to manage. Empty = no-op.
+        type: list
+        elements: dict
+        default: []
+      content_settings:
+        description: Global Satellite settings (name/value pairs) to apply. Empty = no-op.
+        type: list
+        elements: dict
+        default: []
+      content_proxies:
+        description: Smart proxies to register. Empty = no-op.
+        type: list
+        elements: dict
+        default: []
+      content_compute_resources:
+        description: Compute resources to register. Empty = no-op.
+        type: list
+        elements: dict
+        default: []
+      content_hosts:
+        description: >-
+          Bare hosts to create (or remove) via Satellite host-create +
+          PXE build — rhism alignment Phase C item 2 (the "heavy" path;
+          roles/cobbler's add_systems is the light/no-Satellite path for
+          the same capability). Empty = no-op. Each entry: fqdn
+          (required), hostgroup, compute_resource, organization, location,
+          comment, pxe_loader, parameters (list of {name, parameter_type,
+          value}), interfaces_attributes (list, theforeman.foreman.host
+          shape), build (default true — sets PXE boot context), state
+          (present|absent, default present), power_cycle (bool, default
+          false — reset the host's power state after create, to kick off
+          the PXE boot; NOT the same as waiting for kickstart completion,
+          which this role does not attempt to automate — see the depth doc).
+        type: list
+        elements: dict
+        default: []
+      content_host_execute:
+        description: >-
+          Dry-run gate for the 'host' action's real API calls
+          (theforeman.foreman.host + host_power) — false (default) reports
+          what WOULD be created/power-cycled without calling the API;
+          true actually creates hosts and, for power_cycle entries,
+          resets their power state to kick off a real PXE reinstall.
+          Unlike most of this role's list-guarded actions (content_views,
+          activation_keys, etc., where a non-empty list alone is enough to
+          act), 'host' additionally gates on this flag — the action is
+          materially more consequential (a real host create + a real
+          reboot-into-installer trigger, not a content-catalogue change),
+          so populating content_hosts alone is deliberately NOT sufficient
+          authorization to act, matching the double-gate carefulness this
+          platform applies to its other high-consequence operations
+          (e.g. roles/convert2rhel's execute+confirm gates).
+        type: bool
+        default: false
+      content_exports:
+        description: >-
+          Disconnected/air-gapped content to export via the theforeman.foreman
+          content_export_* modules — rhism alignment Phase C item 3, matching
+          upstream RHIS's content_exports: data shape. Empty = no-op. Each
+          entry: name (label), type (library|repository|version, required),
+          organization (default content_organization), format
+          (syncable|importable), chunk_size_gb, destination_server,
+          fail_on_missing_content, incremental, from_history_id. type=repository
+          additionally needs product + repository; type=version additionally
+          needs content_view + content_view_version.
+        type: list
+        elements: dict
+        default: []
+      content_pulp_export_dir:
+        description: >-
+          Server-side Pulp export root (Satellite writes exports under
+          here by its own convention, per organization/destination_server —
+          not something the export API call itself parameterizes).
+        type: str
+        default: /var/lib/pulp/exports
+      content_transfer_media_path:
+        description: >-
+          Local mount point transfer_media copies the export bundle onto
+          (e.g. a mounted USB/removable-media path). Required (no default)
+          for the transfer_media action — the role fails closed rather than
+          guessing a destination for an air-gapped media copy.
+        type: str
+        default: ""
+      content_transfer_source_dir:
+        description: >-
+          Directory transfer_media copies FROM — defaults to
+          content_pulp_export_dir but can point at any already-exported
+          content tree.
+        type: str
+        default: "{{ content_pulp_export_dir | default('/var/lib/pulp/exports') }}"
+      content_imports:
+        description: >-
+          Disconnected content to import via the theforeman.foreman
+          content_import_* modules — the receiving side of content_exports.
+          Empty = no-op. Each entry: name (label), type
+          (library|repository|version, required — selects which import
+          module runs; all three take identical parameters, since the
+          import auto-detects what it's importing from the metadata
+          written alongside the content at export time), organization
+          (default content_organization), path (directory containing the
+          exported content on the importing Satellite's filesystem —
+          required per entry, defaults to content_transfer_media_path when
+          omitted so the 3-stage pipeline chains together by default),
+          metadata (optional dict, mutually exclusive with metadata_file),
+          metadata_file (optional, overrides the metadata.json Satellite
+          expects alongside path by default).
+        type: list
+        elements: dict
+        default: []
+      content_soe_bundles:
+        description: >-
+          Standard Operating Environment (SOE) bundles — rhism alignment plan reuse-map item 1,
+          the strongest surviving idea from upstream RHIS: a single composable spec for one OS
+          build's content view + lifecycle environment + activation key (plus a hostgroup /
+          kickstart-snippet reference), aggregated by the soe_bundles action into this role's own
+          flat content_lifecycle_environments/content_views/content_host_collections/
+          content_activation_keys shapes and dispatched through the SAME content_views.yml/
+          activation_keys.yml task logic those flat actions already use — no parallel
+          API-calling logic. Empty = no-op. Each entry: name (required — SOE identifier, default
+          basis for content_view/activation_key names), lifecycle_environment (required),
+          lifecycle_environment_prior (default Library), content_view (default name),
+          content_view_description, repositories (list, added to the content view),
+          activation_key (default name), auto_attach (default true), subscriptions (list),
+          host_collections (list of {name, description} — created and attached to the
+          activation key), hostgroup (reference only — this role has never managed Satellite
+          hostgroups via API; hand this name to content_hosts[].hostgroup when provisioning
+          real hosts against this SOE), kickstart_snippet (reference only — provisioning-
+          template management is out of this role's scope, the same honest-gap boundary as the
+          host action's PXE-build-completion gap).
+        type: list
+        elements: dict
+        default: []
+      content_soe_bundles_execute:
+        description: >-
+          Dry-run gate for the soe_bundles action's dispatch step. Validation and the transform
+          of content_soe_bundles into the content_views.yml/activation_keys.yml shapes always
+          run; false skips only the two include_tasks calls that actually talk to Satellite —
+          used by molecule to assert on the derived variable shapes without a live server.
+        type: bool
+        default: true

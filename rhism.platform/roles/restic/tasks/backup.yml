@@ -1,0 +1,28 @@
+---
+# backup: run a restic backup
+
+- name: Include restic environment
+  ansible.builtin.include_tasks: env.yml
+
+- name: Validate backup requirements
+  ansible.builtin.assert:
+    that:
+      - backup_restic_paths | length > 0
+    fail_msg: "backup_restic_paths is required for backup"
+
+- name: Execute restic backup
+  ansible.builtin.command:
+    cmd: >-
+      restic backup
+      {{ backup_restic_paths | map('quote') | join(' ') }}
+      {% for excl in backup_restic_exclude_patterns %}--exclude {{ excl | quote }} {% endfor %}
+      {{ backup_restic_extra_args }}
+  environment: "{{ _restic_env }}"
+  become: true
+  no_log: true
+  register: _restic_backup
+  changed_when: true
+
+- name: Report backup result
+  ansible.builtin.debug:
+    msg: "{{ _restic_backup.stdout_lines | default([]) }}"

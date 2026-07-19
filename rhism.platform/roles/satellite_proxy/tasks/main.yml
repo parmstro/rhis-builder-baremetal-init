@@ -1,0 +1,47 @@
+---
+# satellite_proxy — action-driven dispatch
+#
+# Action + variable interface are declared and validated by meta/argument_specs.yml
+# (ansible-core runs the validation automatically at role entry — no manual assert needed).
+#
+# prov_execute is the shared dry-run gate: with prov_execute=false the role validates
+# dispatch + the variable contract without installing packages or writing node config.
+#
+# Valid actions:
+#   present / absent   — install or remove packages + firewall rules
+#   started / stopped / restarted — manage foreman-proxy service
+#   configure          — deploy satellite smart proxy configuration
+#   register           — register proxy with Satellite server
+#   status             — query proxy registration status via Satellite API
+
+# ── Dispatch ──────────────────────────────────────────────────────────────────
+
+- name: Include install tasks
+  ansible.builtin.include_tasks: install.yml
+  when:
+    - action in ['present', 'absent']
+    - prov_execute | bool
+
+- name: Include service tasks
+  ansible.builtin.include_tasks: service.yml
+  when:
+    - action in ['started', 'stopped', 'restarted']
+    - prov_execute | bool
+
+- name: Include configure tasks
+  ansible.builtin.include_tasks: configure.yml
+  when:
+    - action == 'configure'
+    - prov_execute | bool
+
+- name: Include register tasks
+  ansible.builtin.include_tasks: register.yml
+  when:
+    - action == 'register'
+    - prov_execute | bool
+
+- name: Include status tasks
+  ansible.builtin.include_tasks: status.yml
+  when:
+    - action == 'status'
+    - prov_execute | bool

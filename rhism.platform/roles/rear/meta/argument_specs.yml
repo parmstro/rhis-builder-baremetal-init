@@ -1,0 +1,182 @@
+---
+argument_specs:
+  main:
+    short_description: Install and operate Relax-and-Recover (ReaR) bare-metal DR.
+    description: >-
+      Standalone-first backup product role for RHEL bare-metal disaster recovery. Installs
+      ReaR and its method-matched tooling, renders the split OUTPUT (rescue image) and BACKUP
+      (data) configuration into /etc/rear, schedules unattended protection via a systemd timer,
+      verifies the recovery layout, and (behind a deliberate double gate, lab-only) drives a
+      full bare-metal recover. Consumes the shared backup family interface (backup_rear_* vars),
+      the SAME names the backup_management dispatcher exposes, so the dispatcher selects this
+      product with one call passing only the action and every value flows straight through. The
+      argument spec enforces the action + variable contract at role entry, so no hand-written
+      assert is needed.
+    options:
+      action:
+        description: >-
+          Lifecycle action (bare shared var). server prepares the rescue/backup storage target;
+          client installs ReaR and renders the configuration; schedule manages the systemd timer;
+          backup runs a ReaR backup (mode-selected); verify checks the recovery layout read-only;
+          restore drives a real bare-metal recover behind a double gate; baseline orchestrates
+          server, client, schedule and verify; present/absent manage the ReaR package.
+        type: str
+        default: backup
+        choices:
+          - server
+          - client
+          - schedule
+          - backup
+          - verify
+          - restore
+          - baseline
+          - present
+          - absent
+      backup_rear_output_format:
+        description: >-
+          Rescue image format written by ReaR (the OUTPUT directive). ISO is the default;
+          USB, PXE, RAWDISK, OBDR and RAMDISK are also supported.
+        type: str
+        default: ISO
+        choices:
+          - ISO
+          - USB
+          - PXE
+          - RAWDISK
+          - OBDR
+          - RAMDISK
+      backup_rear_output_url:
+        description: >-
+          Destination for the rescue image (the OUTPUT_URL directive). Empty means ReaR falls
+          back to the backup URL, so both artifacts share one target.
+        type: str
+        default: ""
+      backup_rear_grub_rescue:
+        description: >-
+          Install a ReaR rescue entry into the local GRUB boot menu (the GRUB_RESCUE directive).
+        type: bool
+        default: false
+      backup_rear_backup_method:
+        description: >-
+          Data backup method (the BACKUP directive). NETFS is the default; RSYNC and BLOCKCLONE
+          are built in, and TSM, NBU, NSR, BAREOS, BORG, DUPLICITY and EXTERNAL integrate
+          third-party engines.
+        type: str
+        default: NETFS
+      backup_rear_backup_url:
+        description: >-
+          Data backup target location (the BACKUP_URL directive). Supported schemes include
+          nfs, cifs, rsync, sshfs, file, usb, tape and iso.
+        type: str
+        default: "file:///var/lib/rear/output"
+      backup_rear_backup_prog:
+        description: >-
+          Archiver program ReaR uses for the data backup (the BACKUP_PROG directive) — tar by
+          default, or rsync.
+        type: str
+        default: tar
+      backup_rear_exclude_patterns:
+        description: >-
+          Paths and globs excluded from the data backup (appended to the BACKUP_PROG_EXCLUDE
+          directive on top of ReaR's own defaults).
+        type: list
+        elements: str
+        default:
+          - /tmp/*
+          - /var/tmp/*
+          - /var/crash/*
+      backup_rear_keep_old_backup_copy:
+        description: >-
+          Keep the previous data backup alongside the new one (the NETFS_KEEP_OLD_BACKUP_COPY
+          directive).
+        type: bool
+        default: false
+      backup_rear_backup_type:
+        description: >-
+          Backup type (the BACKUP_TYPE directive). Empty means a full backup each run;
+          incremental and differential enable rotation against a periodic full.
+        type: str
+        default: ""
+      backup_rear_fullbackup_day:
+        description: >-
+          Day of week a full backup is forced when using incremental or differential rotation
+          (the FULLBACKUPDAY directive).
+        type: str
+        default: Sun
+      backup_rear_tmpdir:
+        description: >-
+          Scratch directory ReaR uses while building artifacts (the TMPDIR directive).
+        type: str
+        default: /var/tmp
+      backup_rear_config_dir:
+        description: Directory holding the ReaR configuration (local.conf / site.conf).
+        type: str
+        default: /etc/rear
+      backup_rear_manage_site_conf:
+        description: >-
+          Also render the fleet-wide site.conf in addition to the per-host local.conf.
+        type: bool
+        default: false
+      backup_rear_server_local_dir:
+        description: >-
+          Local directory ensured to exist for a file-scheme backup or output target during the
+          server action. Empty skips local directory creation for remote targets.
+        type: str
+        default: /var/lib/rear/output
+      backup_rear_backup_mode:
+        description: >-
+          Sub-mode for the standalone backup action. mkbackup builds the rescue image and the
+          data backup; mkbackuponly takes the data backup only; mkrescue builds the rescue image
+          only.
+        type: str
+        default: mkbackup
+        choices:
+          - mkbackup
+          - mkbackuponly
+          - mkrescue
+      backup_rear_schedule_enabled:
+        description: >-
+          Manage the systemd timer for scheduled protection (schedule action). false disables
+          and stops the timer.
+        type: bool
+        default: true
+      backup_rear_schedule_oncalendar:
+        description: systemd OnCalendar expression for the scheduled-protection timer.
+        type: str
+        default: "Mon..Fri 22:00:00"
+      backup_rear_schedule_command:
+        description: >-
+          Command the scheduled service runs. The default robust pattern keeps the rescue image
+          current cheaply and rebuilds only when the layout changed; a full-protection run uses
+          the ReaR mkbackup command instead.
+        type: str
+        default: "/usr/sbin/rear checklayout || /usr/sbin/rear mkrescue"
+      backup_rear_recover_execute:
+        description: >-
+          First half of the restore double gate. The restore action refuses to run unless this
+          and the irreversible confirmation are both true. Never enabled in CI.
+        type: bool
+        default: false
+      backup_rear_recover_confirm_irreversible:
+        description: >-
+          Second, separate confirmation for the restore action only. rear recover repartitions
+          disks and reinstalls the bootloader with no rollback, so both this and the execute flag
+          must be set together on purpose for a real recover.
+        type: bool
+        default: false
+      backup_rear_apply_server:
+        description: baseline action — run the server phase (storage-target preparation).
+        type: bool
+        default: true
+      backup_rear_apply_client:
+        description: baseline action — run the client phase (install and configure).
+        type: bool
+        default: true
+      backup_rear_apply_schedule:
+        description: baseline action — run the schedule phase (systemd timer).
+        type: bool
+        default: true
+      backup_rear_apply_verify:
+        description: baseline action — run the verify phase (recovery-layout check).
+        type: bool
+        default: true

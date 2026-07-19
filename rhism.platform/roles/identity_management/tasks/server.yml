@@ -1,0 +1,24 @@
+---
+# Dispatch to type-specific server install.
+# ad_integration has no server to deploy — fails fast with a clear message.
+- name: Validate server action applies to this idm_type
+  ansible.builtin.assert:
+    that:
+      - idm_type in ['freeipa', 'rh_idm']
+    fail_msg: >-
+      idm_action: server is not applicable for idm_type: {{ idm_type }}.
+      Active Directory does not require a server deployment.
+      Use idm_action: enroll to join this host to an existing AD domain.
+
+- name: Validate required server variables
+  ansible.builtin.assert:
+    that:
+      - idm_admin_password | length > 0
+      - idm_ds_password | length > 0
+    fail_msg: "idm_admin_password and idm_ds_password must be set (use vault)."
+
+- name: Deploy {{ idm_type }} server
+  ansible.builtin.include_role:
+    name: "{{ idm_type }}"
+  vars:
+    action: server

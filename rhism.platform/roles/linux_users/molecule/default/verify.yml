@@ -1,0 +1,42 @@
+---
+- name: Verify — user security configuration
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Stat faillock.conf
+      ansible.builtin.stat:
+        path: /etc/security/faillock.conf
+      register: _faillock
+
+    - name: Assert faillock.conf exists
+      ansible.builtin.assert:
+        that: _faillock.stat.exists
+        fail_msg: "/etc/security/faillock.conf was not created"
+
+    - name: Slurp faillock.conf
+      ansible.builtin.slurp:
+        src: /etc/security/faillock.conf
+      register: _faillock_content
+
+    - name: Assert deny setting is correct
+      ansible.builtin.assert:
+        that: "'deny = 5' in (_faillock_content.content | b64decode)"
+        fail_msg: "faillock deny setting not found in faillock.conf"
+
+    - name: Assert sudo is installed
+      ansible.builtin.package_facts:
+        manager: auto
+
+    - name: Assert sudo package present
+      ansible.builtin.assert:
+        that: "'sudo' in ansible_facts.packages"
+        fail_msg: "sudo package should be installed"
+
+- name: Verify — summary
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Print summary
+      ansible.builtin.debug:
+        msg: "linux_users verified on EL8, EL9, EL10 containers."

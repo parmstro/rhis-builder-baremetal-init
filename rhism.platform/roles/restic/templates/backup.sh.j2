@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Managed by Ansible — rhism restic role
+set -euo pipefail
+
+export RESTIC_REPOSITORY="{{ backup_restic_repository }}"
+export RESTIC_PASSWORD="{{ backup_restic_password }}"
+{% for key, value in backup_restic_env.items() %}
+export {{ key }}="{{ value }}"
+{% endfor %}
+
+log() { logger -t restic-backup "$*"; }
+
+log "Starting backup to $RESTIC_REPOSITORY"
+
+restic backup \
+{% for path in backup_restic_paths %}
+  "{{ path }}" \
+{% endfor %}
+{% for pattern in backup_restic_exclude_patterns %}
+  --exclude "{{ pattern }}" \
+{% endfor %}
+  --tag ansible-managed \
+  2>&1 | while read -r line; do log "$line"; done
+
+log "Applying retention policy (daily={{ backup_restic_retention_daily }}, weekly={{ backup_restic_retention_weekly }}, monthly={{ backup_restic_retention_monthly }})"
+
+restic forget \
+  --keep-daily {{ backup_restic_retention_daily }} \
+  --keep-weekly {{ backup_restic_retention_weekly }} \
+  --keep-monthly {{ backup_restic_retention_monthly }} \
+  --keep-yearly {{ backup_restic_retention_yearly }} \
+  --prune \
+  2>&1 | while read -r line; do log "$line"; done
+
+log "Backup complete"

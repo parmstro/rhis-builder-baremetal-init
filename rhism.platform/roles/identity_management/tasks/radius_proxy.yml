@@ -1,0 +1,71 @@
+---
+# Configure FreeIPA RADIUS proxy for external MFA token servers.
+# Supports: RSA SecurID, Thales SafeNet, YubiKey OTP (Yubico RADIUS server),
+#           Cisco ISE, any RFC 2865-compliant RADIUS server.
+#
+# Flow: User login → FreeIPA authenticates password → RADIUS proxy validates
+#       second factor → FreeIPA grants Kerberos ticket.
+
+- name: Validate radius_proxy action applies to this idm_type
+  ansible.builtin.assert:
+    that:
+      - idm_type in ['freeipa', 'rh_idm']
+    fail_msg: >-
+      idm_action: radius_proxy requires a FreeIPA/IDM server (idm_type: freeipa or rh_idm).
+
+- name: Validate RADIUS server list
+  ansible.builtin.assert:
+    that:
+      - idm_radius_servers | length > 0
+    fail_msg: >-
+      idm_radius_servers must contain at least one server definition.
+      Each entry: {name, server, secret, type: rsa|safenet|yubikey|generic}
+
+- name: Configure RADIUS proxy servers in FreeIPA
+  freeipa.ansible_freeipa.iparadiusproxy:
+    ipaadmin_password: "{{ idm_admin_password }}"
+    name: "{{ item.name }}"
+    description: "{{ item.description | default(item.type | default('') + ' RADIUS proxy') }}"
+    server: "{{ item.server }}"
+    secret: "{{ item.secret }}"
+    port: "{{ item.port | default(1812) }}"
+    retries: "{{ item.retries | default(3) }}"
+    timeout: "{{ item.timeout | default(10) }}"
+    state: "{{ item.state | default('present') }}"
+  loop: "{{ idm_radius_servers }}"
+  no_log: true
+
+- name: Assign RADIUS proxy to users
+  freeipa.ansible_freeipa.ipauser:
+    ipaadmin_password: "{{ idm_admin_password }}"
+    name: "{{ item.user }}"
+    radiusproxy: "{{ item.proxy_name }}"
+    radiususername: "{{ item.radius_username | default(item.user) }}"
+    userauthtype:
+      - radius
+    state: present
+  loop: "{{ idm_radius_user_mappings }}"
+  when: idm_radius_user_mappings | length > 0
+  loop_control:
+    label: "{{ item.user }}"
+
+- name: Open firewall for RADIUS traffic (outbound to RADIUS servers)
+  ansible.posix.firewalld:
+    port: "{{ item.port | default(1812) }}/udp"
+    permanent: true
+    state: enabled
+    immediate: true
+  loop: "{{ idm_radius_servers }}"
+  become: true
+
+- name: Report RADIUS proxy configuration
+  ansible.builtin.debug:
+    msg: >-
+      Configured {{ idm_radius_servers | length }} RADIUS proxy server(s).
+      {% if idm_radius_user_mappings | length > 0 %}
+      Assigned {{ idm_radius_user_mappings | length }} user(s) to RADIUS authentication.
+      {% endif %}
+      Token types by server:
+      {% for s in idm_radius_servers %}
+        {{ s.name }}: {{ s.type | default('generic') }} at {{ s.server }}:{{ s.port | default(1812) }}
+      {% endfor %}

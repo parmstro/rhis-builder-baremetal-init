@@ -1,0 +1,57 @@
+---
+# gitlab_ee — present
+# RHSM registration (EE-specific), prerequisite packages, package repository,
+# GitLab EE package install, and firewall rules.
+
+- name: Register with RHSM for GitLab EE
+  community.general.redhat_subscription:
+    state: present
+    org_id: "{{ scm_rhsm_org_id }}"
+    activationkey: "{{ scm_rhsm_activation_key }}"
+  become: true
+  no_log: true
+  when:
+    - _scm_rhsm_required | default(false)
+    - not (scm_rhsm_skip_registration | default(false))
+
+- name: Install prerequisite packages
+  ansible.builtin.dnf:
+    name:
+      - curl
+      - policycoreutils
+      - openssh-server
+      - perl
+    state: present
+  become: true
+
+- name: Download GitLab EE repository setup script
+  ansible.builtin.get_url:
+    url: "{{ _scm_package_repo_script }}"
+    dest: /tmp/gitlab_ee_repo_setup.sh
+    mode: "0755"
+  become: true
+
+- name: Run GitLab EE repository setup script
+  ansible.builtin.command:
+    cmd: bash /tmp/gitlab_ee_repo_setup.sh
+  become: true
+  changed_when: true
+
+- name: Remove GitLab EE repository setup script
+  ansible.builtin.file:
+    path: /tmp/gitlab_ee_repo_setup.sh
+    state: absent
+  become: true
+
+- name: Install GitLab EE package
+  ansible.builtin.dnf:
+    name: "{{ _scm_package_name }}"
+    state: present
+  become: true
+  environment:
+    EXTERNAL_URL: "{{ scm_external_url | default('http://' + (ansible_fqdn | default('localhost'))) }}"
+
+- name: Enable GitLab EE firewall rules
+  ansible.builtin.include_tasks: firewall.yml
+  vars:
+    _firewall_state: enabled

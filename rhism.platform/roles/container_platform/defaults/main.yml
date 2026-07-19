@@ -1,0 +1,65 @@
+---
+# Role control
+cp_action: baseline
+cp_type: k3s
+
+# Install gate — dry-run by default
+cp_install_execute: false
+
+# Cluster identity
+cp_cluster_name: cluster
+cp_base_domain: "{{ ansible_domain | default('example.local') }}"
+cp_ingress_domain: "apps.{{ cp_cluster_name }}.{{ cp_base_domain }}"
+
+# Node role
+cp_node_role: control_plane   # control_plane | worker
+
+# K3s / RKE2 cluster join
+cp_server_url: ""             # URL of existing control plane (workers only)
+cp_node_token: ""             # vault-backed cluster join token
+
+# Version pinning (empty = latest)
+cp_install_version: ""
+
+# TLS Subject Alternate Names (added to API server cert)
+cp_tls_san: []
+
+# KUBECONFIG path (set by type var; override here if needed)
+cp_kubeconfig_path: ""
+
+# OCP / OKD install specifics
+cp_ocp_version: "4.16"
+cp_platform_type: none        # none | aws | gcp | azure | vsphere | baremetal
+cp_pull_secret: ""            # vault-backed; required for ocp
+cp_ssh_pub_key: ""            # SSH public key injected into nodes
+cp_install_dir: /opt/openshift-install
+
+# RHSM (ocp only)
+cp_rhsm_org_id: ""
+cp_rhsm_activation_key: ""
+cp_rhsm_skip_registration: false
+
+# Storage
+cp_storage_type: local-path   # local-path | nfs | longhorn | ocs
+cp_storage_nfs_server: ""
+cp_storage_nfs_path: /exports
+cp_storage_class_name: "{{ cp_type }}-storage"
+cp_storage_make_default: true
+
+# Registry
+cp_registry_type: internal    # internal | quay | nexus | generic
+cp_registry_url: ""
+cp_registry_username: ""
+cp_registry_password: ""      # vault-backed
+
+# Ingress
+cp_ingress_type: default      # default | nginx | traefik | haproxy
+cp_ingress_replicas: 1
+cp_ingress_ssl_passthrough: false
+
+# Baseline toggles
+cp_apply_install: false
+cp_apply_configure: false
+cp_apply_storage: false
+cp_apply_registry: false
+cp_apply_ingress: false

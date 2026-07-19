@@ -1,0 +1,17 @@
+---
+# ===========================================================================
+# rhism.platform.aap — shared envelope + action dispatch.
+#
+# The variable interface (action + aap_version choices, types, required fields)
+# is validated automatically by meta/argument_specs.yml at role entry — there is
+# no hand-written assert here. Dispatch uses the dict form of include_tasks
+# (BUG-084: the bare-string shorthand mis-tokenizes Jinja containing ==/!=).
+# ===========================================================================
+
+- name: Resolve the AAP version profile
+  ansible.builtin.include_tasks:
+    file: resolve_version.yml
+
+- name: Dispatch to the requested action
+  ansible.builtin.include_tasks:
+    file: "{{ action }}.yml"

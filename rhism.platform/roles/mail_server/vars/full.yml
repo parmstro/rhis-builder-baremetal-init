@@ -1,0 +1,18 @@
+---
+_mail_packages:
+  - postfix
+  - dovecot
+  - opendkim
+  - opendkim-tools
+  - spamassassin
+  - clamav
+  - clamav-update
+  - clamav-milter
+  - mailx
+_mail_service_name: postfix
+_mail_full_stack: true
+_mail_firewall_services:
+  - smtp
+  - smtp-submission
+  - imaps
+  - imap

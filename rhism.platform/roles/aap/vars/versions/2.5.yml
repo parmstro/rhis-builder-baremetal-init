@@ -1,0 +1,70 @@
+---
+# =============================================================================
+# INSTALL PROFILE — AAP 2.5 (platform gateway line; GA).
+#
+# 2.5 is the headline cross-version restructure: a unified platform gateway
+# fronts every component. The installer inventory gains an `automationgateway`
+# group, and on OpenShift the operator ships a single unified
+# `AnsibleAutomationPlatform` custom resource instead of the pre-gateway
+# per-component CRs (AutomationController/AutomationHub/EDA) 2.4 used.
+#
+# install_method is exactly two paths across every supported version:
+#   containerized — Red Hat's podman-based containerized installer.
+#   openshift     — the AAP Operator + AnsibleAutomationPlatform CR on OCP.
+# The RPM/bundle setup.sh path is intentionally NOT modelled (RPM install is
+# being obsoleted platform-wide).
+#
+# Group names / installer playbook names / CR apiVersion below are grounded in
+# the Red Hat AAP 2.5 Containerized Installation and OpenShift install guides.
+# Anything not yet re-verified against the live docs at scaffold time is
+# TODO-marked — confirm before a real (aap_execute: true) run.
+# =============================================================================
+
+aap_version_profile:
+  version: "2.5"
+  gateway_era: true                       # platform gateway present
+  install_methods:
+    - containerized
+    - openshift
+
+  # Legacy /api/v2/ is replaced by component-scoped paths behind the gateway.
+  controller_api_base: /api/controller/v2/
+  ping_path: /api/controller/v2/ping/
+
+  containerized:
+    available: true
+    tech_preview: false
+    # Red Hat's containerized installer collection + install/backup/restore
+    # playbooks. TODO: confirm the exact collection namespace/playbook names for
+    # 2.5 (ansible.containerized_installer.install|backup|restore) against the
+    # shipped installer tarball before a real run.
+    installer_collection: ansible.containerized_installer
+    installer_install_playbook: ansible.containerized_installer.install
+    installer_backup_playbook: ansible.containerized_installer.backup
+    installer_restore_playbook: ansible.containerized_installer.restore
+    # Gateway-era containerized inventory group model.
+    inventory_groups:
+      - automationgateway
+      - automationcontroller
+      - automationhub
+      - automationeda
+      - database
+    # all:vars the installer requires (subset the role templates as placeholders;
+    # TODO: reconcile the full required set against the 2.5 installer docs).
+    required_group_vars:
+      - postgresql_admin_username
+      - postgresql_admin_password
+      - gateway_admin_password
+      - controller_admin_password
+      - hub_admin_password
+      - registry_username
+      - registry_password
+
+  openshift:
+    available: true
+    # Unified CR introduced in 2.5. TODO: confirm apiVersion group/version
+    # (aap.ansible.com/v1alpha1) against the 2.5 operator bundle.
+    cr_api_version: aap.ansible.com/v1alpha1
+    cr_kind: AnsibleAutomationPlatform
+    operator_channel: stable-2.5
+    operator_package: ansible-automation-platform-operator

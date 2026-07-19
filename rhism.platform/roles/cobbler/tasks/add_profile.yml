@@ -1,0 +1,29 @@
+---
+- name: Validate add_profile variables
+  ansible.builtin.assert:
+    that:
+      - prov_cobbler_profile is defined
+      - prov_cobbler_profile.name is defined
+      - prov_cobbler_profile.distro is defined
+    fail_msg: "add_profile requires prov_cobbler_profile with name and distro"
+
+- name: Add cobbler profile (without kickstart)
+  ansible.builtin.command:
+    cmd: >-
+      cobbler profile add
+      --name="{{ prov_cobbler_profile.name }}"
+      --distro="{{ prov_cobbler_profile.distro }}"
+  become: true
+  changed_when: true
+  when: prov_cobbler_profile.kickstart is not defined
+
+- name: Add cobbler profile (with kickstart)
+  ansible.builtin.command:
+    cmd: >-
+      cobbler profile add
+      --name="{{ prov_cobbler_profile.name }}"
+      --distro="{{ prov_cobbler_profile.distro }}"
+      --kickstart="{{ prov_cobbler_profile.kickstart }}"
+  become: true
+  changed_when: true
+  when: prov_cobbler_profile.kickstart is defined

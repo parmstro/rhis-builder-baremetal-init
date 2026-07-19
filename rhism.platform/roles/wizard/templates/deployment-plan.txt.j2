@@ -1,0 +1,47 @@
+ACME Platform Builder — Deployment Plan
+============================================
+
+Profile  : {{ manifest.profile | default('custom') }}
+Domain   : {{ manifest.network.domain | default('not set') }}
+Realm    : {{ manifest.network.realm | default((manifest.network.domain | default('')) | upper) }}
+Subnet   : {{ manifest.network.subnet | default('not set') }}
+Gateway  : {{ manifest.network.gateway | default('not set') }}
+DNS      : {{ manifest.network.dns | default([]) | join(', ') }}
+Sizing   : {{ manifest.sizing.tier | default('custom') }}
+
+Components to deploy (in dependency order):
+-------------------------------------------
+{% set deploy_order = [
+  ('hypervisor',         'VM infrastructure'),
+  ('tang',               'NBDE / disk-encryption key escrow (Tang)'),
+  ('identity',           'Identity/directory services'),
+  ('provisioning',       'PXE / bare-metal provisioning'),
+  ('content',            'Content management (repos, patching)'),
+  ('scm',                'Source control and CI'),
+  ('backup',             'Backup system'),
+  ('container_platform', 'Container platform'),
+  ('monitoring',         'Monitoring stack'),
+  ('automation',         'Automation platform (AAP/AWX)'),
+  ('security',           'Linux security baseline'),
+] %}
+{% for key, label in deploy_order %}
+{% if manifest.components[key] is defined %}
+{% if manifest.components[key].enabled %}
+  [X] {{ '%-28s' | format(label) }} type={{ manifest.components[key].type | default('default') }}
+{% else %}
+  [ ] {{ label }} — DISABLED
+{% endif %}
+{% endif %}
+{% endfor %}
+
+VM Sizing
+---------
+{% for vm, spec in manifest.sizing.items() %}
+{% if vm != 'tier' %}
+  {{ '%-24s' | format(vm) }}: {{ spec.cores }}vCPU / {{ spec.memory_mb // 1024 }}GB RAM / {{ spec.disk_gb }}GB disk{% if spec.count is defined %} x{{ spec.count }}{% endif %}
+
+{% endif %}
+{% endfor %}
+
+To deploy:  ansible-playbook playbooks/platform_builder.yml -e pb_action=deploy
+To verify:  ansible-playbook playbooks/platform_builder.yml -e pb_action=verify

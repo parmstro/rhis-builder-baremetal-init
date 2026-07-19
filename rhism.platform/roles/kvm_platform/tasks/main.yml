@@ -1,0 +1,5 @@
+---
+# Action + variable interface are validated by meta/argument_specs.yml (ansible-core
+# runs the validation automatically at role entry — no manual assert needed).
+- name: Dispatch kvm_platform action
+  ansible.builtin.include_tasks: "{{ kvm_platform_action }}.yml"

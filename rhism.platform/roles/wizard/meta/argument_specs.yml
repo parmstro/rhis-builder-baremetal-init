@@ -1,0 +1,99 @@
+---
+argument_specs:
+  main:
+    short_description: >-
+      rhism estate wizard — interactive TUI (or pre-baked-profile) collector
+      that writes the deployment manifest rhism.platform.builder consumes.
+    description: >-
+      Orchestrator-adjacent capability role, standalone-first. interactive
+      walks the operator through hypervisor/identity/content/provisioning/
+      scm/backup/secrets/container-platform/mail/network/sizing/credentials
+      choices (or loads a pre-baked profile and skips straight to
+      network/sizing/credentials/review), then writes a schema-valid
+      deployment manifest. validate re-checks an existing manifest's
+      structure. show_plan renders a human-readable deployment plan from
+      it. generate_inventory renders a starter Ansible inventory from it.
+      Pure control-node Ansible logic — no persistent service, no data
+      plane of its own.
+    options:
+      wizard_action:
+        description: >-
+          Which task to run. interactive is the default, real entry point;
+          validate/show_plan/generate_inventory all operate on an
+          already-written manifest at wizard_output_dir/wizard_output_file.
+        type: str
+        default: interactive
+        choices:
+          - interactive
+          - validate
+          - show_plan
+          - generate_inventory
+      wizard_output_dir:
+        description: Directory the deployment manifest is written to/read from.
+        type: str
+        default: /opt/rhism/manifests
+      wizard_output_file:
+        description: >-
+          Manifest filename within wizard_output_dir. Deliberately distinct
+          from rhism.platform.wizard's own default filename in the same
+          default directory, so the two roles never silently overwrite one
+          another's manifest if ever run on the same control host.
+        type: str
+        default: rhism-deployment-manifest.yml
+      wizard_profile:
+        description: >-
+          Set to skip interactive component pages and use a pre-baked
+          profile's choices. "estate" is rhism's own governed-RHEL estate
+          (IdM + Satellite + AAP + KVM + Tang + test hosts — see
+          files/profiles/estate.yml); "custom" and "" both trigger the
+          fully-interactive path (custom.yml is a documentation-only
+          placeholder, never actually loaded).
+        type: str
+        default: ""
+        choices:
+          - estate
+          - custom
+          - ""
+      wizard_estate_sizing_tier:
+        description: >-
+          Which tier (s/m/l) of files/profiles/estate.yml's sizing_defaults
+          becomes the manifest's real sizing block when wizard_profile is
+          "estate". No effect for the fully-interactive/custom path, where
+          tasks/pages/09_sizing.yml's own tier prompt drives sizing instead.
+        type: str
+        default: l
+        choices: [s, m, l]
+      wizard_skip_confirm:
+        description: Skip the final review/confirm page — set true in CI.
+        type: bool
+        default: false
+      wizard_tui_backend:
+        description: Interactive-mode TUI backend.
+        type: str
+        default: whiptail
+        choices:
+          - whiptail
+          - dialog
+      wizard_tui_title:
+        description: Title shown in every TUI dialog.
+        type: str
+        default: "rhism Estate Wizard"
+      wizard_tui_width:
+        description: TUI dialog width (columns).
+        type: int
+        default: 78
+      wizard_tui_height:
+        description: TUI dialog height (rows).
+        type: int
+        default: 20
+      wizard_tool_sizing:
+        description: >-
+          Capacity-planning tier for the wizard TOOL ITSELF (docs/
+          capacity-planning.md) — trivial and effectively invariant, since
+          this role is pure control-node logic with no persistent service.
+          NOT the same variable as wizard_sizing (the accumulated manifest
+          state populated by the wizard's own pages/profile) — deliberately
+          named to avoid colliding with it.
+        type: str
+        default: s
+        choices: [s]

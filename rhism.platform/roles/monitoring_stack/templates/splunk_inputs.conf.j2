@@ -1,0 +1,9 @@
+[default]
+host = {{ inventory_hostname }}
+
+{% for input in mon_splunk_fwd_inputs %}
+[monitor://{{ input.path }}]
+sourcetype = {{ input.sourcetype }}
+index = {{ input.index }}
+
+{% endfor %}

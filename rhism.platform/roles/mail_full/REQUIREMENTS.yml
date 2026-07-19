@@ -1,0 +1,46 @@
+---
+# Functional requirements — mail_full (requirements→test-case layer +
+# Tier-3 elevation, owner rules 2026-07-12).
+functional_requirements:
+  - req_id: MAILFULL-FR-001
+    statement: >-
+      The role SHALL deploy the full mail stack (Postfix + Dovecot + DKIM —
+      one-line KeyTable records preserved) consuming the shared mail_*
+      interface, dry-run gated by mail_execute.
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: MAILFULL-FR-002
+    statement: >-
+      A full deployment SHALL send and receive mail on a lab host, DKIM
+      signing verified.
+    tier: 3
+    verified_by:
+      - lab: playbooks/mail_server.yml#mail_relay
+
+  # --- Image-factory wave (FPS.md, /new-image, 2026-07-14). Capability-
+  # derived rows: verified_by stays empty until the FPS P4/P5 execution —
+  # UNCOVERED rendering is deliberate (honest gaps). Sources and container-
+  # scope expectations per row: see FPS.md.
+  - {req_id: MAILFULL-FR-003, statement: "The system SHALL deploy the complete stack — Postfix MTA + Dovecot IMAP/POP3/LMTP + Sieve (Pigeonhole) + antispam — via this role's actions.", tier: 2, verified_by: []}
+  - {req_id: MAILFULL-FR-004, statement: "The system SHALL accept inbound SMTP on :25 for hosted virtual domains and reject unknown recipients.", tier: 2, verified_by: []}
+  - {req_id: MAILFULL-FR-005, statement: "The system SHALL serve authenticated submission on :587 (RFC 6409), authentication required before relay.", tier: 2, verified_by: []}
+  - {req_id: MAILFULL-FR-006, statement: "The system SHALL deliver accepted mail into per-user Maildir via Dovecot LMTP (role capability gap today — delivers via virtual(8)).", tier: 2, verified_by: []}
+  - {req_id: MAILFULL-FR-007, statement: "The system SHALL authenticate an IMAP4rev1 session and FETCH a delivered message on :143 (STARTTLS) and :993 (implicit TLS).", tier: 2, verified_by: []}
+  - {req_id: MAILFULL-FR-008, statement: "The system SHALL serve POP3 retrieval on :110 (STARTTLS) and :995 (implicit TLS).", tier: 2, verified_by: []}
+  - {req_id: MAILFULL-FR-009, statement: "The system SHALL offer STARTTLS on SMTP/submission and IMAP/POP3 plus implicit-TLS variants (465/993/995), refusing plaintext auth.", tier: 2, verified_by: []}
+  - {req_id: MAILFULL-FR-010, statement: "The system SHALL authenticate SMTP clients via Dovecot as Postfix's SASL backend (smtpd_sasl_type=dovecot; role capability gap today).", tier: 2, verified_by: []}
+  - {req_id: MAILFULL-FR-011, statement: "The system SHALL refuse open relay: unauthenticated mail for non-hosted domains rejected.", tier: 2, verified_by: []}
+  - {req_id: MAILFULL-FR-012, statement: "The system SHALL provision virtual mail domains at runtime (add_domain action).", tier: 2, verified_by: []}
+  - {req_id: MAILFULL-FR-013, statement: "The system SHALL provision virtual mailbox users with passwd-file authentication (add_user action).", tier: 2, verified_by: []}
+  - {req_id: MAILFULL-FR-014, statement: "The system SHALL rewrite addresses via virtual alias maps and local aliases.", tier: 2, verified_by: []}
+  - {req_id: MAILFULL-FR-015, statement: "The system SHALL filter mail at delivery time with Sieve/Pigeonhole (role capability gap today).", tier: 2, verified_by: []}
+  - {req_id: MAILFULL-FR-016, statement: "The system SHALL serve ManageSieve on :4190 for client script management (role capability gap today).", tier: 2, verified_by: []}
+  - {req_id: MAILFULL-FR-017, statement: "The system SHALL enforce per-user mailbox quota via the Dovecot quota plugin (role capability gap today).", tier: 2, verified_by: []}
+  - {req_id: MAILFULL-FR-018, statement: "The system SHALL score and tag spam via SpamAssassin in the delivery path (sourcing probe-gated; EPEL-only on EL10).", tier: 2, verified_by: []}
+  - {req_id: MAILFULL-FR-019, statement: "The system SHALL scan mail for malware via ClamAV/amavisd-new (expected FAIL — EPEL-only sourcing on all bases; freshclam needs network).", tier: 3, verified_by: []}
+  - {req_id: MAILFULL-FR-020, statement: "The system SHALL DKIM-sign outbound mail via the OpenDKIM milter (EPEL-only sourcing; DNS TXT verification expected FAIL — no real DNS in scope).", tier: 3, verified_by: []}
+  - {req_id: MAILFULL-FR-021, statement: "The system SHALL relay outbound mail through a configured smarthost with client SASL (mail_relay_* shared vars).", tier: 2, verified_by: []}
+  - {req_id: MAILFULL-FR-022, statement: "The system SHALL enforce message size limits (mail_message_size_limit).", tier: 2, verified_by: []}
+  - {req_id: MAILFULL-FR-023, statement: "The system SHALL expose queue visibility and service health via the status action and send a REAL message via the test action (real-protocol smoke standard).", tier: 2, verified_by: []}

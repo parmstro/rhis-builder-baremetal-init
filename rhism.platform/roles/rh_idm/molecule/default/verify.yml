@@ -1,0 +1,32 @@
+---
+- name: Verify standalone variable contract
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Load role defaults
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../../defaults/main.yml"
+      delegate_to: localhost
+
+    - name: Assert shared interface defaults resolve for standalone use
+      ansible.builtin.assert:
+        that:
+          - action == 'server'
+          - not (idm_server_install | bool)
+          - not (idm_replica_install | bool)
+          - not (idm_client_install | bool)
+          - not (idm_rhsm_skip_registration | bool)
+          - idm_setup_dns | bool
+          - idm_mkhomedir | bool
+          - idm_idstart | int == 100000  # BUG-115: must exceed login.defs UID_MAX
+          - idm_idmax | int == 199999
+          - _idm_service_name == 'ipa'
+          - _idm_server_packages | length > 0
+          - _idm_rhsm_required | bool
+        fail_msg: "rh_idm defaults did not resolve to the expected standalone contract"
+      delegate_to: localhost
+
+    - name: Report verification passed
+      ansible.builtin.debug:
+        msg: "PASS — rh_idm standalone contract verified"
+      delegate_to: localhost

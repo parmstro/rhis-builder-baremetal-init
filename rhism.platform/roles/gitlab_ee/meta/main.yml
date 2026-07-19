@@ -1,0 +1,23 @@
+---
+galaxy_info:
+  namespace: rhism
+  role_name: gitlab_ee
+  author: rhism
+  description: >-
+    Install and manage GitLab Enterprise Edition (omnibus + RHSM) on EL9 — full lifecycle:
+    RHSM registration, install/remove, gitlab.rb configure, runner registration,
+    backup/restore, upgrade, service state, and status. Standalone-first product role, also
+    selectable by the scm_deploy dispatcher (scm_type: gitlab_ee).
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: EL
+      versions:
+        - "9"
+  galaxy_tags:
+    - gitlab
+    - scm
+    - git
+    - devops
+    - cicd
+dependencies: []

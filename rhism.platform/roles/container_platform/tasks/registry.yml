@@ -1,0 +1,6 @@
+---
+- name: Configure container registry ({{ cp_registry_type }})
+  ansible.builtin.include_role:
+    name: "registry_{{ cp_registry_type }}"
+  vars:
+    action: registry

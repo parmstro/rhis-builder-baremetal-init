@@ -1,0 +1,15 @@
+---
+- name: Prepare — ensure python3 and required tools are present
+  hosts: all
+  gather_facts: false
+
+  tasks:
+    - name: Install python3
+      ansible.builtin.raw: dnf install -y python3 2>/dev/null || apt-get install -y python3 2>/dev/null || true
+      changed_when: false
+
+    - name: Create credential directory
+      ansible.builtin.file:
+        path: /root/.pm_credentials
+        state: directory
+        mode: "0700"

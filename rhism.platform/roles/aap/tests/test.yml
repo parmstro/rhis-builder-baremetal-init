@@ -1,0 +1,27 @@
+---
+# Standalone example — render an AAP 2.5 containerized installer inventory for a
+# small controller/hub/eda/db topology WITHOUT running the real installer
+# (aap_execute defaults to false). Flip aap_execute to true on an entitled host
+# to actually deploy. See README.md for the full standalone + baseline examples.
+- name: Standalone rhism.platform.aap example (dry-run render)
+  hosts: localhost
+  gather_facts: false
+  vars:
+    aap_version: "2.5"
+    aap_install_method: containerized
+    aap_execute: false
+    aap_manage_subscription: false
+    aap_gateway_hosts:
+      - gateway.example.com
+    aap_controller_hosts:
+      - controller.example.com
+    aap_hub_hosts:
+      - hub.example.com
+    aap_eda_hosts:
+      - eda.example.com
+    aap_database_host: db.example.com
+    aap_work_dir: /tmp/aap-example
+  roles:
+    - role: aap
+      vars:
+        action: install

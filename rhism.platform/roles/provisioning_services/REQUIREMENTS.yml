@@ -1,0 +1,74 @@
+---
+# Functional requirements — provisioning_services (requirements->test-case layer +
+# Tier-3 elevation, wave-3+ standard). DISPATCHER role: selects a PXE/DHCP/TFTP/DNS
+# provisioning backend via prov_type (dnsmasq | cobbler | satellite_proxy |
+# foreman_proxy) and orchestrates install/configure/baseline via prov_action.
+# Capability curated from README + tasks/ (main/baseline/install/configure) +
+# vars/main.yml + defaults/main.yml, grounded in the upstream dnsmasq, Cobbler, and
+# Foreman/Satellite Smart Proxy docs. Family lab:
+# playbooks/provisioning_services.yml.
+functional_requirements:
+  - req_id: PROVISIONING_SERVICES-FR-001
+    statement: >-
+      The dispatcher SHALL validate prov_action (install/configure/baseline) and
+      prov_type (dnsmasq/cobbler/satellite_proxy/foreman_proxy) and reject an
+      invalid action or type (negative tests).
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: PROVISIONING_SERVICES-FR-002
+    statement: >-
+      The dispatcher SHALL load the selected type's vars (<prov_type>.yml) and
+      dispatch to the matching action task file, delegating deployment to the
+      product role via include_role with the shared action interface.
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: PROVISIONING_SERVICES-FR-003
+    statement: >-
+      The role SHALL honour the prov_install_execute dry-run gate — the default
+      (false) validates dispatch and variable loading without installing packages.
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: PROVISIONING_SERVICES-FR-004
+    statement: >-
+      On action baseline, the role SHALL orchestrate install then configure in
+      dependency order, each gated by prov_apply_install / prov_apply_configure.
+    tier: 3
+    verified_by:
+      - lab: playbooks/provisioning_services.yml#baseline
+
+  - req_id: PROVISIONING_SERVICES-FR-005
+    statement: >-
+      For prov_type dnsmasq, the role SHALL deploy a single-process DHCP + TFTP +
+      DNS server rendering PXE boot parameters from variables.
+    tier: 3
+    verified_by:
+      - lab: playbooks/provisioning_services.yml#dnsmasq
+
+  - req_id: PROVISIONING_SERVICES-FR-006
+    statement: >-
+      A lab host SHALL PXE-boot against the deployed provisioning service.
+    tier: 3
+    verified_by:
+      - lab: playbooks/provisioning_services.yml#pxe
+
+  - req_id: PROVISIONING_SERVICES-FR-007
+    statement: >-
+      For prov_type cobbler, the role SHALL deploy a Cobbler provisioning server
+      managing distros, profiles, and systems (with managed DHCP/DNS/TFTP) —
+      uncoverable without a Cobbler-capable target.
+    tier: 3
+    verified_by: []
+
+  - req_id: PROVISIONING_SERVICES-FR-008
+    statement: >-
+      For prov_type satellite_proxy / foreman_proxy, the role SHALL register a
+      Foreman/Satellite Smart Proxy (TFTP + DHCP + DNS, content) against a content
+      server — uncoverable without a Foreman/Satellite server.
+    tier: 3
+    verified_by: []

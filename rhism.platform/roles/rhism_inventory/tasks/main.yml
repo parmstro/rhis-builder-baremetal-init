@@ -1,0 +1,91 @@
+---
+# ---------------------------------------------------------------------------
+# rhism_inventory — SOE catalogue owner, action-driven dispatch.
+#
+# Standalone capability role; every action runs entirely on the control node
+# (the catalogue, the outputs, and the publish target are all local content).
+# The action + variable interface is validated by meta/argument_specs.yml at
+# role entry, so no manual action assert is needed here.
+#
+# Shared envelope (runs for EVERY action): resolve the catalogue directory to
+# a concrete path, load every entry file, apply the lifecycle + name filters,
+# then dispatch to the action task file.
+# ---------------------------------------------------------------------------
+
+- name: Resolve the catalogue directory to a concrete path
+  # set_fact renders eagerly, freezing role_path NOW — passing a raw
+  # role_path-based template downstream re-resolves against the wrong role
+  # context (BUG-166).
+  ansible.builtin.set_fact:
+    _rhism_inventory_catalog_dir: >-
+      {{ rhism_inventory_catalog_dir
+         if rhism_inventory_catalog_dir | length > 0
+         else role_path ~ '/files/catalog' }}
+
+- name: Find catalogue entry files
+  ansible.builtin.find:
+    paths: "{{ _rhism_inventory_catalog_dir }}"
+    patterns: "*.yml"
+    file_type: file
+  register: _rhism_inventory_find
+
+- name: Assert the catalogue directory holds at least one entry
+  ansible.builtin.assert:
+    that:
+      - _rhism_inventory_find.matched | int > 0
+    fail_msg: >-
+      no *.yml SOE catalogue entries found under
+      {{ _rhism_inventory_catalog_dir }}
+
+- name: Reset the loaded-catalogue accumulator
+  # Explicit reset — set_fact results persist across plays in one run (BUG-060).
+  ansible.builtin.set_fact:
+    _rhism_inventory_loaded: []
+
+- name: Load catalogue entries
+  ansible.builtin.set_fact:
+    _rhism_inventory_loaded: >-
+      {{ _rhism_inventory_loaded
+         + [{'file': item | basename,
+             'entry': lookup('ansible.builtin.file', item) | from_yaml}] }}
+  loop: "{{ _rhism_inventory_find.files | map(attribute='path') | sort }}"
+  loop_control:
+    label: "{{ item | basename }}"
+
+- name: Record entries dropped by the lifecycle filter
+  ansible.builtin.set_fact:
+    _rhism_inventory_dropped_deprecated: >-
+      {{ _rhism_inventory_loaded
+         | selectattr('entry.lifecycle_state', 'defined')
+         | selectattr('entry.lifecycle_state', 'equalto', 'deprecated')
+         | map(attribute='entry.name', default='(unnamed entry)') | list
+         if rhism_inventory_lifecycle_filter | bool else [] }}
+
+- name: Apply the lifecycle filter
+  ansible.builtin.set_fact:
+    _rhism_inventory_filtered: >-
+      {{ ((_rhism_inventory_loaded | rejectattr('entry.lifecycle_state', 'defined') | list)
+          + (_rhism_inventory_loaded
+             | selectattr('entry.lifecycle_state', 'defined')
+             | rejectattr('entry.lifecycle_state', 'equalto', 'deprecated') | list))
+         | sort(attribute='file')
+         if rhism_inventory_lifecycle_filter | bool
+         else _rhism_inventory_loaded }}
+
+- name: Apply the bundle-name selection
+  ansible.builtin.set_fact:
+    _rhism_inventory_selected_files: >-
+      {{ _rhism_inventory_filtered
+         | selectattr('entry.name', 'defined')
+         | selectattr('entry.name', 'in', rhism_inventory_bundles) | list
+         if rhism_inventory_bundles | length > 0
+         else _rhism_inventory_filtered }}
+
+- name: Expose the selected catalogue entries
+  ansible.builtin.set_fact:
+    _rhism_inventory_selected: >-
+      {{ _rhism_inventory_selected_files | map(attribute='entry') | list }}
+
+- name: Dispatch the requested action
+  ansible.builtin.include_tasks:
+    file: "{{ rhism_inventory_action }}.yml"

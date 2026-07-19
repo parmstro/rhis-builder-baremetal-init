@@ -1,0 +1,22 @@
+---
+# Action: remove_node — drain, delete, and uninstall a worker node
+
+- name: Drain node
+  ansible.builtin.command:
+    cmd: "{{ _cp_kubectl_cmd }} drain {{ inventory_hostname }} --ignore-daemonsets --delete-emptydir-data --force"
+  changed_when: true
+  become: true
+  delegate_to: "{{ groups['control_plane'] | first | default(inventory_hostname) }}"
+
+- name: Delete node from cluster
+  ansible.builtin.command:
+    cmd: "{{ _cp_kubectl_cmd }} delete node {{ inventory_hostname }}"
+  changed_when: true
+  become: true
+  delegate_to: "{{ groups['control_plane'] | first | default(inventory_hostname) }}"
+
+- name: Uninstall k3s agent
+  ansible.builtin.command:
+    cmd: /usr/local/bin/k3s-agent-uninstall.sh
+    removes: "{{ _cp_binary }}"
+  become: true

@@ -1,0 +1,18 @@
+---
+profile: basic
+
+exclude_paths:
+  - collections/
+  - library/
+  - .molecule/
+
+skip_list:
+  - fqcn[action-core]
+  - fqcn[action]
+  - name[casing]
+  - var-naming[no-role-prefix]
+
+warn_list:
+  - yaml
+  - no-changed-when
+  - risky-shell-pipe

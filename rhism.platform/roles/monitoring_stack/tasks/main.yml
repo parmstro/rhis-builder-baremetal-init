@@ -1,0 +1,6 @@
+---
+# Action + variable interface are validated by meta/argument_specs.yml
+# (ansible-core runs the validation automatically at role entry — the former
+# hand-written assert is retired).
+- name: "Execute task file for: {{ mon_action }}"
+  ansible.builtin.include_tasks: "{{ mon_action }}.yml"

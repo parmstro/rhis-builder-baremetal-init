@@ -1,0 +1,22 @@
+---
+# ---------------------------------------------------------------------------
+# gitlab_ce — configure: deploy gitlab.rb template and reconfigure
+# ---------------------------------------------------------------------------
+
+- name: Configure GitLab CE
+  become: true
+  block:
+    - name: Deploy gitlab.rb from template
+      ansible.builtin.template:
+        src: "{{ scm_config_template }}"
+        dest: /etc/gitlab/gitlab.rb
+        owner: root
+        group: root
+        mode: "0600"
+      no_log: true
+      when: scm_config_template | default('') | length > 0
+      notify: gitlab_ce - reconfigure
+
+    - name: Run reconfigure when no template is provided
+      ansible.builtin.include_tasks: reconfigure.yml
+      when: scm_config_template | default('') | length == 0

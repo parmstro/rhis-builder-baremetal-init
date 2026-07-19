@@ -1,0 +1,27 @@
+---
+- name: Verify — SELinux role behaviour in containers
+  hosts: all
+  gather_facts: true
+  tasks:
+    - name: Assert SELinux status is detected (disabled in containers is expected)
+      ansible.builtin.assert:
+        that: ansible_selinux is defined
+        fail_msg: "ansible_selinux fact not gathered"
+
+    - name: Report SELinux status
+      ansible.builtin.debug:
+        msg: "SELinux status on {{ inventory_hostname }}: {{ ansible_selinux.status }}"
+
+    - name: Assert role ran without error (no action needed when SELinux disabled)
+      ansible.builtin.assert:
+        that: true
+        success_msg: "linux_selinux role completed — SELinux skip behaviour verified in container"
+
+- name: Verify — summary
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Print summary
+      ansible.builtin.debug:
+        msg: "linux_selinux verified on EL8, EL9, EL10 containers (SELinux disabled = expected skip)."

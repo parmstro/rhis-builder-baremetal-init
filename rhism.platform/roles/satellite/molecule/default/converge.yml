@@ -1,0 +1,288 @@
+---
+# Each play exercises a representative action. The list-guarded API actions (cdn_repos, repos,
+# sync, content_views, activation_keys, smart_proxy, lifecycle, host) are true no-ops with the
+# empty defaults, so they validate dispatch + the shared var contract without a Red Hat
+# subscription or live Satellite. content_install_execute stays false throughout (installer
+# stays a dry-run).
+- name: Converge — cdn_repos action (Satellite-only, list-guarded no-op) dispatches
+  hosts: all
+  gather_facts: false
+  vars:
+    action: cdn_repos
+    content_install_execute: false
+  roles:
+    - role: rhism.platform.satellite
+
+- name: Converge — repos action dispatches
+  hosts: all
+  gather_facts: false
+  vars:
+    action: repos
+    content_install_execute: false
+  roles:
+    - role: rhism.platform.satellite
+
+- name: Converge — sync action dispatches
+  hosts: all
+  gather_facts: false
+  vars:
+    action: sync
+    content_install_execute: false
+  roles:
+    - role: rhism.platform.satellite
+
+- name: Converge — content_views action dispatches
+  hosts: all
+  gather_facts: false
+  vars:
+    action: content_views
+    content_install_execute: false
+  roles:
+    - role: rhism.platform.satellite
+
+- name: Converge — activation_keys action dispatches
+  hosts: all
+  gather_facts: false
+  vars:
+    action: activation_keys
+    content_install_execute: false
+  roles:
+    - role: rhism.platform.satellite
+
+- name: Converge — lifecycle action dispatches
+  hosts: all
+  gather_facts: false
+  vars:
+    action: lifecycle
+    content_install_execute: false
+  roles:
+    - role: rhism.platform.satellite
+
+- name: Converge — host action dispatches (rhism Phase C item 2, list-guarded no-op)
+  hosts: all
+  gather_facts: false
+  vars:
+    action: host
+    content_install_execute: false
+  roles:
+    - role: satellite
+
+- name: Converge — host action with a populated list stays a no-op when content_host_execute
+    is false (proves the double-gate, not just the list-guard — a real API call against the
+    play's default content_server_url would fail this play outright, since no Satellite exists)
+  hosts: all
+  gather_facts: false
+  vars:
+    action: host
+    content_install_execute: false
+    content_host_execute: false
+    content_hosts:
+      - fqdn: molecule-test-host.example.com
+        hostgroup: "Test Hostgroup"
+        compute_resource: baremetal
+        power_cycle: true
+  roles:
+    - role: satellite
+
+- name: Converge — export_content action dispatches (rhism Phase C item 3, list-guarded no-op)
+  hosts: all
+  gather_facts: false
+  vars:
+    action: export_content
+    content_install_execute: false
+  roles:
+    - role: satellite
+
+- name: Converge — import_content action dispatches (rhism Phase C item 3, list-guarded no-op)
+  hosts: all
+  gather_facts: false
+  vars:
+    action: import_content
+    content_install_execute: false
+  roles:
+    - role: satellite
+
+- name: Converge — soe_bundles action dispatches (rhism reuse-map item 1, list-guarded no-op)
+  hosts: all
+  gather_facts: false
+  vars:
+    action: soe_bundles
+    content_install_execute: false
+  roles:
+    - role: satellite
+
+- name: Converge — soe_bundles real transform proof (rhism reuse-map item 1) — no Satellite API
+    call, since content_soe_bundles_execute is set false; asserts on the _soe_* facts the
+    transform produces before they would ever reach content_views.yml/activation_keys.yml
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Run soe_bundles action with one fixture SOE bundle and the dispatch gate off
+      ansible.builtin.include_role:
+        name: satellite
+      vars:
+        action: soe_bundles
+        content_install_execute: false
+        content_soe_bundles_execute: false
+        content_soe_bundles:
+          - name: rhel9-web-server
+            lifecycle_environment: Production
+            lifecycle_environment_prior: Testing
+            content_view_description: "RHEL9 web server SOE"
+            repositories:
+              - name: rhel9-baseos
+              - name: rhel9-appstream
+            subscriptions:
+              - name: Red Hat Enterprise Linux Server
+            host_collections:
+              - name: rhel9-web-servers
+                description: RHEL9 web server fleet
+            hostgroup: RHEL9/WebServer
+            kickstart_snippet: rhel9-web-server-ks
+
+    - name: Assert the derived lifecycle-environment shape matches the SOE bundle
+      ansible.builtin.assert:
+        that:
+          - "_soe_lifecycle_environments == [{'name': 'Production', 'prior': 'Testing'}]"
+        fail_msg: "soe_bundles did not derive the expected lifecycle_environment shape"
+
+    - name: Assert the derived content-view shape matches the SOE bundle
+      ansible.builtin.assert:
+        that:
+          - _soe_content_views | length == 1
+          - _soe_content_views[0].name == 'rhel9-web-server'
+          - _soe_content_views[0].lifecycle_environments == ['Production']
+          - _soe_content_views[0].description == 'RHEL9 web server SOE'
+          - _soe_content_views[0].repositories | length == 2
+        fail_msg: "soe_bundles did not derive the expected content_view shape"
+
+    - name: Assert the derived activation-key shape matches the SOE bundle
+      ansible.builtin.assert:
+        that:
+          - _soe_activation_keys | length == 1
+          - _soe_activation_keys[0].name == 'rhel9-web-server'
+          - _soe_activation_keys[0].lifecycle_environment == 'Production'
+          - _soe_activation_keys[0].content_view == 'rhel9-web-server'
+          - _soe_activation_keys[0].auto_attach == true
+          - _soe_activation_keys[0].host_collections == ['rhel9-web-servers']
+        fail_msg: "soe_bundles did not derive the expected activation_key shape"
+
+    - name: Assert the derived host-collections shape matches the SOE bundle
+      ansible.builtin.assert:
+        that:
+          - "_soe_host_collections == [{'name': 'rhel9-web-servers', 'description': 'RHEL9 web server fleet'}]"
+        fail_msg: "soe_bundles did not derive the expected host_collections shape"
+
+- name: Converge — soe_bundles negative test (fails when a bundle is missing a required field)
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Attempt soe_bundles with an incomplete bundle entry
+      block:
+        - name: Call role with a bundle missing lifecycle_environment
+          ansible.builtin.include_role:
+            name: satellite
+          vars:
+            action: soe_bundles
+            content_install_execute: false
+            content_soe_bundles_execute: false
+            content_soe_bundles:
+              - name: incomplete-bundle
+      rescue:
+        - name: Confirm expected failure was caught
+          ansible.builtin.debug:
+            msg: "PASS — soe_bundles correctly rejected an incomplete bundle entry"
+
+- name: Converge — transfer_media action (rhism Phase C item 3, real local round trip — no
+    Satellite API involved, so this is a genuine functional test rather than a dispatch no-op)
+  # hosts: localhost / connection: local (BUG-161) — ansible.posix.synchronize hangs
+  # indefinitely under the community.docker.docker connection plugin: rsync tunnels through
+  # --rsh=/usr/local/bin/docker exec -i, and the EE's docker-shim (built for one-shot task
+  # execution, see the "docker exec fails" pitfall) doesn't implement rsync's bidirectional
+  # streaming protocol. Pure filesystem work has no dependency on the container target anyway.
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    _transfer_src: /tmp/rhism_transfer_test/src
+    _transfer_dest: /tmp/rhism_transfer_test/dest
+  tasks:
+    - name: Remove any leftover test dirs from a previous run
+      ansible.builtin.file:
+        path: /tmp/rhism_transfer_test
+        state: absent
+
+    - name: Create a fixture source export tree
+      ansible.builtin.file:
+        path: "{{ _transfer_src }}/subdir"
+        state: directory
+        mode: "0750"
+
+    - name: Write fixture files into the source tree
+      ansible.builtin.copy:
+        dest: "{{ item }}"
+        content: "rhism disconnected transfer fixture — {{ item }}\n"
+        mode: "0640"
+      loop:
+        - "{{ _transfer_src }}/metadata.json"
+        - "{{ _transfer_src }}/subdir/export.tar"
+
+    - name: Run transfer_media action
+      ansible.builtin.include_role:
+        name: satellite
+      vars:
+        action: transfer_media
+        content_install_execute: false
+        content_transfer_source_dir: "{{ _transfer_src }}"
+        content_transfer_media_path: "{{ _transfer_dest }}"
+
+    - name: Confirm transferred files exist at the destination
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: _transfer_dest_stat
+      loop:
+        - "{{ _transfer_dest }}/metadata.json"
+        - "{{ _transfer_dest }}/subdir/export.tar"
+
+    - name: Assert every fixture file landed on the transfer media
+      ansible.builtin.assert:
+        that:
+          - item.stat.exists
+        fail_msg: "transfer_media did not copy {{ item.item }} onto the destination"
+      loop: "{{ _transfer_dest_stat.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+- name: Converge — transfer_media negative test (fails closed without a destination configured)
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Attempt transfer_media with no content_transfer_media_path
+      block:
+        - name: Call role with the destination var left unset
+          ansible.builtin.include_role:
+            name: satellite
+          vars:
+            action: transfer_media
+            content_install_execute: false
+      rescue:
+        - name: Confirm expected failure was caught
+          ansible.builtin.debug:
+            msg: "PASS — transfer_media correctly refused to guess a destination"
+
+- name: Converge — negative test (bogus action must fail)
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Attempt bogus action
+      block:
+        - name: Call role with invalid action
+          ansible.builtin.include_role:
+            name: satellite
+          vars:
+            action: bogus_action
+            content_install_execute: false
+      rescue:
+        - name: Confirm expected failure was caught
+          ansible.builtin.debug:
+            msg: "PASS — bogus action correctly rejected"

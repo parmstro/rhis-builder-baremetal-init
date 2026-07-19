@@ -1,0 +1,50 @@
+---
+# kvm_platform — remove action (destructive).
+# Stops+disables libvirtd, optionally purges the default storage pool/network, and removes
+# the packages installed by `install`. The confirmation assert below runs unconditionally
+# (even when kvm_platform_execute is false) so the safety gate itself is always exercised —
+# see molecule/default/converge.yml's negative test.
+
+- name: Assert deletion has been explicitly confirmed
+  ansible.builtin.assert:
+    that:
+      - kvm_platform_confirm_delete | bool
+    fail_msg: >-
+      kvm_platform_confirm_delete must be set to true to run action=remove — this stops
+      libvirtd, removes packages, and can purge the default storage pool/network.
+
+- name: Remove KVM/libvirt host platform
+  when: kvm_platform_execute | bool
+  block:
+    - name: Resolve package list
+      ansible.builtin.include_tasks: packages.yml
+
+    - name: Stop and disable libvirtd
+      ansible.builtin.service:
+        name: "{{ kvm_platform_libvirt_service }}"
+        state: stopped
+        enabled: false
+      become: true
+      when: kvm_platform_manage_service | bool
+
+    - name: Remove default storage pool (optional)
+      community.libvirt.virt_pool:
+        name: "{{ kvm_platform_pool_name }}"
+        state: absent
+        uri: "{{ kvm_platform_uri }}"
+      become: true
+      when: kvm_platform_purge_storage_pool | bool
+
+    - name: Remove default network (optional)
+      community.libvirt.virt_net:
+        name: "{{ kvm_platform_network_name }}"
+        state: absent
+        uri: "{{ kvm_platform_uri }}"
+      become: true
+      when: kvm_platform_purge_network | bool
+
+    - name: Remove KVM/libvirt packages
+      ansible.builtin.package:
+        name: "{{ _kvm_platform_resolved_packages }}"
+        state: absent
+      become: true

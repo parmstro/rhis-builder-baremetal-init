@@ -1,0 +1,29 @@
+---
+# ---------------------------------------------------------------------------
+# bconsole.yml — Shared bconsole session execution
+#
+# Used by: add_client, add_job, run_job, restore, verify, prune, purge, status
+#
+# Caller must set these variables before including:
+#   _bconsole_name       — descriptive name for the task
+#   _bconsole_commands   — list of commands to send (quit is appended)
+#   _bconsole_timeout    — timeout in seconds (default: 60)
+#   _bconsole_no_log     — suppress output (default: false)
+#
+# Registers: _bconsole_result
+# The calling action file is responsible for changed_when / failed_when
+# evaluation on _bconsole_result after this include returns.
+# ---------------------------------------------------------------------------
+
+- name: "{{ _bconsole_name }}"
+  ansible.builtin.expect:
+    command: bconsole -c /etc/bareos/bconsole.conf
+    responses:
+      "\\*": "{{ _bconsole_commands + ['quit'] }}"
+    timeout: "{{ _bconsole_timeout | default(60) }}"
+    echo: true
+  no_log: "{{ _bconsole_no_log | default(false) }}"
+  register: _bconsole_result
+  changed_when: false
+  failed_when: false
+  become: true

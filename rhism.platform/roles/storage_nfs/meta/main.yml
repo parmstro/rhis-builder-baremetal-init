@@ -1,0 +1,22 @@
+---
+galaxy_info:
+  namespace: rhism
+  role_name: storage_nfs
+  author: rhism
+  description: >-
+    Deploy the NFS subdir external provisioner on a Kubernetes cluster via Helm against an
+    existing NFS export and optionally set its StorageClass as the default. Standalone-first
+    product role, also selectable by the container_platform dispatcher (cp_storage_type: nfs).
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: EL
+      versions:
+        - "9"
+  galaxy_tags:
+    - kubernetes
+    - storage
+    - nfs
+    - csi
+    - helm
+dependencies: []

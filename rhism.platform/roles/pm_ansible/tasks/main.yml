@@ -1,0 +1,25 @@
+---
+# roles/pm_ansible/tasks/main.yml
+# Standalone dispatcher — set pm_ansible_action directly OR call via password_management
+# (which passes action= via vars — bridged below).
+
+- name: Resolve effective action
+  ansible.builtin.set_fact:
+    _pm_ansible_action: "{{ pm_ansible_action if pm_ansible_action | length > 0 else (action | default('')) }}"
+
+- name: Validate pm_ansible_action and required variables
+  ansible.builtin.assert:
+    that:
+      - _pm_ansible_action | length > 0
+      - _pm_ansible_action in ['create', 'delete', 'audit', 'rotate']
+      - pm_target | length > 0
+    fail_msg: >-
+      pm_ansible_action must be one of: create, delete, audit, rotate.
+      pm_target must be set.
+      Got: pm_ansible_action='{{ _pm_ansible_action }}' pm_target='{{ pm_target | default("undefined") }}'
+
+- name: "pm_ansible — {{ _pm_ansible_action }} for {{ pm_target }}"
+  ansible.builtin.include_tasks: "{{ _pm_ansible_action }}.yml"
+  # Dry-run gate (shared family variable — see pm_vault/pm_thycotic): validation
+  # above still runs; only the credential-writing/system-user dispatch is skipped.
+  when: pm_execute | default(true) | bool

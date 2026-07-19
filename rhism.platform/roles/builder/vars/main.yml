@@ -1,0 +1,6 @@
+---
+_pb_valid_actions:
+  - plan
+  - deploy
+  - verify
+  - teardown

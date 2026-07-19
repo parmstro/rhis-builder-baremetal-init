@@ -1,0 +1,17 @@
+---
+# ---------------------------------------------------------------------------
+# status.yml — Report director, storage, and client status
+# ---------------------------------------------------------------------------
+
+- name: Get director, storage, and client status via bconsole
+  ansible.builtin.include_tasks: bconsole.yml
+  vars:
+    _bconsole_name: Get director, storage, and client status via bconsole
+    _bconsole_commands:
+      - "status director"
+      - "status storage"
+      - "status client"
+
+- name: Report bareos status
+  ansible.builtin.debug:
+    msg: "{{ _bconsole_result.stdout_lines | default(['bconsole session failed or no output']) }}"

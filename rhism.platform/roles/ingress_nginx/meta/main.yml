@@ -1,0 +1,22 @@
+---
+galaxy_info:
+  namespace: rhism
+  role_name: ingress_nginx
+  author: rhism
+  description: >-
+    Deploy the NGINX ingress controller on a Kubernetes cluster via Helm and set it as the
+    default IngressClass. Standalone-first product role, also selectable by the
+    container_platform dispatcher (cp_ingress_type: nginx).
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: EL
+      versions:
+        - "9"
+  galaxy_tags:
+    - kubernetes
+    - ingress
+    - nginx
+    - helm
+    - networking
+dependencies: []

@@ -1,0 +1,59 @@
+---
+# k3s — standalone-first defaults over the SHARED container-platform interface.
+#
+# Every Kubernetes-distro product role (k3s / rke2 / okd / ocp) consumes the SAME
+# variable names (bare `action` + cp_* vars), so the container_platform dispatcher selects
+# any of them with one identical call — `include_role: name="{{ cp_type }}"` — and never
+# needs per-distro code. Standalone callers set these same vars directly; the defaults below
+# make the role runnable on its own.
+
+# Shared action — the dispatcher passes it via include_role vars; this default covers
+# standalone use. Actions: present | absent | configure | started | stopped | restarted |
+# add_node | remove_node | upgrade | backup | restore | reset | status.
+action: present
+
+# ── Shared container-platform interface (consumed by every distro) ────────────────
+# Node role — control_plane installs a k3s server, worker installs an agent.
+cp_node_role: control_plane
+# Version pin (empty → stable channel). Passed as INSTALL_K3S_VERSION.
+cp_install_version: ""
+# Worker join parameters (only read when cp_node_role == worker / for add_node).
+cp_server_url: ""
+cp_node_token: ""
+# Standard-path kubeconfig symlink target (created only when set and != the on-node path).
+cp_kubeconfig_path: /etc/rancher/k3s/k3s.yaml
+# Server config knobs consumed by templates/k3s-config.yaml.j2 (all optional).
+# Additional TLS SANs for the API server cert (host/IP the kubeconfig will be reached at).
+cp_tls_sans: []
+# Bundled components to disable on the server (e.g. traefik, servicelb, local-storage).
+cp_disable_components: []
+# Pod / service network CIDRs (empty → k3s defaults 10.42.0.0/16 and 10.43.0.0/16).
+cp_cluster_cidr: ""
+cp_service_cidr: ""
+# etcd snapshot names for backup / restore.
+cp_backup_snapshot_name: "{{ inventory_hostname }}-k3s"
+cp_restore_snapshot_name: ""
+# Safety confirmation required before the destructive reset (teardown) action.
+cp_reset_confirm: false
+
+# ── k3s distribution facts (private; also provided by container_platform vars/k3s.yml) ──
+_cp_install_script_url: https://get.k3s.io
+_cp_packages: []
+_cp_config_dir: /etc/rancher/k3s
+_cp_config_file: /etc/rancher/k3s/config.yaml
+_cp_kubeconfig_path: /etc/rancher/k3s/k3s.yaml
+_cp_service_name: k3s
+_cp_service_name_agent: k3s-agent
+_cp_binary: /usr/local/bin/k3s
+# Absolute path — sudo secure_path on EL9 excludes /usr/local/bin, so a bare
+# `k3s` is not resolvable under become (BUG-041).
+_cp_kubectl_cmd: /usr/local/bin/k3s kubectl
+_cp_rhsm_required: false
+_cp_has_builtin_registry: false
+_cp_has_builtin_ingress: true
+_cp_builtin_ingress_name: traefik
+_cp_firewall_ports:
+  - 6443/tcp
+  - 10250/tcp
+  - 8472/udp
+  - 4789/udp

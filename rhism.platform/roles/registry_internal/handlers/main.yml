@@ -1,0 +1,8 @@
+---
+- name: registry_internal - configure registry
+  ansible.builtin.debug:
+    msg: >-
+      Internal registry configuration applied.
+      Namespace: {{ cp_registry_namespace | default('openshift-image-registry') }}.
+      Platform: {{ cp_type | default('unknown') }}.
+  listen: registry_internal - configure registry

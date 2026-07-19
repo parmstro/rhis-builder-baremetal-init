@@ -1,0 +1,6 @@
+---
+- name: Install content management server ({{ content_type }})
+  ansible.builtin.include_role:
+    name: "{{ content_type }}"
+  vars:
+    action: install

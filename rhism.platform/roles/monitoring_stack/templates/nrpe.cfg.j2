@@ -1,0 +1,14 @@
+log_facility=daemon
+pid_file=/var/run/nrpe/nrpe.pid
+server_port=5666
+nrpe_user=nrpe
+nrpe_group=nrpe
+allowed_hosts={{ mon_nrpe_allowed_hosts }}
+dont_blame_nrpe={{ mon_nrpe_dont_blame }}
+allow_bash_command_substitution=0
+command_timeout=60
+connection_timeout=300
+
+{% for check in mon_nrpe_checks %}
+command[{{ check.name }}]={{ check.command }}
+{% endfor %}

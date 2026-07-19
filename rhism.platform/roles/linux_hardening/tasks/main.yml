@@ -1,0 +1,25 @@
+---
+- name: Validate linux_hardening_action
+  ansible.builtin.assert:
+    that:
+      - linux_hardening_action is defined
+      - linux_hardening_action in ['sysctl', 'ssh', 'pam', 'kernel_modules', 'all']
+    fail_msg: >-
+      linux_hardening_action must be one of: sysctl, ssh, pam, kernel_modules, all
+      (got '{{ linux_hardening_action | default("undefined") }}')
+
+- name: Apply kernel sysctl hardening parameters
+  ansible.builtin.include_tasks: sysctl.yml
+  when: linux_hardening_action in ['sysctl', 'all']
+
+- name: Harden SSH daemon configuration
+  ansible.builtin.include_tasks: ssh.yml
+  when: linux_hardening_action in ['ssh', 'all']
+
+- name: Configure PAM password quality policy
+  ansible.builtin.include_tasks: pam.yml
+  when: linux_hardening_action in ['pam', 'all']
+
+- name: Blacklist unnecessary kernel modules
+  ansible.builtin.include_tasks: kernel_modules.yml
+  when: linux_hardening_action in ['kernel_modules', 'all']

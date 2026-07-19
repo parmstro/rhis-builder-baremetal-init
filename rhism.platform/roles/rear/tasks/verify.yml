@@ -1,0 +1,63 @@
+---
+# verify — read-only, safe, repeatable recovery-readiness check. Three signals so
+# "verify" means more than "the backup job exited 0":
+#   1. config resolves  — `rear dump` prints the effective OUTPUT/BACKUP config
+#   2. layout drift      — `rear checklayout` (rc 0 = layout matches the last rescue
+#                          image; non-zero = disk layout changed and the rescue image
+#                          is stale and must be rebuilt)
+#   3. artifact freshness — assert a rescue/backup artifact actually exists at the target
+# Never repartitions, never writes a backup — purely a health probe.
+
+- name: Dump the effective ReaR configuration
+  ansible.builtin.command: /usr/sbin/rear -v dump  # noqa: command-instead-of-module
+  become: true
+  register: _rear_dump
+  changed_when: false
+  failed_when: _rear_dump.rc != 0
+
+- name: Report the effective configuration
+  ansible.builtin.debug:
+    msg: "{{ _rear_dump.stdout_lines | default([]) }}"
+
+- name: Check the recovery layout against the current rescue image
+  ansible.builtin.command: /usr/sbin/rear checklayout  # noqa: command-instead-of-module
+  become: true
+  register: _rear_checklayout
+  changed_when: false
+  # rc 0 = layout unchanged (rescue image current); non-zero = drift detected.
+  # Drift is a real finding, not a task error — surface it without failing verify.
+  failed_when: false
+
+- name: Report the layout-drift result
+  ansible.builtin.debug:
+    msg: >-
+      rear checklayout rc={{ _rear_checklayout.rc }} —
+      {{ 'layout matches the current rescue image'
+         if _rear_checklayout.rc == 0
+         else 'DISK LAYOUT CHANGED: the rescue image is stale, rebuild it (rear mkrescue)' }}
+
+- name: Locate the most recent ReaR artifact at the local target
+  ansible.builtin.find:
+    paths: "{{ backup_rear_server_local_dir }}"
+    patterns:
+      - "*.iso"
+      - "backup.tar.gz"
+      - "rear-*.iso"
+    recurse: true
+    file_type: file
+  become: true
+  register: _rear_artifacts
+  when: backup_rear_server_local_dir | length > 0
+
+- name: Assert at least one recovery artifact exists
+  ansible.builtin.assert:
+    that:
+      - _rear_artifacts.matched | default(0) | int > 0
+    fail_msg: >-
+      No ReaR recovery artifact (rescue ISO or backup archive) found under
+      {{ backup_rear_server_local_dir }} — the host is NOT currently recoverable.
+      Run the backup action to produce one.
+    success_msg: >-
+      Recovery artifact present ({{ _rear_artifacts.matched | default(0) }} found under
+      {{ backup_rear_server_local_dir }}) — host is recoverable.
+  when: backup_rear_server_local_dir | length > 0

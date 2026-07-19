@@ -1,0 +1,31 @@
+---
+# install — version-aware AAP install via Red Hat's own installer.
+#
+# 1. (optionally) entitle the target hosts via the rhel_subscription role.
+# 2. Render the installer inventory (containerized) or operator CR (openshift).
+# 3. Invoke Red Hat's installer for the chosen method — GATED by aap_execute.
+#    aap_execute: false renders + validates only (no real install); this is what
+#    makes the Tier-1 contract test possible.
+
+- name: Register target hosts with RHSM (reuse the rhel_subscription role)
+  ansible.builtin.include_role:
+    name: rhel_subscription
+  vars:
+    rhel_subscription_action: register
+  when: aap_manage_subscription | bool
+
+- name: Ensure the AAP work directory exists
+  ansible.builtin.file:
+    path: "{{ aap_work_dir }}"
+    state: directory
+    mode: "0700"
+
+- name: Deploy AAP via the containerized installer
+  ansible.builtin.include_tasks:
+    file: containerized_install.yml
+  when: aap_install_method == 'containerized'
+
+- name: Deploy AAP via the OpenShift operator
+  ansible.builtin.include_tasks:
+    file: openshift_install.yml
+  when: aap_install_method == 'openshift'

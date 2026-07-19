@@ -1,0 +1,83 @@
+---
+# Generated inventory — do not edit by hand.
+# Regenerate: ansible-playbook playbooks/infra_wizard.yml -e wizard_action=generate_inventory
+
+all:
+  vars:
+    ansible_domain: {{ manifest.network.domain }}
+    deployment_profile: {{ manifest.profile | default('custom') }}
+
+  children:
+    hypervisor_hosts:
+      hosts:
+        hypervisor01.{{ manifest.network.domain }}:
+          ansible_host: "{{ manifest.network.gateway }}"
+          vm_hypervisor: "{{ manifest.components.hypervisor.type | default('kvm') }}"
+
+{% if manifest.components.identity is defined and manifest.components.identity.enabled %}
+    identity_servers:
+      vars:
+        idm_type: "{{ manifest.components.identity.type }}"
+        idm_domain: "{{ manifest.network.domain }}"
+        idm_realm: "{{ manifest.network.realm | default(manifest.network.domain | upper) }}"
+      hosts:
+        idm01.{{ manifest.network.domain }}:
+          ansible_host: ""
+{% endif %}
+
+{% if manifest.components.provisioning is defined and manifest.components.provisioning.enabled %}
+    provisioning_servers:
+      vars:
+        prov_type: "{{ manifest.components.provisioning.type }}"
+        prov_domain: "{{ manifest.network.domain }}"
+        prov_subnet: "{{ manifest.network.subnet }}"
+      hosts:
+        prov01.{{ manifest.network.domain }}:
+          ansible_host: ""
+{% endif %}
+
+{% if manifest.components.content is defined and manifest.components.content.enabled %}
+    content_servers:
+      vars:
+        content_type: "{{ manifest.components.content.type }}"
+        content_domain: "{{ manifest.network.domain }}"
+      hosts:
+        content01.{{ manifest.network.domain }}:
+          ansible_host: ""
+{% endif %}
+
+{% if manifest.components.scm is defined and manifest.components.scm.enabled %}
+    scm_servers:
+      vars:
+        scm_type: "{{ manifest.components.scm.type }}"
+      hosts:
+        scm01.{{ manifest.network.domain }}:
+          ansible_host: ""
+{% endif %}
+
+{% if manifest.components.backup is defined and manifest.components.backup.enabled %}
+    backup_servers:
+      vars:
+        backup_type: "{{ manifest.components.backup.type }}"
+      hosts:
+        backup01.{{ manifest.network.domain }}:
+          ansible_host: ""
+{% endif %}
+
+{% if manifest.components.container_platform is defined and manifest.components.container_platform.enabled %}
+    cp_control_plane:
+      vars:
+        cp_type: "{{ manifest.components.container_platform.type }}"
+      hosts:
+{% for i in range(manifest.sizing.cp_control_plane.count | default(1)) %}
+        cp-control{{ '%02d' | format(i + 1) }}.{{ manifest.network.domain }}:
+          ansible_host: ""
+{% endfor %}
+
+    cp_workers:
+      hosts:
+{% for i in range(manifest.sizing.cp_worker.count | default(2)) %}
+        cp-worker{{ '%02d' | format(i + 1) }}.{{ manifest.network.domain }}:
+          ansible_host: ""
+{% endfor %}
+{% endif %}

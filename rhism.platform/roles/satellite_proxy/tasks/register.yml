@@ -1,0 +1,26 @@
+---
+# Action: register
+# Register this foreman-proxy instance with the Satellite server.
+
+- name: Include Satellite server validation
+  ansible.builtin.include_tasks: validate_server.yml
+
+- name: Validate registration-specific requirements
+  ansible.builtin.assert:
+    that:
+      - prov_smartproxy_url is defined
+      - prov_smartproxy_url | length > 0
+    fail_msg: "register requires prov_smartproxy_url"
+
+- name: Register smart proxy with Satellite
+  redhat.satellite.smart_proxy:
+    server_url: "{{ prov_content_server_url }}"
+    username: "{{ prov_content_username }}"
+    password: "{{ prov_content_password }}"
+    validate_certs: "{{ prov_content_validate_certs }}"
+    organization: "{{ prov_content_organization }}"
+    location: "{{ prov_content_location }}"
+    name: "{{ ansible_fqdn | default(inventory_hostname) }}"
+    url: "{{ prov_smartproxy_url }}"
+    state: present
+  no_log: true

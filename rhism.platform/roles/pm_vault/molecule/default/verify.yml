@@ -1,0 +1,50 @@
+---
+- name: Verify — pm_vault secret deleted and KV version history written
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    _vault_url: "http://host.containers.internal:18200"
+    _vault_token: "root"
+    _vault_kv_path: "v1/secret/data/password_management/test_db_user"
+    _vault_meta_path: "v1/secret/metadata/password_management/test_db_user"
+
+  tasks:
+    - name: Attempt to read deleted secret (expect 404)
+      ansible.builtin.uri:
+        url: "{{ _vault_url }}/{{ _vault_kv_path }}"
+        method: GET
+        headers:
+          X-Vault-Token: "{{ _vault_token }}"
+        status_code: [200, 403, 404]
+        return_content: true
+      register: _deleted_read
+      delegate_to: localhost
+
+    - name: Assert deleted secret returns 404
+      ansible.builtin.assert:
+        that:
+          - _deleted_read.status == 404
+        fail_msg: >-
+          Expected 404 for deleted secret; got {{ _deleted_read.status }}.
+          Secret was not deleted correctly.
+
+    - name: Read KV metadata to confirm version history exists
+      ansible.builtin.uri:
+        url: "{{ _vault_url }}/{{ _vault_meta_path }}"
+        method: GET
+        headers:
+          X-Vault-Token: "{{ _vault_token }}"
+        status_code: [200]
+        return_content: true
+      register: _kv_meta
+      delegate_to: localhost
+
+    - name: Assert at least 2 versions exist (create + rotate)
+      ansible.builtin.assert:
+        that:
+          - _kv_meta.json.data.versions | length >= 2
+        fail_msg: >-
+          Expected >= 2 KV versions (create + rotate); got
+          {{ _kv_meta.json.data.versions | length }}

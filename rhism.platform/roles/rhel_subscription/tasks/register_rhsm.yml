@@ -1,0 +1,58 @@
+---
+# The real RHSM registration work — asserts the method's required credentials,
+# then registers via community.general.redhat_subscription. This file is loaded
+# via a dynamic include ONLY when rhel_subscription_skip is false (see
+# register.yml). Keeping the community.general.redhat_subscription reference here
+# — behind a gated include rather than a per-task when: — is deliberate: module/
+# action resolution happens when a task file is loaded, BEFORE any per-task
+# when: is evaluated, so a `when: not skip` on the module task alone still aborts
+# the play on an EE that lacks community.general (e.g. awx-ee). Gating the whole
+# file's inclusion means the module is never resolved on the skip/dry-run path
+# (BUG-191; same parse-time-resolution class as BUG-059/BUG-163).
+- name: Validate required fields for the selected registration method
+  ansible.builtin.assert:
+    that:
+      - rhel_subscription_org_id | default('') | length > 0
+      - rhel_subscription_activation_key | default('') | length > 0
+    fail_msg: >-
+      rhel_subscription_org_id and rhel_subscription_activation_key are required when
+      rhel_subscription_method is activation_key
+  when: rhel_subscription_method == 'activation_key'
+
+- name: Validate required fields for the selected registration method
+  ansible.builtin.assert:
+    that:
+      - rhel_subscription_username | default('') | length > 0
+      - rhel_subscription_password | default('') | length > 0
+    fail_msg: >-
+      rhel_subscription_username and rhel_subscription_password are required when
+      rhel_subscription_method is username_password
+  when: rhel_subscription_method == 'username_password'
+
+- name: Register with RHSM via activation key
+  community.general.redhat_subscription:
+    state: present
+    org_id: "{{ rhel_subscription_org_id }}"
+    activationkey: "{{ rhel_subscription_activation_key }}"
+    pool_ids: "{{ rhel_subscription_pool_ids | default(omit) }}"
+    consumer_name: "{{ rhel_subscription_consumer_name | default(omit) }}"
+    server_hostname: "{{ rhel_subscription_server_hostname | default(omit) }}"
+    force_register: "{{ rhel_subscription_force_register | default(omit) }}"
+    auto_attach: "{{ rhel_subscription_auto_attach | default(omit) }}"
+  become: true
+  no_log: true
+  when: rhel_subscription_method == 'activation_key'
+
+- name: Register with RHSM via username/password
+  community.general.redhat_subscription:
+    state: present
+    username: "{{ rhel_subscription_username }}"
+    password: "{{ rhel_subscription_password }}"
+    pool_ids: "{{ rhel_subscription_pool_ids | default(omit) }}"
+    consumer_name: "{{ rhel_subscription_consumer_name | default(omit) }}"
+    server_hostname: "{{ rhel_subscription_server_hostname | default(omit) }}"
+    force_register: "{{ rhel_subscription_force_register | default(omit) }}"
+    auto_attach: "{{ rhel_subscription_auto_attach | default(omit) }}"
+  become: true
+  no_log: true
+  when: rhel_subscription_method == 'username_password'

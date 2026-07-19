@@ -1,0 +1,44 @@
+---
+# backup — standalone on-demand Velero Backup CR (velero.io/v1, kind Backup).
+# Applied into openshift-adp; Velero reconciles it against the default (or named)
+# BackupStorageLocation. .status.phase progresses New → InProgress → Completed
+# (or PartiallyFailed / Failed).
+
+- name: Validate backup requirements
+  ansible.builtin.assert:
+    that:
+      - backup_oadp_backup_name | length > 0
+    fail_msg: "backup_oadp_backup_name is required for the backup action"
+
+- name: Assemble the Backup spec
+  ansible.builtin.include_tasks: backup_spec.yml
+
+- name: Create an on-demand Velero Backup
+  kubernetes.core.k8s:
+    kubeconfig: "{{ backup_oadp_kubeconfig | default(omit) }}"
+    state: present
+    apply: true
+    definition:
+      apiVersion: velero.io/v1
+      kind: Backup
+      metadata:
+        name: "{{ backup_oadp_backup_name }}"
+        namespace: "{{ backup_oadp_namespace }}"
+      spec: "{{ _oadp_backup_spec }}"
+
+- name: Wait for the Backup to complete
+  kubernetes.core.k8s_info:
+    kubeconfig: "{{ backup_oadp_kubeconfig | default(omit) }}"
+    api_version: velero.io/v1
+    kind: Backup
+    name: "{{ backup_oadp_backup_name }}"
+    namespace: "{{ backup_oadp_namespace }}"
+  register: _oadp_backup
+  retries: "{{ (backup_oadp_wait_timeout | int / 10) | int }}"
+  delay: 10
+  until: >-
+    _oadp_backup['resources'] | default([])
+    | selectattr('status.phase', 'defined')
+    | selectattr('status.phase', 'equalto', 'Completed')
+    | list | length > 0
+  when: backup_oadp_wait | bool

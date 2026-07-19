@@ -1,0 +1,14 @@
+---
+- name: container_platform - restart k3s
+  ansible.builtin.service:
+    name: "{{ _cp_service_name }}"
+    state: restarted
+  become: true
+  when: cp_type in ['k3s']
+
+- name: container_platform - restart rke2
+  ansible.builtin.service:
+    name: "{{ _cp_service_name }}"
+    state: restarted
+  become: true
+  when: cp_type in ['rke2']

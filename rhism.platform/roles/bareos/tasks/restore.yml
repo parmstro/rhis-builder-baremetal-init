@@ -1,0 +1,46 @@
+---
+# ---------------------------------------------------------------------------
+# restore.yml — Restore files via bconsole
+# ---------------------------------------------------------------------------
+
+- name: Validate restore requirements
+  ansible.builtin.assert:
+    that:
+      - backup_bareos_restore_client | length > 0
+    fail_msg: "backup_bareos_restore_client is required for restore"
+
+- name: Create restore target directory
+  ansible.builtin.file:
+    path: "{{ backup_bareos_restore_where }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+  become: true
+
+- name: Restore via bconsole
+  ansible.builtin.include_tasks: bconsole.yml
+  vars:
+    _bconsole_name: Restore via bconsole
+    # BUG-120: without restorejob= and `select current` this dropped into
+    # the interactive JobId menu — the action never worked non-interactively.
+    _bconsole_commands:
+      - >-
+        restore client={{ backup_bareos_restore_client }}
+        restorejob={{ backup_bareos_restore_job_name }}
+        where={{ backup_bareos_restore_where }} select current all done yes
+      - "wait"
+      - "messages"
+    _bconsole_timeout: 300
+
+- name: Fail if restore failed
+  ansible.builtin.fail:
+    msg: "Restore for client '{{ backup_bareos_restore_client }}' failed"
+  when:
+    - _bconsole_result.rc is defined
+    - _bconsole_result.rc != 0
+    - "'restore ok' not in _bconsole_result.stdout | lower"
+
+- name: Report restore result
+  ansible.builtin.debug:
+    msg: "{{ _bconsole_result.stdout_lines | default([]) }}"

@@ -1,0 +1,64 @@
+---
+# --------------------------------------------------------------------------- #
+# content_views — lifecycle environments, content views, publish, promote     #
+# --------------------------------------------------------------------------- #
+- name: Manage lifecycle environments
+  theforeman.foreman.lifecycle_environment:
+    server_url: "{{ content_server_url }}"
+    username: "{{ content_username }}"
+    password: "{{ content_password }}"
+    validate_certs: "{{ content_validate_certs }}"
+    organization: "{{ content_organization }}"
+    name: "{{ item.name }}"
+    prior: "{{ item.prior | default('Library') }}"
+    state: present
+  loop: "{{ content_lifecycle_environments }}"
+  no_log: "{{ content_no_log }}"
+  when: content_lifecycle_environments | length > 0
+
+- name: Manage content view
+  theforeman.foreman.content_view:
+    server_url: "{{ content_server_url }}"
+    username: "{{ content_username }}"
+    password: "{{ content_password }}"
+    validate_certs: "{{ content_validate_certs }}"
+    organization: "{{ content_organization }}"
+    name: "{{ item.name }}"
+    description: "{{ item.description | default(omit) }}"
+    repositories: "{{ item.repositories | default(omit) }}"
+    state: present
+  loop: "{{ content_views }}"
+  no_log: "{{ content_no_log }}"
+  when: content_views | length > 0
+
+- name: Publish content view version
+  theforeman.foreman.content_view_version:
+    server_url: "{{ content_server_url }}"
+    username: "{{ content_username }}"
+    password: "{{ content_password }}"
+    validate_certs: "{{ content_validate_certs }}"
+    organization: "{{ content_organization }}"
+    content_view: "{{ item.name }}"
+    state: present
+  loop: "{{ content_views }}"
+  no_log: "{{ content_no_log }}"
+  when:
+    - content_views | length > 0
+    - content_views_publish | bool
+
+- name: Promote content view version
+  theforeman.foreman.content_view_version:
+    server_url: "{{ content_server_url }}"
+    username: "{{ content_username }}"
+    password: "{{ content_password }}"
+    validate_certs: "{{ content_validate_certs }}"
+    organization: "{{ content_organization }}"
+    content_view: "{{ item.0.name }}"
+    lifecycle_environments:
+      - "{{ item.1 }}"
+    state: present
+  loop: "{{ content_views | subelements('lifecycle_environments', skip_missing=True) }}"
+  no_log: "{{ content_no_log }}"
+  when:
+    - content_views | length > 0
+    - content_views_promote | bool

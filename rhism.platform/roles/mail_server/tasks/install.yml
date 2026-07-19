@@ -1,0 +1,6 @@
+---
+- name: Install mail server ({{ mail_type }})
+  ansible.builtin.include_role:
+    name: "mail_{{ mail_type }}"
+  vars:
+    action: present

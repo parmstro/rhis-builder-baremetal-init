@@ -1,0 +1,36 @@
+# Managed by Ansible — rhism provisioning_services ({{ prov_type }})
+---
+:daemon: true
+:bind_host: '*'
+:https_port: 8443
+
+:ssl_certificate: /etc/foreman-proxy/ssl/certs/{{ ansible_fqdn }}.pem
+:ssl_ca_file: /etc/foreman-proxy/ssl/certs/ca.pem
+:ssl_private_key: /etc/foreman-proxy/ssl/private_keys/{{ ansible_fqdn }}.pem
+
+:trusted_hosts:
+  - {{ ansible_fqdn }}
+  - {{ prov_content_server_url | urlsplit('hostname') }}
+
+:log_file: /var/log/foreman-proxy/proxy.log
+:log_level: WARN
+
+{% if prov_smartproxy_dns %}
+:dns: true
+:dns_provider: nsupdate
+{% endif %}
+
+{% if prov_smartproxy_dhcp %}
+:dhcp: true
+:dhcp_provider: isc
+{% endif %}
+
+{% if prov_smartproxy_tftp %}
+:tftp: true
+:tftp_root: {{ prov_tftp_root }}
+{% endif %}
+
+{% if prov_smartproxy_realm %}
+:realm: true
+:realm_provider: freeipa
+{% endif %}

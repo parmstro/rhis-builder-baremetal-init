@@ -1,0 +1,68 @@
+---
+argument_specs:
+  main:
+    short_description: Configure an external container registry (mirror + pull credentials).
+    description: >-
+      Standalone-first registry backend for container_platform. Creates a Kubernetes pull
+      secret and points the cluster at an external registry: on k3s/rke2 it writes a containerd
+      registries.yaml mirror; on ocp/okd it optionally trusts the registry via the cluster Image
+      config. Consumes the shared registry-backend interface (action, cp_* vars) so the
+      container_platform dispatcher can select any backend with identical code.
+    options:
+      action:
+        description: >-
+          Lifecycle action, shared across all registry backends. 'registry' (and its alias
+          'present') configure the external registry; 'absent' removes it.
+        type: str
+        default: registry
+        choices:
+          - registry
+          - present
+          - absent
+      cp_type:
+        description: >-
+          Container platform selector. 'ocp'/'okd' trust the registry via the cluster Image
+          config; 'k3s'/'rke2' write a containerd registries.yaml mirror. Shared interface var.
+        type: str
+        default: k3s
+        choices:
+          - ocp
+          - okd
+          - k3s
+          - rke2
+      cp_kubeconfig_path:
+        description: Path to the cluster kubeconfig (or oc kubeconfig). Shared interface var.
+        type: str
+        default: /etc/rancher/k3s/k3s.yaml
+      cp_registry_execute:
+        description: >-
+          Dry-run gate honoured by every registry backend. false validates action dispatch and
+          variable resolution without changing the node or cluster (used by molecule).
+        type: bool
+        default: true
+      cp_registry_url:
+        description: >-
+          External registry endpoint to configure. Required (non-empty) when executing a
+          configure action; empty default keeps the role loadable standalone.
+        type: str
+        default: ""
+      cp_registry_username:
+        description: External registry username (optional — omit for anonymous-pull registries).
+        type: str
+        default: ""
+      cp_registry_password:
+        description: External registry password (optional — omit for anonymous-pull registries).
+        type: str
+        default: ""
+      cp_registry_secret_name:
+        description: Name of the Kubernetes pull secret created in the default namespace.
+        type: str
+        default: registry-pull-secret
+      cp_registry_config_dir:
+        description: Directory holding the containerd registries.yaml on k3s/rke2 nodes.
+        type: str
+        default: /etc/rancher/k3s
+      cp_registry_trust_cluster:
+        description: On OCP/OKD, add the registry to the cluster Image config allowedRegistries.
+        type: bool
+        default: false

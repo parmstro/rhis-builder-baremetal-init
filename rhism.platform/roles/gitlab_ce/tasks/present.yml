@@ -1,0 +1,46 @@
+---
+# ---------------------------------------------------------------------------
+# gitlab_ce — present: install package repository, prerequisites, and package
+# ---------------------------------------------------------------------------
+
+- name: Install prerequisite packages
+  ansible.builtin.dnf:
+    name:
+      - curl
+      - policycoreutils
+      - openssh-server
+      - perl
+    state: present
+  become: true
+
+- name: Download GitLab CE repository setup script
+  ansible.builtin.get_url:
+    url: "{{ _scm_package_repo_script }}"
+    dest: /tmp/gitlab_ce_repo_setup.sh
+    mode: "0755"
+  become: true
+
+- name: Run GitLab CE repository setup script
+  ansible.builtin.command:
+    cmd: bash /tmp/gitlab_ce_repo_setup.sh
+  become: true
+  changed_when: true
+
+- name: Remove GitLab CE repository setup script
+  ansible.builtin.file:
+    path: /tmp/gitlab_ce_repo_setup.sh
+    state: absent
+  become: true
+
+- name: Manage GitLab CE package
+  ansible.builtin.dnf:
+    name: "{{ _scm_package_name }}"
+    state: present
+  become: true
+  environment:
+    EXTERNAL_URL: "{{ scm_external_url | default('http://' + (ansible_fqdn | default('localhost'))) }}"
+
+- name: Configure firewall rules for GitLab CE
+  ansible.builtin.include_tasks: firewall.yml
+  vars:
+    _gitlab_ce_firewall_state: enabled

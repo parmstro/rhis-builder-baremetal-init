@@ -1,0 +1,8 @@
+---
+- name: Configure PAM password quality policy
+  ansible.builtin.template:
+    src: pwquality.conf.j2
+    dest: /etc/security/pwquality.conf
+    owner: root
+    group: root
+    mode: "0644"

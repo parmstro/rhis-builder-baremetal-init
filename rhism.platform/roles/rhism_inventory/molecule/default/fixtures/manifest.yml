@@ -1,0 +1,18 @@
+---
+# Molecule fixture — a wizard-shaped deployment manifest with a /22 network,
+# chosen because /22 is exactly the regime where the upstream generator's
+# classful octet-split derivation goes wrong (its own default basevars ship a
+# /22). The generate action must derive the FULL reverse-zone set from it.
+profile: custom
+components:
+  identity_management: true
+  content_management: true
+network:
+  domain: soe.example.com
+  realm: SOE.EXAMPLE.COM
+  subnet: 10.20.0.0/22
+  gateway: 10.20.0.1
+  dns:
+    - 10.20.0.10
+sizing: {}
+credentials: {}

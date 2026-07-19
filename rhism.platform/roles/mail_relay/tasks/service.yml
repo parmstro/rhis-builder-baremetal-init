@@ -1,0 +1,12 @@
+---
+# mail_relay — service management (started / stopped / restarted)
+#
+# action var is used directly as service state.
+
+- name: Manage Postfix service
+  ansible.builtin.service:
+    name: "{{ _mail_service_name }}"
+    state: "{{ action }}"
+    enabled: "{{ action == 'started' }}"
+  become: true
+  when: mail_execute | bool

@@ -1,0 +1,50 @@
+---
+# Functional requirements — linux_hardening (requirements→test-case layer,
+# owner rule 2026-07-12). Renderer contract: roles/cmdb
+# requirements_traceability.
+functional_requirements:
+  - req_id: LINHARD-FR-001
+    statement: >-
+      sysctl hardening SHALL support live apply AND config-only mode
+      (linux_hardening_sysctl_apply false → lineinfile to
+      linux_hardening_sysctl_file, no sysctl-binary dependency — BUG-020/103)
+      so minimal/container images harden without procps-ng.
+    tier: 2
+    verified_by:
+      - molecule: default
+
+  - req_id: LINHARD-FR-002
+    statement: >-
+      sshd hardening SHALL deploy the CIS config (PermitRootLogin no,
+      PasswordAuthentication no, etc.) with skippable validation and
+      skippable server install (ssh_validate/ssh_install_server — BUG-104):
+      image builds bake config only, never host keys.
+    tier: 2
+    verified_by:
+      - molecule: default
+
+  - req_id: LINHARD-FR-003
+    statement: >-
+      Kernel-module blacklisting SHALL support live unload AND config-only
+      mode (modules_apply false → CIS-style /etc/modprobe.d files, no kmod
+      dependency — BUG-105).
+    tier: 2
+    verified_by:
+      - molecule: default
+
+  - req_id: LINHARD-FR-004
+    statement: >-
+      PAM password quality SHALL render pwquality.conf with the configured
+      minlen/minclass.
+    tier: 2
+    verified_by:
+      - molecule: default
+
+  - req_id: LINHARD-FR-005
+    statement: >-
+      The config-only baseline baked into a container image SHALL hold at
+      runtime: hardened sshd_config accepts key-only auth on derived images
+      (proven over real SSH by the lab).
+    tier: 2
+    verified_by:
+      - register: TEST-SSH-LAB-TRANSPORT

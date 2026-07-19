@@ -1,0 +1,101 @@
+---
+# Lifecycle action (bare shared var). Standalone default is the read-only `verify` — a safe
+# no-op against an existing stack, never an unattended operator install. The backup_management
+# dispatcher overrides this via include_role vars. Full choice list and typed defaults are
+# declared and validated in meta/argument_specs.yml.
+action: verify
+
+# Standalone-first defaults over the SHARED backup family interface (backup_oadp_*).
+# These are the SAME variable names the backup_management dispatcher exposes, so the
+# dispatcher selects OADP with one call passing only `action`, and every backup_oadp_* value
+# flows straight through. Standalone callers set these same names directly. Internals prefixed
+# with _ are the only exception to the family namespace (BUG-040).
+
+# --- Cluster access -------------------------------------------------------
+# Empty = use the ambient kube context (in-cluster service account or KUBECONFIG env).
+backup_oadp_kubeconfig: ""
+# All OADP/Velero resources live in this namespace — never hardcoded in tasks.
+backup_oadp_namespace: openshift-adp
+# Wait for CSV/BSL/CR readiness (server, backup, restore). Timeout is in seconds and is
+# divided by the 10s poll delay to derive the retry count.
+backup_oadp_wait: true
+backup_oadp_wait_timeout: 600
+
+# --- Operator subscription (OLM) ------------------------------------------
+backup_oadp_operator_package: redhat-oadp-operator
+backup_oadp_operator_channel: stable
+backup_oadp_operator_source: redhat-operators
+backup_oadp_operator_source_namespace: openshift-marketplace
+backup_oadp_operator_group_name: oadp-operator-group
+
+# --- DataProtectionApplication (DPA) --------------------------------------
+backup_oadp_dpa_name: dpa-sample
+# defaultPlugins: always include openshift; aws is the object-store plugin (used even for
+# MinIO/ODF S3-compatible endpoints); csi enables CSI VolumeSnapshot-based volume backup.
+backup_oadp_default_plugins:
+  - aws
+  - openshift
+  - csi
+# node-agent = the DaemonSet doing filesystem (pod volume) backup. kopia is the modern
+# default uploader; restic is the legacy alternative.
+backup_oadp_node_agent_enable: true
+backup_oadp_node_agent_uploader_type: kopia
+
+# --- Backup storage location (object store; owned by the DPA) -------------
+# aws is the Velero provider name for any S3-compatible store, MinIO/ODF included.
+backup_oadp_provider: aws
+backup_oadp_bucket: ""
+backup_oadp_prefix: velero
+backup_oadp_region: us-east-1
+# MinIO/ODF: set an explicit S3 endpoint URL + path-style addressing.
+backup_oadp_s3_url: ""
+backup_oadp_s3_force_path_style: false
+backup_oadp_insecure_skip_tls_verify: false
+# Object-store credential Secret consumed by the BackupStorageLocation.
+backup_oadp_credential_secret: cloud-credentials
+backup_oadp_credential_key: cloud
+# Raw credentials-file content written into the Secret by the server action (vault-backed).
+# Empty = assume the Secret is provisioned out of band (e.g. IRSA / STS / pre-created).
+backup_oadp_cloud_credentials: ""
+
+# --- Volume snapshot location (optional; omit for CSI/fs-only) ------------
+backup_oadp_snapshot_location_enabled: false
+backup_oadp_snapshot_provider: aws
+backup_oadp_snapshot_region: us-east-1
+
+# --- Client (per-app enablement) ------------------------------------------
+backup_oadp_client_namespace: ""
+backup_oadp_client_labels: {}
+backup_oadp_client_annotations: {}
+
+# --- Backup CR (backup action) --------------------------------------------
+backup_oadp_backup_name: ""
+backup_oadp_included_namespaces: []
+backup_oadp_included_resources:
+  - "*"
+backup_oadp_label_selector: {}
+backup_oadp_snapshot_volumes: true
+backup_oadp_default_volumes_to_fs_backup: false
+# ttl 720h0m0s = 30 days retention for the Backup.
+backup_oadp_ttl: 720h0m0s
+backup_oadp_storage_location: default
+
+# --- Schedule CR (schedule action) ----------------------------------------
+backup_oadp_schedule_name: ""
+backup_oadp_schedule_cron: "0 1 * * *"
+backup_oadp_schedule_paused: false
+backup_oadp_schedule_ttl: 720h0m0s
+
+# --- Restore CR (restore action) ------------------------------------------
+backup_oadp_restore_name: ""
+# Name of the Backup to restore from (or a Schedule name → its latest Backup).
+backup_oadp_restore_backup_name: ""
+backup_oadp_restore_namespace_mapping: {}
+backup_oadp_restore_pvs: true
+# existingResourcePolicy: none (leave present resources untouched) or update (patch them).
+backup_oadp_restore_existing_policy: none
+
+# --- baseline orchestration gates -----------------------------------------
+backup_oadp_apply_server: true
+backup_oadp_apply_schedule: false
+backup_oadp_apply_verify: true

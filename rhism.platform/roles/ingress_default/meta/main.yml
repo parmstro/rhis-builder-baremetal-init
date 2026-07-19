@@ -1,0 +1,22 @@
+---
+galaxy_info:
+  namespace: rhism
+  role_name: ingress_default
+  author: rhism
+  description: >-
+    Configure the platform's built-in ingress controller (Traefik on k3s via
+    HelmChartConfig; status reporting on other platforms). Standalone-first product role,
+    also selectable by the container_platform dispatcher (cp_ingress_type: default).
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: EL
+      versions:
+        - "9"
+  galaxy_tags:
+    - kubernetes
+    - ingress
+    - k3s
+    - traefik
+    - networking
+dependencies: []

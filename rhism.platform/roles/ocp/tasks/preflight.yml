@@ -1,0 +1,12 @@
+---
+# Shared: etcd backup/restore preflight
+# Included by: backup, restore
+
+- name: Ensure backup directory exists
+  ansible.builtin.file:
+    path: "{{ cp_backup_dir | default('/var/backup/etcd') }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+  become: true

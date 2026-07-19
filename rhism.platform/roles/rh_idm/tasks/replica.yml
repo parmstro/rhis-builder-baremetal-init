@@ -1,0 +1,41 @@
+---
+# action: replica — promote host to IDM replica
+
+- name: Configure Red Hat IDM replica
+  become: true
+  block:
+    - name: Prepare Red Hat IDM replica host
+      ansible.builtin.include_tasks: prepare_server.yml
+      when: idm_replica_install | bool
+
+    - name: Skip IDM replica install (dry-run mode)
+      ansible.builtin.debug:
+        msg: >-
+          DRY RUN — idm_replica_install=false.
+          Would promote {{ inventory_hostname }} to IDM replica of {{ idm_master_server }}.
+      when: not (idm_replica_install | bool)
+
+    - name: Enroll replica as IPA client first
+      freeipa.ansible_freeipa.ipaclient:
+        servers: "{{ idm_master_server }}"
+        domain: "{{ idm_domain }}"
+        realm: "{{ idm_realm }}"
+        principal: admin
+        password: "{{ idm_admin_password }}"
+        mkhomedir: "{{ idm_mkhomedir | bool }}"
+        state: present
+      no_log: true
+      when: idm_replica_install | bool
+
+    - name: Promote to Red Hat IDM replica
+      freeipa.ansible_freeipa.ipareplica:
+        principal: admin
+        admin_password: "{{ idm_admin_password }}"
+        setup_dns: "{{ idm_replica_setup_dns | bool }}"
+        setup_ca: "{{ idm_replica_setup_ca | bool }}"
+        auto_forwarders: "{{ idm_auto_forwarders | bool }}"
+        forwarders: "{{ idm_forwarders | default(omit) }}"
+        state: present
+      no_log: true
+      when: idm_replica_install | bool
+      notify: rh_idm - restart ipa

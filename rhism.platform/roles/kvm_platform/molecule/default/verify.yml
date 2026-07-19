@@ -1,0 +1,50 @@
+---
+- name: Verify standalone variable contract
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Load role defaults
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../../defaults/main.yml"
+      delegate_to: localhost
+
+    - name: Assert defaults resolve to the expected standalone contract
+      ansible.builtin.assert:
+        that:
+          - kvm_platform_action == 'install'
+          - kvm_platform_execute | bool
+          - kvm_platform_uri == 'qemu:///system'
+          - kvm_platform_packages == []
+          - kvm_platform_manage_service | bool
+          - kvm_platform_libvirt_service == 'libvirtd'
+          - not (kvm_platform_manage_bridge | bool)
+          - kvm_platform_pool_name == 'default'
+          - kvm_platform_network_name == 'default'
+          - kvm_platform_check_nested_virt | bool
+          - not (kvm_platform_confirm_delete | bool)
+        fail_msg: "kvm_platform standalone default contract not satisfied"
+      delegate_to: localhost
+
+    - name: Verify a dispatch task file exists for every declared action
+      ansible.builtin.stat:
+        path: "{{ playbook_dir }}/../../tasks/{{ item }}.yml"
+      register: _kvm_platform_action_stat
+      failed_when: not _kvm_platform_action_stat.stat.exists
+      loop:
+        - install
+        - configure
+        - upgrade
+        - remove
+      delegate_to: localhost
+
+    - name: Verify shared package-resolution task file exists
+      ansible.builtin.stat:
+        path: "{{ playbook_dir }}/../../tasks/packages.yml"
+      register: _kvm_platform_packages_stat
+      failed_when: not _kvm_platform_packages_stat.stat.exists
+      delegate_to: localhost
+
+    - name: Report verification passed
+      ansible.builtin.debug:
+        msg: "PASS — kvm_platform standalone contract verified"
+      delegate_to: localhost

@@ -1,0 +1,123 @@
+---
+argument_specs:
+  main:
+    short_description: Configure a Postfix relay (smarthost) mail server.
+    description: >-
+      Standalone-first mail product role. Installs and configures Postfix as an outbound
+      SMTP relay (smarthost) with TLS and SASL authentication, and manages the mail queue.
+      Consumes the shared mail-server interface (action, mail_* vars) so the mail_server
+      dispatcher can select either mail product (relay | full) with identical code.
+    options:
+      action:
+        description: >-
+          Lifecycle action, shared across both mail products. 'present'/'absent' manage
+          packages + firewall; 'configure' writes Postfix config; 'secure' applies TLS/SASL;
+          'started'/'stopped'/'restarted' manage the service; 'status'/'test' inspect; and
+          'queue_flush'/'queue_purge' operate on the mail queue.
+        type: str
+        default: present
+        choices:
+          - present
+          - absent
+          - configure
+          - secure
+          - test
+          - status
+          - started
+          - stopped
+          - restarted
+          - queue_flush
+          - queue_purge
+      mail_execute:
+        description: >-
+          Dry-run gate honoured by both mail products. false validates action dispatch and
+          variable resolution without changing the node (used by molecule).
+        type: bool
+        default: true
+      mail_domain:
+        description: Mail domain (mydomain / myorigin). Shared interface var.
+        type: str
+        default: "{{ ansible_domain | default('example.local') }}"
+      mail_hostname:
+        description: Fully-qualified mail hostname (myhostname). Shared interface var.
+        type: str
+        default: "{{ ansible_fqdn | default('mail.example.local') }}"
+      mail_relay_host:
+        description: Upstream SMTP smarthost to relay through (empty = direct delivery).
+        type: str
+        default: ""
+      mail_relay_port:
+        description: Upstream smarthost port.
+        type: int
+        default: 587
+      mail_relay_user:
+        description: SASL username for the upstream smarthost (empty = no SASL auth).
+        type: str
+        default: ""
+      mail_relay_password:
+        description: SASL password for the upstream smarthost (vault-backed, no_log).
+        type: str
+        default: ""
+      mail_tls_enabled:
+        description: Enable TLS for inbound/outbound SMTP. Shared interface var.
+        type: bool
+        default: true
+      mail_tls_cert_file:
+        description: PEM certificate path (empty = no explicit cert).
+        type: str
+        default: ""
+      mail_tls_key_file:
+        description: PEM private-key path (empty = no explicit key).
+        type: str
+        default: ""
+      mail_tls_security_level:
+        description: Postfix TLS security level.
+        type: str
+        default: may
+        choices: [may, encrypt, dane, dane-only, verify]
+      mail_inet_interfaces:
+        description: Postfix inet_interfaces value.
+        type: str
+        default: all
+      mail_inet_protocols:
+        description: Postfix inet_protocols value.
+        type: str
+        default: ipv4
+      mail_message_size_limit:
+        description: Postfix message_size_limit (bytes).
+        type: int
+        default: 10485760
+      mail_mailbox_size_limit:
+        description: Postfix mailbox_size_limit (bytes; 0 = unlimited).
+        type: int
+        default: 0
+      mail_open_smtp:
+        description: Open the SMTP firewall port (25). Shared interface var.
+        type: bool
+        default: true
+      mail_open_submission:
+        description: Open the submission firewall port (587). Shared interface var.
+        type: bool
+        default: true
+      mail_open_smtps:
+        description: Open the SMTPS firewall port (465). Shared interface var.
+        type: bool
+        default: false
+      mail_test_recipient:
+        description: Recipient address for the 'test' action.
+        type: str
+        default: "admin@localhost"
+      mail_queue_purge_confirm:
+        description: Safety gate — must be true for the destructive 'queue_purge' action.
+        type: bool
+        default: false
+      mail_db_type:
+        description: >-
+          Postfix lookup-table type (BUG-122 — EL10/postfix 3.8 unbundles hash:
+          into the deprecated postfix-hash subpackage). EL-aware default: lmdb
+          on EL10+, hash below.
+        type: str
+      mail_manage_service:
+        description: Manage/restart the postfix service (BUG-117 class — false on containers; guards the handlers).
+        type: bool
+        default: true

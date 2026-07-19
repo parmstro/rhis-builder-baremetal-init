@@ -1,0 +1,56 @@
+---
+# Tier-2 REAL functional scenario — builds the real image from
+# files/rhism_ui/'s Containerfile via roles/podman's build action, runs the
+# real container via roles/podman's container action, and verify.yml proves
+# all 8 real behaviors from the manual pre-flight verification with real
+# ansible.builtin.uri/stat calls against the genuinely running container.
+#
+# roles/podman's containers.podman modules shell out to a REAL podman CLI
+# binary (BUG-160) — the EE itself does not have one. Uses the SAME
+# nested-podman test platform as roles/podman's own molecule scenario
+# (docker.io/geerlingguy/docker-rockylinux9-ansible, privileged) so the role
+# genuinely runs against a real podman binary, not a dry-run gate — this is a
+# self-contained Node app with no other external infra dependency, making a
+# real Tier-2 functional test practical in CI (unlike roles/tang/roles/quay,
+# which defer real proof to a Tier-3 lab).
+#
+# Collection-hosted scenario: prerun/galaxy dependency disabled (BUG-112
+# class) — molecule's collection-under-test auto-install would clobber the
+# loader symlink at collections/ansible_collections/rhism/rhism.
+prerun: false
+
+dependency:
+  name: galaxy
+  enabled: false
+
+driver:
+  name: docker
+
+platforms:
+  - name: builder-ui-el9
+    image: docker.io/geerlingguy/docker-rockylinux9-ansible:latest
+    pre_build_image: true
+    override_command: false
+    privileged: true
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
+
+provisioner:
+  name: ansible
+  inventory:
+    group_vars:
+      all:
+        ansible_python_interpreter: /usr/bin/python3
+        ansible_remote_tmp: /tmp
+
+verifier:
+  name: ansible
+
+scenario:
+  test_sequence:
+    - dependency
+    - create
+    - prepare
+    - converge
+    - verify
+    - destroy

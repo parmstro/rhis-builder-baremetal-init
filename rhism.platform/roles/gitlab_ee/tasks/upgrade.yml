@@ -1,0 +1,20 @@
+---
+# gitlab_ee — upgrade
+# Validate, update package, reconfigure.
+
+- name: Upgrade GitLab EE
+  become: true
+  block:
+    - name: Validate upgrade is not a dry-run
+      ansible.builtin.assert:
+        that: scm_upgrade_execute | default(false)
+        fail_msg: "scm_upgrade_execute must be true to perform upgrade"
+
+    - name: Update GitLab EE package
+      ansible.builtin.dnf:
+        name: "{{ _scm_package_name }}"
+        state: latest
+      notify: gitlab_ee - reconfigure
+
+    - name: Reconfigure GitLab after upgrade
+      ansible.builtin.include_tasks: reconfigure.yml

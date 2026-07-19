@@ -1,0 +1,63 @@
+---
+# Functional requirements — linux_auditing (requirements->test-case layer +
+# Tier-3 elevation, wave-3+ standard). Standalone linux_* domain role (chained
+# by the linux_security orchestrator). Capability fact-checked against the RHEL
+# auditd documentation (audit package, /etc/audit/rules.d/*.rules, auditd.conf
+# max_log_file/num_logs/space_left_action, the -e 2 immutable flag) and CIS/STIG
+# audit-rule guidance. Curated from README + meta/argument_specs.yml + tasks/.
+# Molecule default is a real Tier 2 scenario on EL9/EL10 systemd containers
+# (linux_auditing_start_service:false — the kernel audit subsystem is not
+# independently accessible in a container). Family lab: playbooks/linux_security.yml.
+functional_requirements:
+  - req_id: LINUX_AUDITING-FR-001
+    statement: >-
+      configure SHALL install the audit package and deploy the CIS/STIG-aligned
+      baseline ruleset to /etc/audit/rules.d/linux_auditing.rules (time-change,
+      identity, system-locale, login/logout, session, DAC changes, unsuccessful
+      file access, privileged commands, kernel module load/unload, sudoers watches).
+    tier: 2
+    verified_by:
+      - molecule: default
+
+  - req_id: LINUX_AUDITING-FR-002
+    statement: >-
+      configure SHALL set auditd.conf log rotation from linux_auditing_log_size
+      (max_log_file, KB), linux_auditing_num_logs, and
+      linux_auditing_space_left_action.
+    tier: 2
+    verified_by:
+      - molecule: default
+
+  - req_id: LINUX_AUDITING-FR-003
+    statement: >-
+      configure SHALL append each linux_auditing_rules_extra entry as a raw
+      auditctl rule line after the baseline ruleset.
+    tier: 2
+    verified_by:
+      - molecule: default
+
+  - req_id: LINUX_AUDITING-FR-004
+    statement: >-
+      verify SHALL assert the rules file exists with the expected keys (sudoers,
+      identity, time-change, privileged, modules) and record the
+      linux_auditing_verify_result fact.
+    tier: 2
+    verified_by:
+      - molecule: default
+
+  - req_id: LINUX_AUDITING-FR-005
+    statement: >-
+      baseline SHALL run configure then verify then report in sequence, setting
+      all three result facts.
+    tier: 2
+    verified_by:
+      - molecule: default
+
+  - req_id: LINUX_AUDITING-FR-006
+    statement: >-
+      On a real host the auditd service SHALL be running and enabled and report
+      SHALL summarise real audit events via aureport — uncoverable in a container
+      where the kernel audit subsystem is not independently accessible.
+    tier: 3
+    verified_by:
+      - lab: playbooks/linux_security.yml#auditing

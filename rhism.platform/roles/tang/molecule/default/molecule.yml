@@ -1,0 +1,37 @@
+---
+# Default scenario — Tier 1 CONTRACT (control host only, no live podman
+# target). Real functional deployment needs a genuine target host with
+# podman (roles/podman's containers.podman modules shell out to a real
+# podman CLI, which the EE itself does not have — see converge.yml's header
+# comment for the full discovery). This scenario proves the contract:
+# argument-spec validation, dispatch dispatch, and that the
+# tang_deploy_execute dry-run gate genuinely makes no changes when false.
+# Real functional proof (real image pull, real container, real clevis
+# round-trip) is a Tier-3 lab concern against a real target — see docs/tang.md.
+prerun: false
+
+dependency:
+  name: galaxy
+  enabled: false
+
+driver:
+  name: default
+
+platforms:
+  - name: localhost
+    groups:
+      - control
+
+provisioner:
+  name: ansible
+  inventory:
+    host_vars:
+      localhost:
+        ansible_connection: local
+
+scenario:
+  test_sequence:
+    - dependency
+    - syntax
+    - converge
+    - verify

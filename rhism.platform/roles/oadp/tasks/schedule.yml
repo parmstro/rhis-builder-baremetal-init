@@ -1,0 +1,29 @@
+---
+# schedule — apply a Velero Schedule CR (velero.io/v1, kind Schedule). Velero creates a
+# Backup from spec.template on the given cron. The template reuses the shared Backup spec,
+# overriding ttl with the schedule-specific retention.
+
+- name: Validate schedule requirements
+  ansible.builtin.assert:
+    that:
+      - backup_oadp_schedule_name | length > 0
+    fail_msg: "backup_oadp_schedule_name is required for the schedule action"
+
+- name: Assemble the Backup spec used as the schedule template
+  ansible.builtin.include_tasks: backup_spec.yml
+
+- name: Apply the Velero Schedule
+  kubernetes.core.k8s:
+    kubeconfig: "{{ backup_oadp_kubeconfig | default(omit) }}"
+    state: present
+    apply: true
+    definition:
+      apiVersion: velero.io/v1
+      kind: Schedule
+      metadata:
+        name: "{{ backup_oadp_schedule_name }}"
+        namespace: "{{ backup_oadp_namespace }}"
+      spec:
+        schedule: "{{ backup_oadp_schedule_cron }}"
+        paused: "{{ backup_oadp_schedule_paused | bool }}"
+        template: "{{ _oadp_backup_spec | combine({'ttl': backup_oadp_schedule_ttl}) }}"

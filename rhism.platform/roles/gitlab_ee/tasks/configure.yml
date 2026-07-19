@@ -1,0 +1,22 @@
+---
+# gitlab_ee — configure
+# Deploy gitlab.rb template and reconfigure, or just reconfigure if no
+# template is provided.
+
+- name: Configure GitLab EE
+  become: true
+  block:
+    - name: Deploy gitlab.rb from template
+      ansible.builtin.template:
+        src: "{{ scm_config_template }}"
+        dest: /etc/gitlab/gitlab.rb
+        owner: root
+        group: root
+        mode: "0600"
+      no_log: true
+      when: scm_config_template | default('') | length > 0
+      notify: gitlab_ee - reconfigure
+
+    - name: Run reconfigure (no template provided)
+      ansible.builtin.include_tasks: reconfigure.yml
+      when: scm_config_template | default('') | length == 0

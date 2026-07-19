@@ -1,0 +1,24 @@
+---
+galaxy_info:
+  namespace: rhism
+  role_name: mail_full
+  author: rhism
+  description: >-
+    Deploy a full mail stack — Postfix (MTA) + Dovecot (IMAP/POP3) + OpenDKIM +
+    SpamAssassin + ClamAV — with virtual domains/users, DKIM signing, and antispam.
+    Standalone-first product role, also selectable by the mail_server dispatcher
+    (mail_type: full).
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: EL
+      versions:
+        - "9"
+  galaxy_tags:
+    - mail
+    - postfix
+    - dovecot
+    - dkim
+    - spamassassin
+    - clamav
+dependencies: []

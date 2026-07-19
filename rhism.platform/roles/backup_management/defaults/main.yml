@@ -1,0 +1,246 @@
+---
+# Role control
+backup_action: baseline
+backup_type: restic
+
+# Install gate — dry-run by default
+backup_install_execute: false
+
+# --- restic (default type) ---
+
+# Repository — local path, sftp, s3, b2, rest server, rclone, etc.
+# Examples:
+#   /backups/myhost
+#   sftp:user@host:/backups/myhost
+#   s3:s3.amazonaws.com/mybucket/myhost
+#   b2:mybucket:myhost
+backup_restic_repository: ""
+backup_restic_password: ""      # vault-backed; encrypts the entire repository
+
+# Directories to back up
+backup_restic_paths:
+  - /etc
+  - /home
+  - /root
+  - /var/log
+
+backup_restic_exclude_patterns:
+  - /proc
+  - /sys
+  - /dev
+  - /run
+  - "*.sock"
+  - "*.pid"
+
+# Retention policy
+backup_restic_retention_daily: 7
+backup_restic_retention_weekly: 4
+backup_restic_retention_monthly: 12
+backup_restic_retention_yearly: 1
+
+# Restore
+backup_restic_restore_snapshot: latest
+backup_restic_restore_path: /var/restore
+
+# Extra environment variables (for cloud backends)
+# AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, B2_ACCOUNT_ID, B2_ACCOUNT_KEY, etc.
+backup_restic_env: {}
+
+# Schedule (cron)
+backup_restic_cron_enabled: true
+backup_restic_cron_hour: "2"
+backup_restic_cron_minute: "0"
+backup_restic_cron_user: root
+backup_restic_script_dir: /usr/local/bin
+
+# --- bareos (bareos type) ---
+
+backup_bareos_director_host: "{{ ansible_fqdn | default('localhost') }}"
+backup_bareos_director_port: 9101
+backup_bareos_storage_host: "{{ ansible_fqdn | default('localhost') }}"
+backup_bareos_storage_port: 9103
+backup_bareos_file_daemon_port: 9102
+backup_bareos_director_password: ""    # vault-backed
+backup_bareos_storage_password: ""     # vault-backed
+backup_bareos_monitor_password: ""     # vault-backed
+backup_bareos_file_daemon_password: "" # vault-backed
+
+backup_bareos_storage_device: /var/lib/bareos/storage
+backup_bareos_max_concurrent_jobs: 20
+backup_bareos_message_retention: "180 days"
+backup_bareos_job_retention: "12 months"
+backup_bareos_volume_retention: "365 days"
+
+# Bareos pools
+backup_bareos_pools: []
+# - name: Default
+#   pool_type: Backup
+#   recycle: yes
+#   autoprune: yes
+#   volume_retention: "365 days"
+#   max_volume_bytes: 50G
+#   max_volumes: 100
+
+# Bareos filesets (what to back up per job)
+backup_bareos_filesets: []
+# - name: LinuxAll
+#   include:
+#     - /
+#   exclude:
+#     - /proc
+#     - /sys
+
+# Bareos schedules
+backup_bareos_schedules: []
+# - name: WeeklyCycle
+#   run:
+#     - "Full 1st sat at 21:00"
+#     - "Differential 2nd-5th sat at 21:00"
+#     - "Incremental mon-fri at 21:00"
+
+# Bareos jobs
+backup_bareos_jobs: []
+# - name: BackupClient1
+#   type: Backup
+#   level: Incremental
+#   client: client1-fd
+#   fileset: LinuxAll
+#   schedule: WeeklyCycle
+#   storage: File1
+#   pool: Default
+#   priority: 10
+
+# Client to register with Director (client action)
+backup_bareos_client_name: "{{ ansible_hostname | default('localhost') }}-fd"
+backup_bareos_client_address: "{{ ansible_default_ipv4.address | default('127.0.0.1') }}"
+backup_bareos_client_password: ""  # vault-backed
+
+# --- rear (rear type — RHEL bare-metal disaster recovery) ---
+# ReaR emits two independent artifacts: OUTPUT (bootable rescue image) and
+# BACKUP (data backup). OUTPUT_URL falls back to BACKUP_URL when unset.
+
+# OUTPUT side (rescue image)
+backup_rear_output_format: ISO
+backup_rear_output_url: ""
+backup_rear_grub_rescue: false
+
+# BACKUP side (data backup)
+backup_rear_backup_method: NETFS
+backup_rear_backup_url: "file:///var/lib/rear/output"
+backup_rear_backup_prog: tar
+backup_rear_exclude_patterns:
+  - /tmp/*
+  - /var/tmp/*
+  - /var/crash/*
+
+# Retention / rotation
+backup_rear_keep_old_backup_copy: false
+backup_rear_backup_type: ""          # "" full, or incremental / differential
+backup_rear_fullbackup_day: Sun
+backup_rear_tmpdir: /var/tmp
+
+# Config file management
+backup_rear_config_dir: /etc/rear
+backup_rear_manage_site_conf: false
+
+# server action: storage-target preparation
+backup_rear_server_local_dir: /var/lib/rear/output
+
+# backup action sub-mode: mkbackup | mkbackuponly | mkrescue
+backup_rear_backup_mode: mkbackup
+
+# schedule action (systemd timer)
+backup_rear_schedule_enabled: true
+backup_rear_schedule_oncalendar: "Mon..Fri 22:00:00"
+backup_rear_schedule_command: "/usr/sbin/rear checklayout || /usr/sbin/rear mkrescue"
+
+# restore action (rear recover) — DOUBLE execute gate (destructive/irreversible)
+backup_rear_recover_execute: false
+backup_rear_recover_confirm_irreversible: false
+
+# baseline orchestration toggles
+backup_rear_apply_server: true
+backup_rear_apply_client: true
+backup_rear_apply_schedule: true
+backup_rear_apply_verify: true
+
+# --- oadp (oadp type — OpenShift API for Data Protection, Velero-based) ---
+
+# Cluster access
+backup_oadp_kubeconfig: ""
+backup_oadp_namespace: openshift-adp
+backup_oadp_wait: true
+backup_oadp_wait_timeout: 600
+
+# Operator subscription (OLM)
+backup_oadp_operator_package: redhat-oadp-operator
+backup_oadp_operator_channel: stable
+backup_oadp_operator_source: redhat-operators
+backup_oadp_operator_source_namespace: openshift-marketplace
+backup_oadp_operator_group_name: oadp-operator-group
+
+# DataProtectionApplication (DPA)
+backup_oadp_dpa_name: dpa-sample
+backup_oadp_default_plugins:
+  - aws
+  - openshift
+  - csi
+backup_oadp_node_agent_enable: true
+backup_oadp_node_agent_uploader_type: kopia
+
+# Backup storage location (object store; owned by the DPA)
+backup_oadp_provider: aws
+backup_oadp_bucket: ""
+backup_oadp_prefix: velero
+backup_oadp_region: us-east-1
+backup_oadp_s3_url: ""
+backup_oadp_s3_force_path_style: false
+backup_oadp_insecure_skip_tls_verify: false
+backup_oadp_credential_secret: cloud-credentials
+backup_oadp_credential_key: cloud
+backup_oadp_cloud_credentials: ""   # vault-backed; empty => Secret provisioned out of band
+
+# Volume snapshot location (optional; omit for CSI/fs-only)
+backup_oadp_snapshot_location_enabled: false
+backup_oadp_snapshot_provider: aws
+backup_oadp_snapshot_region: us-east-1
+
+# Client (per-app enablement)
+backup_oadp_client_namespace: ""
+backup_oadp_client_labels: {}
+backup_oadp_client_annotations: {}
+
+# Backup CR (backup action)
+backup_oadp_backup_name: ""
+backup_oadp_included_namespaces: []
+backup_oadp_included_resources:
+  - "*"
+backup_oadp_label_selector: {}
+backup_oadp_snapshot_volumes: true
+backup_oadp_default_volumes_to_fs_backup: false
+backup_oadp_ttl: 720h0m0s
+backup_oadp_storage_location: default
+
+# Schedule CR (schedule action)
+backup_oadp_schedule_name: ""
+backup_oadp_schedule_cron: "0 1 * * *"
+backup_oadp_schedule_paused: false
+backup_oadp_schedule_ttl: 720h0m0s
+
+# Restore CR (restore action)
+backup_oadp_restore_name: ""
+backup_oadp_restore_backup_name: ""
+backup_oadp_restore_namespace_mapping: {}
+backup_oadp_restore_pvs: true
+backup_oadp_restore_existing_policy: none
+
+# baseline orchestration gates
+backup_oadp_apply_server: true
+backup_oadp_apply_schedule: false
+backup_oadp_apply_verify: true
+
+# Baseline toggles
+backup_apply_server: false
+backup_apply_client: false
+backup_apply_schedule: false
+backup_apply_verify: false

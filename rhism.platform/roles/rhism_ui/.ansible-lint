@@ -1,0 +1,23 @@
+---
+# Permissive baseline. Start green, then raise `profile` toward `production`
+# as the repo's older tasks are modernised (FQCN, loop vs with_items, etc.).
+# Run locally with: ansible-lint
+profile: basic
+
+exclude_paths:
+  - .molecule/
+  - files/rhism_ui/    # forked application source — not Ansible content, security-fixed and out of scope for this role's lint
+
+# Conventions documented in CLAUDE.md that older code still uses. Remove entries
+# here as the corresponding code is migrated to the "going forward" conventions.
+skip_list:
+  - fqcn[action-core]   # existing tasks use short module names (copy, yum, ...)
+  - fqcn[action]
+  - name[casing]        # don't fail on task-name capitalisation
+  - var-naming[no-role-prefix]
+
+# Treat these as warnings rather than hard failures during the initial rollout.
+warn_list:
+  - yaml               # defer to .yamllint for YAML style
+  - no-changed-when
+  - risky-shell-pipe

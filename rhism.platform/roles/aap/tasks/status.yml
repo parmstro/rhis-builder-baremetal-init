@@ -1,0 +1,29 @@
+---
+# status — read-only health check. GET the controller ping endpoint (the base
+# path is version-aware, from the profile: 2.4 /api/v2/ping/, 2.5+ the gateway
+# /api/controller/v2/ping/) and assert the API answers healthy.
+
+- name: Assert the controller URL is set for the health check
+  ansible.builtin.assert:
+    that:
+      - aap_controller_host | length > 0
+    fail_msg: "aap_controller_host must be set (the controller URL) to check status."
+
+- name: Query the AAP controller ping endpoint
+  ansible.builtin.uri:
+    url: "{{ aap_controller_host }}{{ aap_version_profile.ping_path }}"
+    method: GET
+    validate_certs: "{{ aap_validate_certs }}"
+    timeout: "{{ aap_api_timeout }}"
+    return_content: true
+    status_code: 200
+  register: aap_status_ping
+
+- name: Assert the controller reports healthy
+  ansible.builtin.assert:
+    that:
+      - aap_status_ping.status == 200
+      - aap_status_ping.json.version is defined
+    fail_msg: "AAP controller ping did not report healthy: {{ aap_status_ping.status }}"
+    success_msg: >-
+      AAP {{ aap_version }} controller healthy (version {{ aap_status_ping.json.version | default('unknown') }}).

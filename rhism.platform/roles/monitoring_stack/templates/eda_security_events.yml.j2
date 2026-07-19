@@ -1,0 +1,46 @@
+---
+- name: Security event response
+  hosts: all
+  sources:
+    - ansible.eda.webhook:
+        host: 0.0.0.0
+        port: {{ mon_eda_webhook_port }}
+  rules:
+    - name: Failed SSH brute force detected
+      condition: >-
+        event.payload.source is defined and
+        (
+          (event.payload.source == "splunk" and
+           event.payload.search_name == "Failed SSH Authentication") or
+          (event.payload.source == "nagios" and
+           event.payload.service == "SSH" and
+           event.payload.state == "CRITICAL") or
+          (event.payload.source == "elastic" and
+           event.payload.rule_name is match("failed.*ssh", ignorecase=true))
+        )
+      action:
+        run_playbook:
+          name: {{ mon_eda_response_playbooks.failed_ssh.playbook }}
+          extra_vars:
+            event_action: {{ mon_eda_response_playbooks.failed_ssh.extra_vars.event_action }}
+            event_source: "{% raw %}{{ event.payload.source }}{% endraw %}"
+            event_host: "{% raw %}{{ event.payload.host | default('unknown') }}{% endraw %}"
+            event_detail: "{% raw %}{{ event.payload | to_json }}{% endraw %}"
+
+    - name: Unauthorized privilege escalation
+      condition: >-
+        event.payload.source is defined and
+        (
+          (event.payload.source == "splunk" and
+           event.payload.search_name == "Unauthorized Privilege Escalation") or
+          (event.payload.source == "elastic" and
+           event.payload.rule_name is match("privilege.*escalation", ignorecase=true))
+        )
+      action:
+        run_playbook:
+          name: {{ mon_eda_response_playbooks.privilege_escalation.playbook }}
+          extra_vars:
+            event_action: {{ mon_eda_response_playbooks.privilege_escalation.extra_vars.event_action }}
+            event_source: "{% raw %}{{ event.payload.source }}{% endraw %}"
+            event_host: "{% raw %}{{ event.payload.host | default('unknown') }}{% endraw %}"
+            event_detail: "{% raw %}{{ event.payload | to_json }}{% endraw %}"

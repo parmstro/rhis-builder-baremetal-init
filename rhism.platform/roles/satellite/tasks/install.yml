@@ -1,0 +1,93 @@
+---
+# --------------------------------------------------------------------------- #
+# install — RHSM registration, packages, firewall, satellite-installer       #
+#                                                                             #
+# Satellite-specific: RHSM subscription steps and manifest upload.           #
+# --------------------------------------------------------------------------- #
+- name: Install satellite
+  become: true
+  block:
+    - name: Register with RHSM
+      ansible.builtin.include_role:
+        name: rhel_subscription
+      vars:
+        rhel_subscription_action: register
+        rhel_subscription_method: activation_key
+        rhel_subscription_org_id: "{{ content_rhsm_org_id }}"
+        rhel_subscription_activation_key: "{{ content_rhsm_activation_key }}"
+        rhel_subscription_skip: "{{ content_rhsm_skip_registration | bool }}"
+
+    - name: Enable satellite repos via subscription-manager
+      ansible.builtin.command:
+        cmd: >-
+          subscription-manager repos
+          --enable satellite-6-for-rhel-9-x86_64-rpms
+          --enable satellite-maintenance-6-for-rhel-9-x86_64-rpms
+      changed_when: true
+      when: not content_rhsm_skip_registration | bool
+
+    - name: Upload RHSM manifest
+      ansible.builtin.copy:
+        src: "{{ content_rhsm_manifest_path }}"
+        dest: /root/manifest.zip
+        owner: root
+        group: root
+        mode: "0600"
+      when:
+        - content_rhsm_manifest_path | length > 0
+        - content_install_execute | bool
+
+    - name: Install satellite packages
+      ansible.builtin.package:
+        name: "{{ _content_installer_packages }}"
+        state: present
+      when: content_install_execute | bool
+
+    - name: Install satellite-cli
+      ansible.builtin.package:
+        name: satellite-cli
+        state: present
+      when: content_install_execute | bool
+
+    - name: Open firewall ports
+      ansible.builtin.include_tasks: _firewall.yml
+      when: content_install_execute | bool
+
+    - name: Show dry-run installer command
+      ansible.builtin.debug:
+        msg: >-
+          DRY-RUN: would run:
+            {{ _content_installer_cmd }}
+            --scenario {{ _content_installer_scenario }}
+            --foreman-initial-organization "{{ content_organization }}"
+            --foreman-initial-location "{{ content_location }}"
+            --foreman-initial-admin-username "{{ content_username }}"
+            --foreman-initial-admin-password "***"
+            {{ content_installer_extra_args | join(' ') }}
+          Set content_install_execute: true to perform actual install.
+      when: not content_install_execute | bool
+
+    - name: Run satellite-installer
+      ansible.builtin.command:
+        cmd: >-
+          {{ _content_installer_cmd }}
+          --scenario {{ _content_installer_scenario }}
+          --foreman-initial-organization "{{ content_organization }}"
+          --foreman-initial-location "{{ content_location }}"
+          --foreman-initial-admin-username "{{ content_username }}"
+          --foreman-initial-admin-password "{{ content_password }}"
+          {{ content_installer_extra_args | join(' ') }}
+      no_log: true
+      when: content_install_execute | bool
+      register: _content_satellite_install
+      changed_when: "'Success' in _content_satellite_install.stdout"
+      notify: satellite - restart foreman
+
+    - name: Import RHSM manifest
+      ansible.builtin.command:
+        cmd: hammer subscription upload --organization "{{ content_organization }}" --file /root/manifest.zip
+      when:
+        - content_rhsm_manifest_path | length > 0
+        - content_install_execute | bool
+      changed_when: true
+      no_log: true

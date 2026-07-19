@@ -1,0 +1,51 @@
+---
+# Bareos has no dry-run gate and its actions install packages / manage services via `become`,
+# which fails on a minimal container (no sudo). So this scenario validates the STANDALONE
+# CONTRACT on the control host: argument-spec enforcement (a real negative test — the role
+# loads fine on Linux), the shared backup_bareos_* default contract, and the presence of every
+# dispatch task file. Functional install is validated in the full-stack test lab, not molecule.
+- name: Validate bareos dispatcher + standalone variable contract (control host only)
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Load role defaults
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../../defaults/main.yml"
+
+    - name: Negative test — argument spec rejects a bogus action
+      block:
+        - name: Call role with invalid action
+          ansible.builtin.include_role:
+            name: rhism.platform.bareos
+          vars:
+            action: bogus_action
+        - name: Fail if validation did not catch invalid action
+          ansible.builtin.fail:
+            msg: "argument_spec should have rejected the bogus action"
+      rescue:
+        - name: Confirm expected failure was caught
+          ansible.builtin.debug:
+            msg: "PASS — bogus action correctly rejected"
+
+    - name: Assert standalone variable/default contract
+      ansible.builtin.assert:
+        that:
+          - action == 'server'
+          - backup_bareos_director_port | int == 9101
+          - backup_bareos_storage_port | int == 9103
+          - backup_bareos_file_daemon_port | int == 9102
+        fail_msg: "bareos standalone default contract not satisfied"
+
+    - name: Verify a dispatch task file exists for every declared action
+      ansible.builtin.stat:
+        path: "{{ playbook_dir }}/../../tasks/{{ item }}.yml"
+      register: _bareos_action_stat
+      failed_when: not _bareos_action_stat.stat.exists
+      loop:
+        - server
+        - client
+        - configure
+        - present
+        - status
+        - restore
+        - verify

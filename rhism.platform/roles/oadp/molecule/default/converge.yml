@@ -1,0 +1,78 @@
+---
+# OADP has no dry-run gate and its actions apply CRs to a real OpenShift cluster, which does
+# not exist in CI. So this scenario validates the STANDALONE CONTRACT on the control host:
+# argument-spec enforcement (a real negative test — the role loads fine on Linux), the shared
+# backup_oadp_* default contract, a client-side CR render, and the presence of every dispatch
+# task file. Functional deployment (operator install, backup lands in the bucket, restore
+# recreates workloads) is validated in a Tier-3 lab (OCP + MinIO), not in molecule.
+- name: Validate oadp dispatcher + standalone variable contract (control host only)
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Load role defaults
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../../defaults/main.yml"
+
+    - name: Negative test — argument spec rejects a bogus action
+      block:
+        - name: Call role with invalid action
+          ansible.builtin.include_role:
+            name: rhism.platform.oadp
+          vars:
+            action: bogus_action
+        - name: Fail if validation did not catch invalid action
+          ansible.builtin.fail:
+            msg: "argument_spec should have rejected the bogus action"
+      rescue:
+        - name: Confirm expected failure was caught
+          ansible.builtin.debug:
+            msg: "PASS — bogus action correctly rejected"
+
+    - name: Assert standalone variable/default contract
+      ansible.builtin.assert:
+        that:
+          - action == 'verify'
+          - backup_oadp_namespace == 'openshift-adp'
+          - "'openshift' in backup_oadp_default_plugins"
+          - "'csi' in backup_oadp_default_plugins"
+          - backup_oadp_node_agent_uploader_type == 'kopia'
+          - backup_oadp_prefix == 'velero'
+          - backup_oadp_credential_secret == 'cloud-credentials'
+          - backup_oadp_ttl == '720h0m0s'
+        fail_msg: "oadp standalone default contract not satisfied"
+
+    - name: Render a Velero Backup CR client-side (no cluster) and assert its structure
+      ansible.builtin.assert:
+        that:
+          - _oadp_rendered_backup.apiVersion == 'velero.io/v1'
+          - _oadp_rendered_backup.kind == 'Backup'
+          - _oadp_rendered_backup.spec.storageLocation == 'default'
+          - _oadp_rendered_backup.spec.includedResources == ['*']
+        fail_msg: "rendered Backup CR structure not as expected"
+      vars:
+        _oadp_rendered_backup:
+          apiVersion: velero.io/v1
+          kind: Backup
+          metadata:
+            name: contract-render
+            namespace: "{{ backup_oadp_namespace }}"
+          spec:
+            includedNamespaces: "{{ backup_oadp_included_namespaces }}"
+            includedResources: "{{ backup_oadp_included_resources }}"
+            snapshotVolumes: "{{ backup_oadp_snapshot_volumes | bool }}"
+            ttl: "{{ backup_oadp_ttl }}"
+            storageLocation: "{{ backup_oadp_storage_location }}"
+
+    - name: Verify a dispatch task file exists for every declared action
+      ansible.builtin.stat:
+        path: "{{ playbook_dir }}/../../tasks/{{ item }}.yml"
+      register: _oadp_action_stat
+      failed_when: not _oadp_action_stat.stat.exists
+      loop:
+        - server
+        - client
+        - schedule
+        - backup
+        - restore
+        - verify
+        - baseline

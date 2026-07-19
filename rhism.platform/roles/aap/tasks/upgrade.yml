@@ -1,0 +1,51 @@
+---
+# upgrade — day-2 version upgrade. Re-renders the installer inventory / CR for
+# the target aap_version and re-runs the installer, which performs the in-place
+# upgrade. GATED by aap_execute.
+
+- name: Ensure the AAP work directory exists
+  ansible.builtin.file:
+    path: "{{ aap_work_dir }}"
+    state: directory
+    mode: "0700"
+
+- name: Re-render the containerized installer inventory for the target version
+  ansible.builtin.template:
+    src: containerized_inventory.ini.j2
+    dest: "{{ aap_work_dir }}/installer_inventory.ini"
+    mode: "0600"
+  when: aap_install_method == 'containerized'
+
+- name: Re-render the operator custom resource for the target version
+  ansible.builtin.template:
+    src: openshift_aap_cr.yml.j2
+    dest: "{{ aap_work_dir }}/aap_cr.yml"
+    mode: "0600"
+  when: aap_install_method == 'openshift'
+
+- name: Run the containerized installer to upgrade (real run)
+  ansible.builtin.command:
+    cmd: >-
+      ansible-playbook -i {{ aap_work_dir }}/installer_inventory.ini
+      {{ aap_version_profile.containerized.installer_install_playbook }}
+    chdir: "{{ aap_work_dir }}"
+  register: aap_upgrade_run
+  changed_when: aap_upgrade_run.rc == 0
+  no_log: true
+  when:
+    - aap_install_method == 'containerized'
+    - aap_execute | bool
+
+- name: Apply the updated custom resource to upgrade (real run, OpenShift)
+  kubernetes.core.k8s:
+    state: present
+    src: "{{ aap_work_dir }}/aap_cr.yml"
+    validate_certs: "{{ aap_validate_certs }}"
+  when:
+    - aap_install_method == 'openshift'
+    - aap_execute | bool
+
+- name: Report dry-run (upgrade NOT invoked)
+  ansible.builtin.debug:
+    msg: "aap_execute is false — AAP upgrade to {{ aap_version }} ({{ aap_install_method }}) NOT invoked."
+  when: not (aap_execute | bool)

@@ -1,0 +1,10 @@
+---
+# gitlab_ee — started / stopped / restarted (consolidated)
+# Actions differ only by the state param passed to the service module.
+
+- name: Manage GitLab EE service
+  ansible.builtin.service:
+    name: "{{ _scm_service_name }}"
+    state: "{{ action }}"
+    enabled: "{{ action == 'started' }}"
+  become: true

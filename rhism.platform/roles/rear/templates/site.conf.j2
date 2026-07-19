@@ -1,0 +1,14 @@
+# {{ ansible_managed }}
+# Fleet-wide ReaR configuration — rhism.platform.rear (backup_rear_manage_site_conf: true).
+# site.conf carries settings common to a fleet; per-host overrides live in local.conf.
+# Do NOT edit by hand; managed by Ansible.
+
+# Shared scratch location across the fleet.
+TMPDIR="{{ backup_rear_tmpdir }}"
+
+# Shared backup method for the fleet (per-host BACKUP_URL still comes from local.conf).
+BACKUP={{ backup_rear_backup_method }}
+BACKUP_PROG={{ backup_rear_backup_prog }}
+{% if backup_rear_exclude_patterns | length > 0 %}
+BACKUP_PROG_EXCLUDE=( "${BACKUP_PROG_EXCLUDE[@]}" {{ backup_rear_exclude_patterns | map('quote') | join(' ') }} )
+{% endif %}

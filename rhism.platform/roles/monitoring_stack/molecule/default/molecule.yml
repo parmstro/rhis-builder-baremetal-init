@@ -1,0 +1,38 @@
+---
+# Collection-hosted scenario: molecule's collection-under-test auto-install
+# (prerun) would try to ansible-galaxy-install this collection into the
+# workspace collections path, clobbering the loader symlink at
+# collections/ansible_collections/rhism/<name> ("Cannot call rmtree on
+# a symbolic link"). Disabled — local collection checkouts already resolve
+# via ANSIBLE_COLLECTIONS_PATH.
+prerun: false
+
+dependency:
+  name: galaxy
+  enabled: false
+
+driver:
+  name: docker
+
+platforms:
+  - name: monitoring-stack-test
+    image: rockylinux:9-minimal
+    pre_build_image: true
+    override_command: true
+    pull: true
+
+provisioner:
+  name: ansible
+  env:
+    ANSIBLE_ROLES_PATH: "../../../../roles"
+
+scenario:
+  test_sequence:
+    - dependency
+    - destroy
+    - syntax
+    - create
+    - converge
+    - converge
+    - verify
+    - destroy

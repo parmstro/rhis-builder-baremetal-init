@@ -1,0 +1,20 @@
+---
+# Functional requirements — mail_server dispatcher (requirements→test-case
+# layer + Tier-3 elevation, owner rules 2026-07-12).
+functional_requirements:
+  - req_id: MAILDISP-FR-001
+    statement: >-
+      The dispatcher SHALL validate mail_type (relay/full) and action,
+      selecting either product via one parameterised include_role with the
+      shared mail_* interface; install dry-runs SHALL honour the real shared
+      gate variable mail_execute (BUG-095).
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: MAILDISP-FR-002
+    statement: >-
+      A dispatched deployment SHALL serve mail on a lab host end-to-end.
+    tier: 3
+    verified_by:
+      - lab: playbooks/mail_server.yml#mail_relay

@@ -1,0 +1,12 @@
+---
+- name: Prepare
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Install system utilities required by security sub-roles
+      ansible.builtin.raw: dnf install -y procps-ng openssh-server pam 2>/dev/null
+      changed_when: false
+
+    - name: Generate SSH host keys (required for sshd -t validation in containers)
+      ansible.builtin.raw: ssh-keygen -A 2>/dev/null
+      changed_when: false

@@ -1,0 +1,7 @@
+- module: system
+  syslog:
+    enabled: {{ (mon_filebeat_modules | selectattr('name', 'equalto', 'system') | first).syslog_enabled | default(true) | lower }}
+    var.paths: ["/var/log/messages"]
+  auth:
+    enabled: {{ (mon_filebeat_modules | selectattr('name', 'equalto', 'system') | first).auth_enabled | default(true) | lower }}
+    var.paths: ["/var/log/secure"]

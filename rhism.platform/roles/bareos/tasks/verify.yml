@@ -1,0 +1,29 @@
+---
+# ---------------------------------------------------------------------------
+# verify.yml — Run a verify job via bconsole
+# ---------------------------------------------------------------------------
+
+- name: Validate verify requirements
+  ansible.builtin.assert:
+    that:
+      - backup_bareos_verify_job_name | length > 0
+    fail_msg: "backup_bareos_verify_job_name is required for verify"
+
+- name: Run verify via bconsole
+  ansible.builtin.include_tasks: bconsole.yml
+  vars:
+    _bconsole_name: Run verify via bconsole
+    _bconsole_commands:
+      - "run job={{ backup_bareos_verify_job_name }} level={{ backup_bareos_verify_level }} yes"
+    _bconsole_timeout: 300
+
+- name: Fail if verify failed
+  ansible.builtin.fail:
+    msg: "Verify job '{{ backup_bareos_verify_job_name }}' failed"
+  when:
+    - _bconsole_result.rc is defined
+    - _bconsole_result.rc != 0
+
+- name: Report verify output
+  ansible.builtin.debug:
+    msg: "{{ _bconsole_result.stdout_lines | default([]) }}"

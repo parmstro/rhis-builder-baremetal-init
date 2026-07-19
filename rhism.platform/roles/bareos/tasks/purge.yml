@@ -1,0 +1,42 @@
+---
+# ---------------------------------------------------------------------------
+# purge.yml — Purge volumes (remove catalog data for expired volumes)
+# ---------------------------------------------------------------------------
+
+- name: Purge specific volume via bconsole
+  ansible.builtin.include_tasks: bconsole.yml
+  vars:
+    _bconsole_name: Purge specific volume via bconsole
+    _bconsole_commands:
+      - "purge volume={{ backup_bareos_purge_volume }} yes"
+    _bconsole_timeout: 120
+  when: backup_bareos_purge_volume | length > 0
+
+- name: Fail if named purge failed
+  ansible.builtin.fail:
+    msg: "Failed to purge volume '{{ backup_bareos_purge_volume }}'"
+  when:
+    - backup_bareos_purge_volume | length > 0
+    - _bconsole_result.rc is defined
+    - _bconsole_result.rc != 0
+
+- name: Purge all expired volumes via bconsole
+  ansible.builtin.include_tasks: bconsole.yml
+  vars:
+    _bconsole_name: Purge all expired volumes via bconsole
+    _bconsole_commands:
+      - "purge expired jobs yes"
+    _bconsole_timeout: 120
+  when: backup_bareos_purge_volume | length == 0
+
+- name: Fail if expired purge failed
+  ansible.builtin.fail:
+    msg: "Failed to purge expired jobs"
+  when:
+    - backup_bareos_purge_volume | length == 0
+    - _bconsole_result.rc is defined
+    - _bconsole_result.rc != 0
+
+- name: Report purge output
+  ansible.builtin.debug:
+    msg: "{{ _bconsole_result.stdout_lines | default([]) }}"

@@ -1,0 +1,83 @@
+---
+# ACME — IPA/IdM's own integrated ACME CA (Dogtag ACMEv2 responder, RFC 8555).
+# Two modes, selected by idm_acme_mode:
+#   enable | disable | status  — server-side, on a CA server. `ipa-acme-manage`
+#     is CLI-ONLY (no Ansible module anywhere); it operates on the LOCAL Dogtag
+#     instance as root and replicates the flag via LDAP, so enable on ONE CA
+#     replica only. Verified against ipa-acme-manage(1) + the FreeIPA ACME page,
+#     not assumed.
+#   request — client-side, on an enrolled host. Uses ipa-getcert (certmonger),
+#     the IPA-native path: certmonger tracks the cert and AUTO-RENEWS it. This
+#     is deliberately preferred over pointing community.crypto.acme_* at the
+#     ACME directory (https://<server>/acme/directory) — on an already-enrolled
+#     host that would mean hand-rolling challenge fulfilment for no benefit.
+#
+# idm_acme_execute gates the state-changing modes (enable/disable/request);
+# status is always safe to read. Default false = dry run.
+
+- name: Validate idm_acme_mode
+  ansible.builtin.assert:
+    that: idm_acme_mode in ['enable', 'disable', 'status', 'request']
+    fail_msg: "idm_acme_mode must be one of: enable, disable, status, request (got '{{ idm_acme_mode }}')"
+
+# ---- Server-side: ipa-acme-manage (enable/disable/status) ----
+- name: Read current ACME service state
+  ansible.builtin.command: ipa-acme-manage status
+  register: _idm_acme_status
+  changed_when: false
+  failed_when: false
+  become: true
+  when: idm_acme_mode in ['enable', 'disable', 'status']
+
+- name: Report ACME service state
+  ansible.builtin.debug:
+    msg: "IPA ACME service: {{ _idm_acme_status.stdout | default('unknown') | trim }}"
+  when: idm_acme_mode in ['enable', 'disable', 'status']
+
+- name: "DRY RUN — would {{ idm_acme_mode }} the IPA ACME service (idm_acme_execute is false)"
+  ansible.builtin.debug:
+    msg: "DRY RUN: would run 'ipa-acme-manage {{ idm_acme_mode }}' on this CA server."
+  when:
+    - idm_acme_mode in ['enable', 'disable']
+    - not (idm_acme_execute | bool)
+
+- name: "{{ idm_acme_mode | capitalize }} the IPA ACME service"
+  ansible.builtin.command: "ipa-acme-manage {{ idm_acme_mode }}"
+  become: true
+  register: _idm_acme_manage
+  # Idempotent: only flip when the current status doesn't already match the goal
+  # ('enabled' appears in status output when on).
+  changed_when: _idm_acme_manage.rc == 0
+  when:
+    - idm_acme_mode in ['enable', 'disable']
+    - idm_acme_execute | bool
+    - (idm_acme_mode == 'enable') != ('enabled' in (_idm_acme_status.stdout | default('') | lower))
+
+# ---- Client-side: ipa-getcert request (certmonger-tracked, auto-renewing) ----
+- name: "DRY RUN — would request an ACME/IPA cert via ipa-getcert (idm_acme_execute is false)"
+  ansible.builtin.debug:
+    msg: >-
+      DRY RUN: would run 'ipa-getcert request' for {{ idm_acme_cert_subject | default(inventory_hostname) }}
+      → cert {{ idm_acme_cert_file }}, key {{ idm_acme_key_file }}.
+  when:
+    - idm_acme_mode == 'request'
+    - not (idm_acme_execute | bool)
+
+- name: Request a certmonger-tracked certificate from the IPA CA
+  ansible.builtin.command:
+    argv:
+      - ipa-getcert
+      - request
+      - "-f"
+      - "{{ idm_acme_cert_file }}"
+      - "-k"
+      - "{{ idm_acme_key_file }}"
+      - "-N"
+      - "CN={{ idm_acme_cert_subject | default(inventory_hostname) }}"
+      - "-K"
+      - "{{ idm_acme_cert_principal | default('host/' ~ inventory_hostname) }}"
+    creates: "{{ idm_acme_cert_file }}"
+  become: true
+  when:
+    - idm_acme_mode == 'request'
+    - idm_acme_execute | bool

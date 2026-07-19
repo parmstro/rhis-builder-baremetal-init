@@ -1,0 +1,48 @@
+---
+# =============================================================================
+# INSTALL PROFILE — AAP 2.6 (gateway line; incremental over 2.5).
+#
+# Same gateway topology and install-method set as 2.5. Differences over 2.5 are
+# incremental (installer defaults, operator channel). TODO: confirm the 2.6
+# operator channel and any containerized required-var additions against the Red
+# Hat AAP 2.6 install guides before a real run.
+# =============================================================================
+
+aap_version_profile:
+  version: "2.6"
+  gateway_era: true
+  install_methods:
+    - containerized
+    - openshift
+
+  controller_api_base: /api/controller/v2/
+  ping_path: /api/controller/v2/ping/
+
+  containerized:
+    available: true
+    tech_preview: false
+    installer_collection: ansible.containerized_installer
+    installer_install_playbook: ansible.containerized_installer.install
+    installer_backup_playbook: ansible.containerized_installer.backup
+    installer_restore_playbook: ansible.containerized_installer.restore
+    inventory_groups:
+      - automationgateway
+      - automationcontroller
+      - automationhub
+      - automationeda
+      - database
+    required_group_vars:
+      - postgresql_admin_username
+      - postgresql_admin_password
+      - gateway_admin_password
+      - controller_admin_password
+      - hub_admin_password
+      - registry_username
+      - registry_password
+
+  openshift:
+    available: true
+    cr_api_version: aap.ansible.com/v1alpha1
+    cr_kind: AnsibleAutomationPlatform
+    operator_channel: stable-2.6            # TODO: confirm
+    operator_package: ansible-automation-platform-operator

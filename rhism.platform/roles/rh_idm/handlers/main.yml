@@ -1,0 +1,6 @@
+---
+- name: rh_idm - restart ipa
+  ansible.builtin.service:
+    name: "{{ _idm_service_name }}"
+    state: restarted
+  become: true

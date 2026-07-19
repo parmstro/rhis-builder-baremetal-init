@@ -1,0 +1,7 @@
+---
+# Action: remove_node — scale MachineSet down to remove worker nodes
+
+- name: Scale MachineSet down to 0
+  ansible.builtin.include_tasks: node_scale.yml
+  vars:
+    _cp_node_scale_replicas: 0

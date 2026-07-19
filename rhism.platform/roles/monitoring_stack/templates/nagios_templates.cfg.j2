@@ -1,0 +1,14 @@
+{% for tmpl in mon_nagios_host_templates %}
+define host {
+    name                            {{ tmpl.name }}
+    use                             generic-host
+    check_command                   {{ tmpl.check_command }}
+    check_interval                  {{ tmpl.check_interval }}
+    retry_interval                  {{ tmpl.retry_interval }}
+    max_check_attempts              {{ tmpl.max_check_attempts }}
+    notification_interval           {{ tmpl.notification_interval }}
+    contact_groups                  {{ tmpl.contact_groups }}
+    register                        0
+}
+
+{% endfor %}

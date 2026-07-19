@@ -1,0 +1,8 @@
+---
+# Interface is validated by meta/argument_specs.yml at role entry.
+# One rule-set entry at a time; each entry may carry any combination of the
+# supported keys (zone/source/interface/masquerade/service/port/icmp_block/
+# rich_rule) — see README.md.
+- name: Apply firewalld rule sets
+  ansible.builtin.include_tasks: firewalld.yml
+  loop: "{{ firewall }}"

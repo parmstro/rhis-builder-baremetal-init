@@ -1,0 +1,10 @@
+<network>
+  <name>{{ kvm_platform_network_name }}</name>
+  <forward mode="{{ kvm_platform_network_forward_mode }}"/>
+  <bridge name="{{ kvm_platform_network_bridge }}" stp="on" delay="0"/>
+  <ip address="{{ kvm_platform_network_ip }}" netmask="{{ kvm_platform_network_netmask }}">
+    <dhcp>
+      <range start="{{ kvm_platform_network_dhcp_start }}" end="{{ kvm_platform_network_dhcp_end }}"/>
+    </dhcp>
+  </ip>
+</network>

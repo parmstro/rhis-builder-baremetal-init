@@ -1,0 +1,111 @@
+---
+# Verify — assert the rendered installer artifacts from disk (proving the render
+# logic AND the aap_execute:false dry-run gate: files were rendered, but no real
+# installer ran), and that a dispatch file exists for every action.
+- name: aap contract verify (rendered artifacts + dispatch files)
+  hosts: localhost
+  gather_facts: false
+  vars:
+    _aap_role_root: "{{ playbook_dir }}/../.."
+    _aap_out: "{{ lookup('ansible.builtin.env', 'MOLECULE_EPHEMERAL_DIRECTORY') }}/aap"
+  tasks:
+    - name: Read the rendered 2.5 containerized inventory
+      ansible.builtin.slurp:
+        src: "{{ _aap_out }}/c25/installer_inventory.ini"
+      register: _aap_c25
+
+    - name: Read the rendered 2.4 (pre-gateway) containerized inventory
+      ansible.builtin.slurp:
+        src: "{{ _aap_out }}/c24/installer_inventory.ini"
+      register: _aap_c24
+
+    - name: Read the rendered 2.5 OpenShift custom resource
+      ansible.builtin.slurp:
+        src: "{{ _aap_out }}/o25/aap_cr.yml"
+      register: _aap_o25
+
+    - name: Assert the 2.5 containerized inventory has the gateway-era group model + secret placeholders
+      ansible.builtin.assert:
+        that:
+          - "'[automationgateway]' in (_aap_c25.content | b64decode)"
+          - "'gw1.example.com' in (_aap_c25.content | b64decode)"
+          - "'[automationcontroller]' in (_aap_c25.content | b64decode)"
+          - "'ctrl1.example.com' in (_aap_c25.content | b64decode)"
+          - "'[database]' in (_aap_c25.content | b64decode)"
+          - "'db1.example.com' in (_aap_c25.content | b64decode)"
+          - "'controller_admin_password=__ADMIN_PASSWORD__' in (_aap_c25.content | b64decode)"
+          - "'gateway_admin_password=__ADMIN_PASSWORD__' in (_aap_c25.content | b64decode)"
+          - "'postgresql_admin_password=__PG_ADMIN_PASSWORD__' in (_aap_c25.content | b64decode)"
+        fail_msg: "2.5 containerized inventory render is missing expected groups/placeholders"
+        success_msg: "PASS — 2.5 render has gateway group model + admin-password placeholders"
+
+    - name: Assert the 2.4 inventory is pre-gateway (no automationgateway, no gateway admin var)
+      ansible.builtin.assert:
+        that:
+          - "'[automationgateway]' not in (_aap_c24.content | b64decode)"
+          - "'gateway_admin_password' not in (_aap_c24.content | b64decode)"
+          - "'[automationcontroller]' in (_aap_c24.content | b64decode)"
+          - "'controller_admin_password=__ADMIN_PASSWORD__' in (_aap_c24.content | b64decode)"
+        fail_msg: "2.4 inventory render leaked gateway-era content"
+        success_msg: "PASS — 2.4 render is correctly pre-gateway"
+
+    - name: Assert the OpenShift CR is the unified 2.5 kind in the right namespace
+      ansible.builtin.assert:
+        that:
+          - "'kind: AnsibleAutomationPlatform' in (_aap_o25.content | b64decode)"
+          - "'namespace: aap-molecule' in (_aap_o25.content | b64decode)"
+          - "'name: aap-mol' in (_aap_o25.content | b64decode)"
+        fail_msg: "OpenShift CR render is not the expected unified 2.5 resource"
+        success_msg: "PASS — 2.5 OpenShift CR rendered (AnsibleAutomationPlatform)"
+
+    - name: Stat every action dispatch file
+      ansible.builtin.stat:
+        path: "{{ _aap_role_root }}/tasks/{{ item }}.yml"
+      register: _aap_dispatch
+      loop:
+        - install
+        - configure
+        - baseline
+        - backup
+        - restore
+        - upgrade
+        - status
+        - resolve_version
+        - containerized_install
+        - openshift_install
+
+    - name: Assert all action dispatch files are present
+      ansible.builtin.assert:
+        that:
+          - _aap_dispatch.results | selectattr('stat.exists', 'equalto', false) | list | length == 0
+        fail_msg: "one or more action dispatch files are missing"
+        success_msg: "PASS — every action has its dispatch file"
+
+    # ------------------------------------------------------------- AAP-FR-003
+    - name: Stat every config-as-code engine section file (self-contained, no awx_config)
+      ansible.builtin.stat:
+        path: "{{ _aap_role_root }}/tasks/config_{{ item }}.yml"
+      register: _aap_config_engine
+      loop:
+        - organization
+        - credentials
+        - projects
+        - inventories
+        - templates
+        - workflows
+        - schedules
+
+    - name: Assert the seven config engine files are present
+      ansible.builtin.assert:
+        that:
+          - _aap_config_engine.results | selectattr('stat.exists', 'equalto', false) | list | length == 0
+        fail_msg: "one or more config_<section>.yml engine files are missing"
+        success_msg: "PASS — aap carries its own seven-section config engine"
+
+    - name: Assert the configure dispatcher never includes another role
+      ansible.builtin.assert:
+        that:
+          - "'include_role' not in (lookup('ansible.builtin.file', _aap_role_root ~ '/tasks/configure.yml'))"
+          - "'awx_config' not in (lookup('ansible.builtin.file', _aap_role_root ~ '/tasks/configure.yml'))"
+        fail_msg: "tasks/configure.yml regressed to an external role dependency"
+        success_msg: "PASS — configure is self-contained (no include_role, no awx_config)"

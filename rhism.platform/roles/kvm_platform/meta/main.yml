@@ -1,0 +1,25 @@
+---
+galaxy_info:
+  role_name: kvm_platform
+  namespace: rhism
+  author: rhism
+  description: >-
+    Install, configure, upgrade, and decommission the KVM/libvirt hypervisor HOST platform
+    itself — qemu-kvm/libvirtd packages, the libvirtd service, and the default storage pool
+    and network. Standalone-first product role. VM guest lifecycle (create/destroy/gold
+    image build/cloud-init) on top of an already-installed KVM host is a separate concern,
+    owned by roles/vm_provisioning.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: EL
+      versions:
+        - "9"
+  galaxy_tags:
+    - virtualization
+    - kvm
+    - libvirt
+    - hypervisor
+    - qemu
+
+dependencies: []

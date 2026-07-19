@@ -1,0 +1,79 @@
+---
+# Permissive baseline. Start green, then raise `profile` toward `production`
+# as the repo's older tasks are modernised (FQCN, loop vs with_items, etc.).
+# Run locally with: ansible-lint
+profile: basic
+
+# Never install requirements.yml (git-SSH URLs) or refresh schemas during lint —
+# every role/collection resolves locally (ANSIBLE_ROLES_PATH/COLLECTIONS_PATH),
+# and EE runs default offline per the container-security posture. Without this,
+# lint git-clones inside the EE and dies on host-key verification whenever the
+# .ansible/roles cache is absent (surfaced after the 2026-07-11 VM prune).
+offline: true
+
+exclude_paths:
+  - collections/
+  - library/            # custom modules/plugins are linted on their own terms
+  - .molecule/
+  - roles/docker/       # Shape-4 vendored upstream role ships its own lint config
+  - pristine/           # self-contained ANVIL package — own standards, own CI
+  - .local-cmdb/        # local-stack runtime artifacts (gitignored)
+  - WIKI/               # wiki clones (gitignored helper checkouts, not platform code)
+  - external/           # helper repo checkouts (conventions, sboms) — gitignored
+  - archive/            # historical snapshots (pre-platform baseline) — gitignored
+  # BUG-112 class: the case-insensitive macOS FS (through virtiofs) serves each
+  # role's REQUIREMENTS.yml (test-traceability layer) when ansible-lint probes
+  # for requirements.yml, then fails schema validation. No independent role
+  # tracks a real lowercase requirements.yml — the platform's real one is this
+  # repo's root file, which stays linted.
+  - roles/*/REQUIREMENTS.yml
+  - roles/*/requirements.yml
+  # Role-relative variants of the same BUG-112 exclusion — this copy of the config
+  # is consumed from the role's own root (independent repo / `cd roles/freeradius`).
+  - REQUIREMENTS.yml
+  - requirements.yml
+  # Web-app static assets (binary images) vendored under templates/ — served
+  # files, not Jinja YAML; ansible-lint's loader chokes on them (load-failure).
+  - templates/podman/flask-web-server/docs/
+  - templates/podman/flask-web-server/flaskipa/
+  - templates/podman/reverse_proxy/html/
+
+# Collections declared in the EE but not yet installed in the current image.
+# Mock the modules so syntax-check passes for roles that use them.
+mock_roles:
+  # arista.avd lives in the net_ee layer, not the base EE this lint runs in.
+  - arista.avd.eos_designs
+  - arista.avd.eos_cli_config_gen
+
+mock_modules:
+  # arista.eos lives in the net_ee layer, not the base EE this lint runs in.
+  - arista.eos.eos_facts
+  - arista.eos.eos_command
+  - ansible.windows.win_ping
+  - ansible.windows.win_optional_feature
+  - ansible.windows.win_regedit
+  - ansible.windows.win_service
+  - ansible.windows.win_shell
+  - ansible.windows.win_template
+  - ansible.windows.win_updates
+  - chocolatey.chocolatey.win_chocolatey
+  - chocolatey.chocolatey.win_chocolatey_config
+  - community.windows.win_firewall
+  - community.windows.win_firewall_rule
+  - community.windows.win_scheduled_task
+
+# Conventions documented in CLAUDE.md that older code still uses. Remove entries
+# here as the corresponding code is migrated to the "going forward" conventions.
+skip_list:
+  - fqcn[action-core]   # existing tasks use short module names (copy, yum, ...)
+  - fqcn[action]
+  - name[casing]        # don't fail on task-name capitalisation
+  - var-naming[no-role-prefix]
+  - var-naming[no-reserved]  # dispatcher pattern passes `action` to product roles
+  - name[template]           # task names include mid-string vars for clarity
+
+# Treat these as warnings rather than hard failures during the initial rollout.
+warn_list:
+  - yaml               # defer to .yamllint for YAML style
+  - no-changed-when
+  - risky-shell-pipe

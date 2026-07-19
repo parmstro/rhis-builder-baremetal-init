@@ -1,0 +1,119 @@
+---
+# Functional requirements — rhism wizard (requirements→test-case layer,
+# owner rule 2026-07-12; user-story schema, owner rule 2026-07-16 — see
+# docs/scaffolding-templates.md's REQUIREMENTS.yml template).
+functional_requirements:
+  - req_id: RHISM-WIZARD-FR-001
+    persona: administrator
+    capability: >-
+      a way to produce a complete, schema-valid estate deployment manifest
+      from a pre-baked profile without stepping through interactive
+      questions
+    benefit: >-
+      a repeatable, non-interactive path to the same manifest an operator
+      would build by hand — usable from CI, automation, or a scripted
+      bootstrap, not just a terminal session
+    acceptance:
+      - given: wizard_profile is set to a real pre-baked profile
+        when: wizard_action is validate, show_plan, or generate_inventory
+        then: each action operates on a complete, schema-valid manifest
+          with no interactive prompt required
+    statement: >-
+      As an administrator, I want a non-interactive way to produce a
+      complete, schema-valid estate manifest from a pre-baked profile, so
+      that I can automate estate definition without a terminal session.
+    tier: 2
+    verified_by:
+      - molecule: default
+      - register: TEST-RHISM-WIZARD-DEFAULT
+
+  - req_id: RHISM-WIZARD-FR-002
+    persona: administrator
+    capability: >-
+      the estate profile's resource sizing to reflect the real scale I'm
+      deploying at, not one fixed figure regardless of estate size
+    benefit: >-
+      capacity planning stays honest — a lab-scale estate and an
+      enterprise-scale one genuinely need different VM footprints, and the
+      manifest should say so
+    acceptance:
+      - given: wizard_profile is the estate profile
+        when: wizard_estate_sizing_tier is set to s, m, or l
+        then: the manifest's sizing block reflects that tier's real,
+          distinct cores/memory/disk figures for every estate component
+          (identity_server, content_server, hypervisor_host, tang_host)
+    statement: >-
+      As an administrator, I want the estate profile's sizing to reflect a
+      real, selectable capacity tier, so that capacity planning stays
+      honest across lab-scale and enterprise-scale deployments alike.
+    tier: 2
+    verified_by:
+      - molecule: default
+      - register: TEST-RHISM-WIZARD-DEFAULT
+
+  - req_id: RHISM-WIZARD-FR-003
+    persona: administrator
+    capability: >-
+      the estate profile to correctly flag which Red Hat subscriptions the
+      estate needs, without me having to work that out by reading every
+      component's type by hand
+    benefit: >-
+      subscription/entitlement planning happens automatically from the
+      components actually selected, catching a missing activation key
+      before deployment rather than mid-deploy
+    acceptance:
+      - given: wizard_profile is the estate profile (identity=rh_idm,
+          content=satellite)
+        when: a manifest is generated
+        then: wizard_licensing.rhsm and wizard_licensing.satellite are
+          both true in the resulting manifest
+    statement: >-
+      As an administrator, I want the estate profile to correctly derive
+      which Red Hat subscriptions are needed from its component selection,
+      so that entitlement gaps surface before deployment, not during it.
+    tier: 2
+    verified_by:
+      - molecule: default
+      - register: TEST-RHISM-WIZARD-DEFAULT
+
+  - req_id: RHISM-WIZARD-FR-004
+    persona: administrator
+    capability: >-
+      a fully-interactive path when I want to build a custom estate the
+      pre-baked profile doesn't cover
+    benefit: >-
+      the wizard stays useful beyond its one built-in estate shape — any
+      component combination is reachable by walking the interactive pages
+    acceptance:
+      - given: wizard_profile is unset or "custom"
+        when: wizard_action is interactive
+        then: every component/network/sizing/credentials page is walked in
+          order and the same schema-valid manifest shape is produced
+    statement: >-
+      As an administrator, I want a fully-interactive path for building a
+      custom estate, so that the wizard remains useful beyond its one
+      built-in profile.
+    tier: 3
+    verified_by:
+      - manual: molecule/interactive is documented manual-only (needs a TTY)
+
+  - req_id: RHISM-WIZARD-FR-005
+    persona: administrator
+    capability: >-
+      the estate profile to include NBDE/Tang key escrow as a first-class,
+      enabled-by-default component
+    benefit: >-
+      disk-encryption unlock is part of the estate definition from the
+      start, not a manual afterthought bolted on post-deploy
+    acceptance:
+      - given: wizard_profile is the estate profile
+        when: a manifest is generated
+        then: components.tang.enabled is true in the resulting manifest
+    statement: >-
+      As an administrator, I want NBDE/Tang key escrow included as a
+      first-class estate component, so that disk-encryption unlock is part
+      of the estate definition from day one.
+    tier: 2
+    verified_by:
+      - molecule: default
+      - register: TEST-RHISM-WIZARD-DEFAULT

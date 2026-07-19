@@ -1,0 +1,17 @@
+---
+# Non-secret vars for the rhism RHSM scenario.
+# RHSM credentials and IDM passwords come from vault.yml.
+rhsm_org_id: "{{ vault_rhsm_org_id }}"
+rhsm_activation_key: "{{ vault_rhsm_activation_key }}"
+
+idm_domain: "rhism-rhsm.lab.example.com"
+idm_realm: "RHISM-RHSM.LAB.EXAMPLE.COM"
+idm_admin_password: "{{ vault_idm_admin_password }}"
+idm_ds_password: "{{ vault_idm_ds_password }}"
+idm_setup_dns: true
+idm_forwarders:
+  - 8.8.8.8
+idm_mkhomedir: true
+idm_server_install: true
+idm_idstart: 50000
+idm_idmax: 199999

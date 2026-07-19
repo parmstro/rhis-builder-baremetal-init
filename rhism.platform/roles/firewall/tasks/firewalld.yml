@@ -1,0 +1,87 @@
+---
+# One firewall rule-set entry (`item`). Every key is optional; each present
+# key produces its firewalld call. `service`, `port`, and `source` accept a
+# single string or a list — the `is string` normalisation matters: a bare
+# string is ALSO iterable in Jinja, so without it a scalar value would loop
+# per-character (latent bug in the original import, fixed 2026-07-11 —
+# BUG-098 in the orchestration repo's BUGFIXES.md).
+
+- name: Apply firewalld zone rule set (privilege-escalated)
+  become: true
+  block:
+    - name: "Ensure zone exists: {{ item.zone | default('') }}"
+      ansible.posix.firewalld:
+        zone: "{{ item.zone }}"
+        state: present
+        permanent: true
+      when: item.zone is defined
+
+    - name: "Add sources to zone {{ item.zone | default('default') }}"
+      ansible.posix.firewalld:
+        zone: "{{ item.zone | default(omit) }}"
+        state: "{{ item.state | default('enabled') }}"
+        source: "{{ source }}"
+        permanent: "{{ item.permanent | default(true) }}"
+      loop: "{{ [item.source] if item.source is string else item.source }}"
+      loop_control:
+        loop_var: source
+      when: item.source is defined
+
+    - name: "Bind interface to zone {{ item.zone | default('default') }}"
+      ansible.posix.firewalld:
+        zone: "{{ item.zone | default(omit) }}"
+        state: "{{ item.state | default('enabled') }}"
+        permanent: "{{ item.permanent | default(true) }}"
+        interface: "{{ item.interface }}"
+        immediate: true
+      when: item.interface is defined
+
+    - name: "Set masquerade on zone {{ item.zone | default('default') }}"
+      ansible.posix.firewalld:
+        zone: "{{ item.zone | default(omit) }}"
+        state: "{{ item.state | default('enabled') }}"
+        permanent: "{{ item.permanent | default(true) }}"
+        masquerade: true
+      when:
+        - item.masquerade is defined
+        - item.masquerade
+
+    - name: "Apply service rules on zone {{ item.zone | default('default') }}"
+      ansible.posix.firewalld:
+        zone: "{{ item.zone | default(omit) }}"
+        state: "{{ item.state | default('enabled') }}"
+        permanent: "{{ item.permanent | default(true) }}"
+        service: "{{ service }}"
+        immediate: true
+      loop: "{{ [item.service] if item.service is string else item.service }}"
+      loop_control:
+        loop_var: service
+      when: item.service is defined
+
+    - name: "Apply port rules on zone {{ item.zone | default('default') }}"
+      ansible.posix.firewalld:
+        zone: "{{ item.zone | default(omit) }}"
+        state: "{{ item.state | default('enabled') }}"
+        permanent: "{{ item.permanent | default(true) }}"
+        port: "{{ port }}"
+      loop: "{{ [item.port] if item.port is string else item.port }}"
+      loop_control:
+        loop_var: port
+      when: item.port is defined
+
+    - name: "Block ICMP on zone {{ item.zone | default('default') }}"
+      ansible.posix.firewalld:
+        zone: "{{ item.zone | default(omit) }}"
+        state: "{{ item.state | default('enabled') }}"
+        permanent: "{{ item.permanent | default(true) }}"
+        icmp_block: "{{ item.icmp_block }}"
+      when: item.icmp_block is defined
+
+    - name: "Add rich rule to zone {{ item.zone | default('default') }}"
+      ansible.posix.firewalld:
+        zone: "{{ item.zone | default(omit) }}"
+        state: "{{ item.state | default('enabled') }}"
+        permanent: "{{ item.permanent | default(true) }}"
+        immediate: "{{ item.immediate | default(omit) }}"
+        rich_rule: "{{ item.rich_rule | default(item.rule) }}"
+      when: (item.rich_rule is defined) or (item.rule is defined)

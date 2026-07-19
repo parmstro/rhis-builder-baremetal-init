@@ -1,0 +1,242 @@
+---
+- name: Load deployment manifest
+  ansible.builtin.include_vars:
+    file: "{{ pb_manifest_path }}"
+    name: pb_manifest
+
+# Resolve which components to verify (and their types) ONCE, from the manifest —
+# every probe below then gates on a short fact reference instead of repeating
+# the manifest lookup. Same shape as deploy.yml's decision block.
+- name: Resolve which components to verify
+  ansible.builtin.set_fact:
+    pb_enabled:
+      hypervisor: "{{ pb_manifest.components.hypervisor.enabled | default(false) | bool }}"
+      identity: "{{ pb_manifest.components.identity.enabled | default(false) | bool }}"
+      mail: "{{ pb_manifest.components.mail.enabled | default(false) | bool }}"
+      scm: "{{ pb_manifest.components.scm.enabled | default(false) | bool }}"
+      container_platform: "{{ pb_manifest.components.container_platform.enabled | default(false) | bool }}"
+      automation: "{{ pb_manifest.components.automation.enabled | default(false) | bool }}"
+    pb_type:
+      hypervisor: "{{ pb_manifest.components.hypervisor.type | default('kvm') }}"
+      identity: "{{ pb_manifest.components.identity.type | default('idm') }}"
+      mail: "{{ pb_manifest.components.mail.type | default('postfix') }}"
+      scm: "{{ pb_manifest.components.scm.type | default('gitlab') }}"
+      container_platform: "{{ pb_manifest.components.container_platform.type | default('k3s') }}"
+      automation: "{{ pb_manifest.components.automation.type | default('aap') }}"
+
+- name: Show what will be verified
+  ansible.builtin.debug:
+    msg: "Verifying — enabled: {{ pb_enabled }}, types: {{ pb_type }}"
+
+- name: Assert verification decisions resolved
+  ansible.builtin.assert:
+    that:
+      - pb_enabled is defined
+      - pb_type is defined
+    fail_msg: "Verification decision facts failed to resolve — check the manifest."
+
+# ── KVM hypervisor ────────────────────────────────────────────────────────
+- name: Check libvirtd service
+  ansible.builtin.systemd:
+    name: libvirtd
+  become: true
+  register: _pb_libvirtd_service
+  failed_when: false
+  when:
+    - pb_enabled.hypervisor | bool
+    - pb_type.hypervisor == 'kvm'
+
+- name: Set libvirtd status fact
+  ansible.builtin.set_fact:
+    _pb_libvirtd_status:
+      stdout: "{{ _pb_libvirtd_service.status.ActiveState | default('unknown') }}"
+  when:
+    - pb_enabled.hypervisor | bool
+    - pb_type.hypervisor == 'kvm'
+
+- name: List libvirt default network/pool
+  ansible.builtin.command:
+    cmd: virsh net-list --all
+  become: true
+  register: _pb_virsh_netlist
+  changed_when: false
+  failed_when: false
+  when:
+    - pb_enabled.hypervisor | bool
+    - pb_type.hypervisor == 'kvm'
+
+# ── Identity management ───────────────────────────────────────────────────
+- name: Check identity management service
+  ansible.builtin.systemd:
+    name: ipa
+  become: true
+  register: _pb_ipa_service
+  failed_when: false
+  when: pb_enabled.identity | bool
+
+- name: Set IPA status fact
+  ansible.builtin.set_fact:
+    _pb_ipa_status:
+      stdout: "{{ _pb_ipa_service.status.ActiveState | default('unknown') }}"
+  when: pb_enabled.identity | bool
+
+- name: Probe IDM HTTPS web UI
+  ansible.builtin.uri:
+    url: "https://{{ ansible_fqdn }}/ipa/ui/"
+    validate_certs: false
+    return_content: false
+    timeout: 10
+    status_code: [200, 301, 302]
+  register: _pb_ipa_http
+  failed_when: false
+  when: pb_enabled.identity | bool
+
+# ── Mail server ───────────────────────────────────────────────────────────
+- name: Check mail server service
+  ansible.builtin.systemd:
+    name: postfix
+  become: true
+  register: _pb_postfix_service
+  failed_when: false
+  when: pb_enabled.mail | bool
+
+- name: Set postfix status fact
+  ansible.builtin.set_fact:
+    _pb_postfix_status:
+      stdout: "{{ _pb_postfix_service.status.ActiveState | default('unknown') }}"
+  when: pb_enabled.mail | bool
+
+- name: Probe SMTP port reachability
+  ansible.builtin.wait_for:
+    host: "{{ ansible_fqdn }}"
+    port: 25
+    timeout: 5
+  register: _pb_smtp_probe
+  failed_when: false
+  when: pb_enabled.mail | bool
+
+# ── SCM (GitLab) ──────────────────────────────────────────────────────────
+- name: Check SCM service
+  ansible.builtin.command:
+    cmd: gitlab-ctl status
+  become: true
+  register: _pb_gitlab_status
+  changed_when: false
+  failed_when: false
+  when: pb_enabled.scm | bool
+
+- name: Probe GitLab health endpoint
+  ansible.builtin.uri:
+    url: "http://{{ ansible_fqdn }}/-/health"
+    validate_certs: false
+    return_content: false
+    timeout: 10
+    status_code: [200, 302]
+  register: _pb_gitlab_http
+  failed_when: false
+  when: pb_enabled.scm | bool
+
+# ── Container platform ────────────────────────────────────────────────────
+- name: Check container platform node status
+  ansible.builtin.command:
+    cmd: >-
+      {% if pb_type.container_platform == 'rke2' %}
+      /var/lib/rancher/rke2/bin/kubectl get nodes
+      {% elif pb_type.container_platform in ['ocp', 'okd'] %}
+      oc get nodes
+      {% else %}
+      k3s kubectl get nodes
+      {% endif %}
+  become: true
+  register: _pb_cp_status
+  changed_when: false
+  failed_when: false
+  environment:
+    KUBECONFIG: >-
+      {% if pb_type.container_platform == 'rke2' %}
+      /etc/rancher/rke2/rke2.yaml
+      {% else %}
+      /etc/rancher/k3s/k3s.yaml
+      {% endif %}
+  when: pb_enabled.container_platform | bool
+
+- name: Probe container platform API
+  ansible.builtin.uri:
+    url: >-
+      {% if pb_type.container_platform in ['ocp', 'okd'] %}
+      https://api.{{ ansible_domain }}:6443/healthz
+      {% elif pb_type.container_platform == 'rke2' %}
+      https://{{ ansible_fqdn }}:9345/ping
+      {% else %}
+      https://{{ ansible_fqdn }}:6443/healthz
+      {% endif %}
+    validate_certs: false
+    return_content: false
+    timeout: 10
+  register: _pb_cp_http
+  failed_when: false
+  when: pb_enabled.container_platform | bool
+
+# ── Automation Platform (AAP) ─────────────────────────────────────────────
+- name: Check AAP controller service
+  ansible.builtin.systemd:
+    name: automation-controller
+  become: true
+  register: _pb_aap_service
+  failed_when: false
+  when: pb_enabled.automation | bool
+
+- name: Set AAP controller status fact
+  ansible.builtin.set_fact:
+    _pb_aap_status:
+      stdout: "{{ _pb_aap_service.status.ActiveState | default('unknown') }}"
+  when: pb_enabled.automation | bool
+
+- name: Probe AAP controller web UI
+  ansible.builtin.uri:
+    url: "{{ pb_aap_controller_host if pb_aap_controller_host | length > 0 else 'https://' ~ ansible_fqdn }}/api/controller/v2/ping/"
+    validate_certs: false
+    return_content: false
+    timeout: 10
+    status_code: [200, 301, 302, 401]
+  register: _pb_aap_http
+  failed_when: false
+  when: pb_enabled.automation | bool
+
+# ── Verification report ───────────────────────────────────────────────────
+- name: Display verification results
+  ansible.builtin.debug:
+    msg: |
+      Platform Builder — Verification Report
+      =======================================
+      Profile: {{ pb_manifest.profile }}
+      {% if pb_enabled.hypervisor and pb_type.hypervisor == 'kvm' %}
+      Hypervisor (KVM/libvirt)
+        libvirtd : {{ _pb_libvirtd_status.stdout | default('N/A') }}
+        networks : {{ 'listed' if _pb_virsh_netlist.rc | default(1) == 0 else 'unreachable' }}
+      {% endif %}
+      {% if pb_enabled.identity %}
+      Identity ({{ pb_type.identity }})
+        systemd  : {{ _pb_ipa_status.stdout | default('N/A') }}
+        HTTPS /ui: HTTP {{ _pb_ipa_http.status | default('N/A') }}
+      {% endif %}
+      {% if pb_enabled.mail %}
+      Mail (Postfix)
+        systemd  : {{ _pb_postfix_status.stdout | default('N/A') }}
+        SMTP :25  : {{ 'open' if not (_pb_smtp_probe.failed | default(true)) else 'closed/timeout' }}
+      {% endif %}
+      {% if pb_enabled.scm %}
+      SCM ({{ pb_type.scm }})
+        ctl      : {{ 'ok' if _pb_gitlab_status.rc | default(1) == 0 else 'error' }}
+        HTTP/-/health: HTTP {{ _pb_gitlab_http.status | default('N/A') }}
+      {% endif %}
+      {% if pb_enabled.container_platform %}
+      Container platform ({{ pb_type.container_platform }})
+        nodes    : {{ 'reachable' if _pb_cp_status.rc | default(1) == 0 else 'unreachable' }}
+        API probe: HTTP {{ _pb_cp_http.status | default('N/A') }}
+      {% endif %}
+      {% if pb_enabled.automation %}
+      Automation Platform ({{ pb_type.automation }})
+        controller : {{ _pb_aap_status.stdout | default('N/A') }}
+        API /ping  : HTTP {{ _pb_aap_http.status | default('N/A') }}
+      {% endif %}

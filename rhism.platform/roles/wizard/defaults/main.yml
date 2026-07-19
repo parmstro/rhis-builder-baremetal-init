@@ -1,0 +1,61 @@
+---
+# Which wizard task to run:
+#   interactive | validate | show_plan | generate_inventory
+wizard_action: interactive
+
+# ===========================================================================
+# Output
+# ===========================================================================
+# The output FILE name is a deliberately distinct default, so that two
+# wizards sharing the same wizard_output_dir on one control host never
+# silently overwrite each other's manifest.
+wizard_output_dir: /opt/rhism/manifests
+wizard_output_file: rhism-deployment-manifest.yml
+
+# ===========================================================================
+# Profile (pre-baked stack selection)
+# ===========================================================================
+# Set to a profile name to skip interactive component pages and use defaults.
+# Allowed: estate | custom | "" (fully interactive)
+wizard_profile: ""
+
+# Which pre-computed tier of files/profiles/estate.yml's sizing_defaults
+# becomes the manifest's real sizing block when a pre-baked profile is
+# loaded (s | m | l) — see tasks/interactive.yml. Has no effect for the
+# fully-interactive or custom path, where tasks/pages/09_sizing.yml's own
+# tier prompt drives sizing instead.
+wizard_estate_sizing_tier: l
+
+# ===========================================================================
+# Interactive mode settings
+# ===========================================================================
+wizard_skip_confirm: false         # Set true in CI to skip review/confirm page
+wizard_tui_backend: whiptail       # whiptail | dialog
+wizard_tui_title: "rhism Estate Wizard"
+wizard_tui_width: 78
+wizard_tui_height: 20
+
+# ===========================================================================
+# Accumulated state (set by wizard pages via set_fact — not user-configured)
+# ===========================================================================
+wizard_components: {}
+wizard_network: {}
+wizard_sizing: {}
+wizard_credentials: {}
+wizard_licensing: {}
+
+# ===========================================================================
+# Capacity planning — t-shirt sizing for the wizard TOOL ITSELF (docs/
+# capacity-planning.md in the orchestration repo). Deliberately named
+# wizard_tool_sizing, NOT wizard_sizing — that name is already the
+# accumulated-manifest-state variable above (populated by the wizard's own
+# pages/profile, consumed by templates/deployment-manifest.yml.j2); reusing
+# it here would silently clobber real runtime state. This is trivial: the
+# wizard is pure control-node Ansible logic with no persistent service, so
+# every tier is effectively the same footprint — a single s tier, listed
+# for consistency with the platform's own sizing convention rather than
+# because it varies. ADDITIVE figures, OS baseline excluded (1 vCPU / 2 GB
+# RAM / 20 GB disk, RHEL 9 — see docs/capacity-planning.md).
+wizard_tool_sizing: s
+wizard_tool_sizing_profiles:
+  s: {cpu: 1, ram_mb: 512, disk_gb: 1}

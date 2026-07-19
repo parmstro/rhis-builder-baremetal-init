@@ -1,0 +1,84 @@
+---
+# Active Directory realm join via realmd + sssd.
+# Only applicable for idm_type: ad_integration.
+
+- name: Validate enroll action applies to this idm_type
+  ansible.builtin.assert:
+    that:
+      - idm_type == 'ad_integration'
+    fail_msg: >-
+      idm_action: enroll is intended for idm_type: ad_integration.
+      For FreeIPA/IDM client enrollment, use idm_action: client.
+
+- name: Validate required AD enrollment variables
+  ansible.builtin.assert:
+    that:
+      - idm_ad_admin_user | length > 0
+      - idm_ad_admin_password | length > 0
+    fail_msg: "idm_ad_admin_user and idm_ad_admin_password must be set (use vault)."
+
+- name: Install AD integration packages
+  ansible.builtin.package:
+    name: "{{ _idm_join_packages }}"
+    state: present
+  become: true
+  when: idm_ad_enroll_execute | bool
+
+- name: Enable and start oddjobd for home directory creation
+  ansible.builtin.service:
+    name: oddjobd
+    enabled: true
+    state: started
+  become: true
+  when: idm_ad_enroll_execute | bool
+
+- name: Skip AD realm join (dry-run mode)
+  ansible.builtin.debug:
+    msg: >-
+      DRY RUN — idm_ad_enroll_execute=false.
+      Would run: realm join --user={{ idm_ad_admin_user }}
+      {% if idm_ad_computer_ou %}--computer-ou={{ idm_ad_computer_ou }}{% endif %}
+      {{ idm_domain }}
+  when: not (idm_ad_enroll_execute | bool)
+
+- name: Join Active Directory domain
+  ansible.builtin.command:
+    cmd: >-
+      realm join
+      --user={{ idm_ad_admin_user }}
+      {% if idm_ad_computer_ou | length > 0 %}--computer-ou={{ idm_ad_computer_ou }}{% endif %}
+      {{ idm_domain }}
+    stdin: "{{ idm_ad_admin_password }}"
+  register: _idm_realm_join
+  changed_when: _idm_realm_join.rc == 0
+  failed_when: >-
+    _idm_realm_join.rc != 0
+    and 'Already joined' not in (_idm_realm_join.stderr | default(''))
+  become: true
+  when: idm_ad_enroll_execute | bool
+  no_log: true
+
+- name: Configure SSSD for AD
+  ansible.builtin.lineinfile:
+    path: /etc/sssd/sssd.conf
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    backrefs: true
+  loop:
+    - regexp: '^use_fully_qualified_names\s*='
+      line: 'use_fully_qualified_names = False'
+    - regexp: '^fallback_homedir\s*='
+      line: 'fallback_homedir = /home/%u'
+  become: true
+  when: idm_ad_enroll_execute | bool
+  notify: identity_management - restart sssd
+
+- name: Allow all AD users to log in
+  ansible.builtin.command:
+    cmd: realm permit --all
+  register: _idm_realm_permit
+  changed_when: _idm_realm_permit.rc == 0
+  become: true
+  when:
+    - idm_ad_enroll_execute | bool
+    - idm_ad_permit_all_users | bool

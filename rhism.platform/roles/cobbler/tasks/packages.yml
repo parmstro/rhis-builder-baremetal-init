@@ -1,0 +1,22 @@
+---
+# Handles both present and absent via state: "{{ action }}"
+- name: Manage cobbler packages
+  ansible.builtin.package:
+    name: "{{ _prov_packages }}"
+    state: "{{ action }}"
+  become: true
+
+- name: Manage httpd package
+  ansible.builtin.package:
+    name: httpd
+    state: "{{ action }}"
+  become: true
+
+- name: Manage cobbler firewall services
+  ansible.posix.firewalld:
+    service: "{{ item }}"
+    state: "{{ 'enabled' if action == 'present' else 'disabled' }}"
+    permanent: true
+    immediate: true
+  become: true
+  loop: "{{ _prov_firewall_services }}"

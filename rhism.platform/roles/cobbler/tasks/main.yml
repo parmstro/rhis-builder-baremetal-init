@@ -1,0 +1,67 @@
+---
+# Action + variable interface are declared and validated by meta/argument_specs.yml
+# (ansible-core runs the validation automatically at role entry — no manual assert needed).
+#
+# prov_execute is the shared dry-run gate: with prov_execute=false the role validates
+# dispatch + the variable contract without installing packages or running the cobbler CLI.
+
+# ── Action dispatch ────────────────────────────────────────────────────────────
+- name: Dispatch to package management
+  ansible.builtin.include_tasks: packages.yml
+  when:
+    - action in ['present', 'absent']
+    - prov_execute | bool
+
+- name: Dispatch to service management
+  ansible.builtin.include_tasks: service.yml
+  when:
+    - action in ['started', 'stopped', 'restarted']
+    - prov_execute | bool
+
+- name: Dispatch to configure
+  ansible.builtin.include_tasks: configure.yml
+  when:
+    - action == 'configure'
+    - prov_execute | bool
+
+- name: Dispatch to add_distro
+  ansible.builtin.include_tasks: add_distro.yml
+  when:
+    - action == 'add_distro'
+    - prov_execute | bool
+
+- name: Dispatch to add_profile
+  ansible.builtin.include_tasks: add_profile.yml
+  when:
+    - action == 'add_profile'
+    - prov_execute | bool
+
+- name: Dispatch to add_system
+  ansible.builtin.include_tasks: add_system.yml
+  when:
+    - action == 'add_system'
+    - prov_execute | bool
+
+- name: Dispatch to add_systems
+  ansible.builtin.include_tasks: add_systems.yml
+  when:
+    - action == 'add_systems'
+    - prov_execute | bool
+
+- name: Dispatch to remove_system
+  ansible.builtin.include_tasks: remove_system.yml
+  when:
+    - action == 'remove_system'
+    - prov_execute | bool
+
+- name: Dispatch to sync
+  ansible.builtin.include_tasks: sync.yml
+  when:
+    - action == 'sync'
+    - prov_execute | bool
+
+- name: Dispatch to status
+  ansible.builtin.include_tasks: status.yml
+  when:
+    - action == 'status'
+    - prov_execute | bool

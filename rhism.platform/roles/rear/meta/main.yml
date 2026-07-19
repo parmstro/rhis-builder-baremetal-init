@@ -1,0 +1,23 @@
+---
+galaxy_info:
+  namespace: rhism
+  role_name: rear
+  author: rhism
+  description: >-
+    Install and operate Relax-and-Recover (ReaR) for RHEL bare-metal disaster recovery —
+    build a bootable rescue image and a matching data backup, schedule unattended protection,
+    verify the recovery layout, and (in a lab) drive a full bare-metal recover. Standalone-first
+    product role, also selectable by the backup_management dispatcher (backup_type: rear).
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: EL
+      versions:
+        - "9"
+  galaxy_tags:
+    - backup
+    - rear
+    - baremetal
+    - disasterrecovery
+    - restore
+dependencies: []

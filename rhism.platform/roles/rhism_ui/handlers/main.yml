@@ -1,0 +1,4 @@
+---
+# No handlers — roles/podman's container action manages restart/recreate
+# semantics directly (podman_container_recreate); nothing here needs a
+# separate service-restart trigger.

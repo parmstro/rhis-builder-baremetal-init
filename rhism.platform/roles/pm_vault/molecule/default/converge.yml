@@ -1,0 +1,86 @@
+---
+# All tasks run on localhost (the EE/control node).
+# community.hashi_vault modules make HTTP calls to the vault dev container.
+- name: Converge — pm_vault secret lifecycle against Vault dev server
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    _vault_url: "http://host.containers.internal:18200"
+    _vault_token: "root"
+
+  tasks:
+    - name: Create secret for test_db_user
+      ansible.builtin.include_role:
+        name: pm_vault
+      vars:
+        pm_vault_action: create
+        pm_target: test_db_user
+        pm_service: postgresql
+        pm_vault_url: "{{ _vault_url }}"
+        pm_vault_auth_method: token
+        pm_vault_token: "{{ _vault_token }}"
+
+    - name: Read secret back and verify round-trip
+      ansible.builtin.include_role:
+        name: pm_vault
+      vars:
+        pm_vault_action: read
+        pm_target: test_db_user
+        pm_vault_url: "{{ _vault_url }}"
+        pm_vault_auth_method: token
+        pm_vault_token: "{{ _vault_token }}"
+
+    - name: Assert secret was returned
+      ansible.builtin.assert:
+        that:
+          - pm_result is defined
+          - pm_result.password is defined
+          - pm_result.password | length >= 20
+        fail_msg: "pm_result.password missing or too short after read"
+
+    - name: Audit secret (check ISM metadata and expiry)
+      ansible.builtin.include_role:
+        name: pm_vault
+      vars:
+        pm_vault_action: audit
+        pm_target: test_db_user
+        pm_vault_url: "{{ _vault_url }}"
+        pm_vault_auth_method: token
+        pm_vault_token: "{{ _vault_token }}"
+
+    - name: Rotate secret (new KV v2 version — history preserved)
+      ansible.builtin.include_role:
+        name: pm_vault
+      vars:
+        pm_vault_action: rotate
+        pm_target: test_db_user
+        pm_vault_url: "{{ _vault_url }}"
+        pm_vault_auth_method: token
+        pm_vault_token: "{{ _vault_token }}"
+
+    - name: Read rotated secret and confirm it changed
+      ansible.builtin.include_role:
+        name: pm_vault
+      vars:
+        pm_vault_action: read
+        pm_target: test_db_user
+        pm_vault_url: "{{ _vault_url }}"
+        pm_vault_auth_method: token
+        pm_vault_token: "{{ _vault_token }}"
+
+    - name: Store rotated password for verify phase
+      ansible.builtin.set_fact:
+        _rotated_password: "{{ pm_result.password }}"
+      no_log: true
+
+    - name: Delete secret
+      ansible.builtin.include_role:
+        name: pm_vault
+      vars:
+        pm_vault_action: delete
+        pm_target: test_db_user
+        pm_vault_url: "{{ _vault_url }}"
+        pm_vault_auth_method: token
+        pm_vault_token: "{{ _vault_token }}"

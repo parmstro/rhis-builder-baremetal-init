@@ -1,0 +1,135 @@
+---
+# install — build the real rhism-ui image from source (this role's own
+# files/rhism_ui/ Containerfile, already security-fixed — see
+# files/rhism_ui/backend/src/{auth,app,utils,index}.js and collection commit
+# faf40d7) and run it, reusing roles/podman for all container mechanics
+# (CLAUDE.md "Reuse existing roles") rather than reimplementing
+# containers.podman calls directly. `include_role: name: podman` (bare, no
+# FQCN) resolves via ANSIBLE_ROLES_PATH to the ORCHESTRATION REPO's own
+# roles/podman — the same mechanism roles/tang and roles/quay already rely
+# on. roles/podman is not vendored into any collection; ci_runner's molecule
+# task sets ANSIBLE_ROLES_PATH to the workspace root's roles/ directory
+# regardless of whether the calling role itself lives in a collection.
+#
+# Dry-run gated by rhism_ui_deploy_execute (default false): roles/podman's
+# containers.podman modules shell out to a REAL podman binary (BUG-160) that
+# the EE itself does not have, so an ungated run in a socket-only scope would
+# fail outright rather than merely no-op. Real functional deployment needs a
+# genuine podman-capable target — this role's own molecule scenario proves it
+# for real, against the same nested-podman test platform roles/podman's own
+# scenario uses (see molecule/default/molecule.yml).
+
+- name: Report dry-run status
+  ansible.builtin.debug:
+    msg: >-
+      {{ 'INSTALLING for real' if (rhism_ui_deploy_execute | bool)
+         else 'DRY-RUN (rhism_ui_deploy_execute=false): validating only, no changes made' }}
+
+- name: Install for real
+  when: rhism_ui_deploy_execute | bool
+  block:
+    - name: Fail closed if the admin secret is not set
+      ansible.builtin.assert:
+        that:
+          - rhism_ui_admin_secret | length > 0
+        fail_msg: >-
+          rhism_ui_deploy_execute is true but rhism_ui_admin_secret is
+          unset — refusing to deploy a UI whose session claim/steal endpoints
+          would have no caller-presentable credential. The app itself also
+          fails closed on an unset RHISM_UI_ADMIN_SECRET (503
+          ADMIN_SECRET_NOT_CONFIGURED — see backend/src/auth.js), but this
+          role catches it before the build/run cycle, not after.
+
+    - name: Fail closed if the catalog path is not set
+      ansible.builtin.assert:
+        that:
+          - rhism_ui_catalog_path | length > 0
+        fail_msg: >-
+          rhism_ui_deploy_execute is true but rhism_ui_catalog_path is
+          unset — the UI has nothing to browse without a real
+          rhis-builder-inventory schema/soe_catalog checkout mounted in. Set
+          rhism_ui_catalog_path to that checkout's path.
+
+    - name: Compute the container environment (contains the admin secret)
+      no_log: true
+      ansible.builtin.set_fact:
+        _rhism_ui_env: "{{ _rhism_ui_env_base | combine(_rhism_ui_env_deployment) }}"
+      vars:
+        _rhism_ui_env_base:
+          HOST: "0.0.0.0"
+          PORT: "{{ rhism_ui_port }}"
+          RHISM_UI_ADMIN_SECRET: "{{ rhism_ui_admin_secret }}"
+          RHISM_UI_ALLOWED_ORIGIN: "{{ rhism_ui_allowed_origin }}"
+          CATALOG_PATH: /catalog
+          DB_PATH: "{{ rhism_ui_container_data_dir }}/session.db"
+        _rhism_ui_env_deployment: >-
+          {{ {'DEPLOYMENT_PATH': '/deployments'} if rhism_ui_deployment_path | length > 0 else {} }}
+
+    - name: Compute the container volumes
+      ansible.builtin.set_fact:
+        _rhism_ui_volumes: >-
+          {{
+            [
+              rhism_ui_catalog_path ~ ':/catalog:ro,Z',
+              rhism_ui_data_volume_name ~ ':' ~ rhism_ui_container_data_dir ~ ':Z',
+            ]
+            + ([rhism_ui_deployment_path ~ ':/deployments:Z'] if rhism_ui_deployment_path | length > 0 else [])
+          }}
+
+    - name: Resolve the build context path (role_path is DYNAMICALLY scoped — see comment below)
+      # `role_path` is a magic variable re-evaluated at the point a template is
+      # actually rendered, not frozen when a default is declared. Passing the
+      # raw rhism_ui_build_context default ("{{ role_path }}/files/rhism_ui")
+      # straight into podman's own `vars:` means it gets recursively templated
+      # INSIDE roles/podman's own task context — role_path there resolves to
+      # roles/podman's path, not this role's, silently pointing the build at
+      # roles/podman/files/rhism_ui (which doesn't exist). set_fact renders
+      # eagerly, in THIS role's own context, so the result is a concrete
+      # string with no more role_path reference left to re-resolve (BUG-166).
+      ansible.builtin.set_fact:
+        _rhism_ui_resolved_build_context: "{{ rhism_ui_build_context }}"
+
+    # BUG-167: a collection-hosted role's `role_path` resolves through the
+    # FQCN loader symlink (collections/ansible_collections/<ns>/<name>/...),
+    # not the collection's real physical path
+    # (collections/<ns>/<name>/...) — `podman build`/`containers.podman.
+    # podman_image` reject a build context reached via that symlink with
+    # "context must be a directory", even though the directory genuinely
+    # exists and is readable at that path (confirmed: `ansible.builtin.stat`
+    # on the same path succeeds). Resolve the real, symlink-free path first
+    # via `realpath` and hand THAT to podman, not the as-resolved role_path.
+    - name: Resolve the real (symlink-free) build context path
+      ansible.builtin.command:
+        cmd: "realpath {{ _rhism_ui_resolved_build_context | quote }}"
+      register: _rhism_ui_realpath
+      changed_when: false
+
+    - name: Use the symlink-free path for the actual build
+      ansible.builtin.set_fact:
+        _rhism_ui_resolved_build_context: "{{ _rhism_ui_realpath.stdout }}"
+
+    - name: Build the rhism-ui image from source
+      ansible.builtin.include_role:
+        name: podman
+      vars:
+        podman_action: build
+        podman_image_name: "{{ rhism_ui_image_repository }}"
+        podman_image_tag: "{{ rhism_ui_image_tag }}"
+        podman_build_context: "{{ _rhism_ui_resolved_build_context }}"
+
+    - name: Run the rhism-ui container (loopback-only publish — see index.js/run_container.sh)
+      ansible.builtin.include_role:
+        name: podman
+      vars:
+        podman_action: container
+        podman_container_name: "{{ rhism_ui_container_name }}"
+        podman_container_image: >-
+          {{ rhism_ui_image_repository }}{{
+             '@' ~ rhism_ui_image_digest if rhism_ui_image_digest
+             else ':' ~ rhism_ui_image_tag }}
+        podman_container_state: started
+        podman_restart_policy: always
+        podman_volumes: "{{ _rhism_ui_volumes }}"
+        podman_ports:
+          - "127.0.0.1:{{ rhism_ui_port }}:{{ rhism_ui_port }}"
+        podman_env: "{{ _rhism_ui_env }}"

@@ -1,0 +1,13 @@
+---
+- name: Converge — SELinux policy
+  hosts: all
+  gather_facts: true
+  vars:
+    # SELinux is disabled inside containers — the role gracefully skips
+    # enforce/booleans/fcontexts when ansible_selinux.status == 'disabled'.
+    linux_selinux_action: all
+    linux_selinux_state: permissive
+    linux_selinux_booleans: []
+    linux_selinux_fcontexts: []
+  roles:
+    - role: rhism.platform.linux_selinux

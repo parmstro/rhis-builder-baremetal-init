@@ -1,0 +1,8 @@
+---
+- name: Install provisioning services
+  ansible.builtin.include_tasks: install.yml
+  when: prov_apply_install | bool
+
+- name: Configure provisioning services
+  ansible.builtin.include_tasks: configure.yml
+  when: prov_apply_configure | bool

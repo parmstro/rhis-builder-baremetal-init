@@ -1,0 +1,5 @@
+# Managed by Ansible — cx_ansible_galaxy.linux_users
+# /etc/security/faillock.conf — pam_faillock configuration
+deny = {{ linux_users_faillock_deny }}
+fail_interval = {{ linux_users_faillock_fail_interval }}
+unlock_time = {{ linux_users_faillock_unlock_time }}

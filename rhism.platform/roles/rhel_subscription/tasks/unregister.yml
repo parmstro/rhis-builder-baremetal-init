@@ -1,0 +1,11 @@
+---
+- name: Unregister from RHSM
+  community.general.redhat_subscription:
+    state: absent
+  become: true
+  when: not (rhel_subscription_skip | bool)
+
+- name: Report skipped unregistration
+  ansible.builtin.debug:
+    msg: "rhel_subscription_skip is true — no RHSM unregistration attempted."
+  when: rhel_subscription_skip | bool

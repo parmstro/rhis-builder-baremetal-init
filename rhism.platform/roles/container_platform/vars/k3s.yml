@@ -1,0 +1,19 @@
+---
+_cp_install_script_url: https://get.k3s.io
+_cp_packages: []
+_cp_config_dir: /etc/rancher/k3s
+_cp_config_file: /etc/rancher/k3s/config.yaml
+_cp_kubeconfig_path: /etc/rancher/k3s/k3s.yaml
+_cp_service_name: k3s
+_cp_service_name_agent: k3s-agent
+_cp_binary: /usr/local/bin/k3s
+_cp_kubectl_cmd: /usr/local/bin/k3s kubectl
+_cp_rhsm_required: false
+_cp_has_builtin_registry: false
+_cp_has_builtin_ingress: true
+_cp_builtin_ingress_name: traefik
+_cp_firewall_ports:
+  - 6443/tcp
+  - 10250/tcp
+  - 8472/udp
+  - 4789/udp

@@ -1,0 +1,70 @@
+---
+# pm_thycotic — audit action.
+# Retrieves secret metadata from Delinea Secret Server and checks ISM compliance.
+# TSS provides last-changed date and expiry policy server-side.
+
+- name: Validate secret ID is set
+  ansible.builtin.assert:
+    that:
+      - pm_thycotic_secret_id | length > 0
+    fail_msg: "pm_thycotic_secret_id must be set for the audit action."
+  when: not pm_thycotic_skip_api | bool
+
+- name: Fetch and parse secret metadata from Thycotic Secret Server
+  ansible.builtin.include_tasks: tss_audit.yml
+  when: not pm_thycotic_skip_api | bool
+
+- name: Get current timestamp
+  ansible.builtin.command:
+    cmd: "date +%s"
+  register: _pm_now_epoch
+  changed_when: false
+  delegate_to: localhost
+
+- name: Build dry-run audit record (skip_api mode)
+  ansible.builtin.set_fact:
+    _pm_tss_name: "{{ pm_target }}"
+    _pm_tss_last_changed: "unknown"
+    _pm_tss_active: true
+  when: pm_thycotic_skip_api | bool
+
+- name: Build TSS audit report
+  ansible.builtin.set_fact:
+    _pm_audit_report:
+      target: "{{ pm_target }}"
+      secret_id: "{{ pm_thycotic_secret_id | default('dry-run') }}"
+      secret_name: "{{ _pm_tss_name }}"
+      backend: thycotic
+      server: "{{ pm_thycotic_server_url | default('dry-run') }}"
+      audit_timestamp: "{{ lookup('pipe', 'date -u +%Y-%m-%dT%H:%M:%SZ') }}"
+      last_changed: "{{ _pm_tss_last_changed }}"
+      is_active: "{{ _pm_tss_active }}"
+      expiry_policy_days: "{{ pm_expiry_days }}"
+      skip_api: "{{ pm_thycotic_skip_api | bool }}"
+      ism_checks:
+        ISM_0410_active_secret: "{{ _pm_tss_active | bool }}"
+
+- name: Write audit report
+  ansible.builtin.copy:
+    content: "{{ _pm_audit_report | to_nice_yaml }}"
+    dest: "{{ pm_audit_report_path }}"
+    mode: "0600"
+  delegate_to: localhost
+  become: true
+  when: pm_audit_report_format == 'text'
+
+- name: Write audit report (JSON)
+  ansible.builtin.copy:
+    content: "{{ _pm_audit_report | to_nice_json }}"
+    dest: "{{ pm_audit_report_path }}"
+    mode: "0600"
+  delegate_to: localhost
+  become: true
+  when: pm_audit_report_format == 'json'
+
+- name: Assert secret is active
+  ansible.builtin.assert:
+    that:
+      - _pm_tss_active | bool
+    fail_msg: "ISM audit: secret '{{ _pm_tss_name }}' (ID: {{ pm_thycotic_secret_id | default('dry-run') }}) is retired/inactive."
+    success_msg: "ISM audit passed: secret '{{ _pm_tss_name }}' is active."

@@ -1,0 +1,136 @@
+---
+argument_specs:
+  main:
+    short_description: Install, configure, upgrade, and decommission the KVM/libvirt hypervisor host.
+    description: >-
+      Standalone-first product role managing the KVM/libvirt HOST/PLATFORM itself — packages,
+      the libvirtd service, and the default storage pool + network. Does not manage VM guests
+      (see roles/vm_provisioning for create/destroy/gold-image lifecycle on top of this host).
+    options:
+      kvm_platform_action:
+        description: >-
+          Lifecycle action. install: packages + libvirtd service (default, safest/idempotent).
+          configure: default storage pool + network + informational nested-virt sanity checks.
+          upgrade: package upgrade to latest + libvirtd restart handler. remove: stop/disable
+          libvirtd, optionally purge pool/network, remove packages — destructive, gated behind
+          kvm_platform_confirm_delete.
+        type: str
+        default: install
+        choices:
+          - install
+          - configure
+          - upgrade
+          - remove
+      kvm_platform_execute:
+        description: >-
+          Dry-run gate wrapping every real state-changing task. false validates action dispatch
+          and variable resolution without touching packages/services/libvirt objects — used by
+          the molecule scenario, since nested virtualization is unreliable inside a container.
+        type: bool
+        default: true
+      kvm_platform_uri:
+        description: >-
+          libvirt connection URI. qemu:///system (host-wide, root/polkit) or qemu:///session
+          (unprivileged, per-user).
+        type: str
+        default: "qemu:///system"
+      kvm_platform_packages:
+        description: >-
+          Explicit package list to install/upgrade/remove. Empty = auto-select the right set
+          for ansible_facts['os_family'] from the internal RedHat/Debian map in vars/main.yml.
+        type: list
+        elements: str
+        default: []
+      kvm_platform_manage_service:
+        description: Manage (enable/start/restart) the libvirtd service. False in containers with no systemd.
+        type: bool
+        default: true
+      kvm_platform_libvirt_service:
+        description: Name of the libvirtd systemd service/unit.
+        type: str
+        default: libvirtd
+      kvm_platform_manage_bridge:
+        description: >-
+          Create a host Linux bridge via community.general.nmcli during the install action.
+          Off by default — bridge-utils is legacy on EL9+; libvirt's own NAT "default" network
+          (from the configure action) needs no host bridge at all.
+        type: bool
+        default: false
+      kvm_platform_bridge_name:
+        description: Name of the host bridge to create when kvm_platform_manage_bridge is true.
+        type: str
+        default: br0
+      kvm_platform_bridge_interface:
+        description: >-
+          Physical NIC to enslave to the bridge, e.g. eth1. Empty = create the bridge with no
+          slave interface.
+        type: str
+        default: ""
+      kvm_platform_pool_name:
+        description: Name of the default libvirt storage pool managed by the configure action.
+        type: str
+        default: default
+      kvm_platform_pool_type:
+        description: libvirt storage pool type.
+        type: str
+        default: dir
+      kvm_platform_pool_path:
+        description: Host filesystem path backing the storage pool.
+        type: str
+        default: /var/lib/libvirt/images
+      kvm_platform_pool_autostart:
+        description: Autostart the storage pool on libvirtd start.
+        type: bool
+        default: true
+      kvm_platform_network_name:
+        description: Name of the default libvirt network managed by the configure action.
+        type: str
+        default: default
+      kvm_platform_network_forward_mode:
+        description: libvirt network forward mode.
+        type: str
+        default: nat
+      kvm_platform_network_bridge:
+        description: Name of the libvirt-managed bridge device for this network.
+        type: str
+        default: virbr0
+      kvm_platform_network_ip:
+        description: Gateway IP address for the default network.
+        type: str
+        default: 192.168.122.1
+      kvm_platform_network_netmask:
+        description: Netmask for the default network.
+        type: str
+        default: 255.255.255.0
+      kvm_platform_network_dhcp_start:
+        description: Start of the DHCP range handed out by the default network.
+        type: str
+        default: 192.168.122.2
+      kvm_platform_network_dhcp_end:
+        description: End of the DHCP range handed out by the default network.
+        type: str
+        default: 192.168.122.254
+      kvm_platform_network_autostart:
+        description: Autostart the network on libvirtd start.
+        type: bool
+        default: true
+      kvm_platform_check_nested_virt:
+        description: >-
+          Run informational /dev/kvm + kvm_intel/kvm_amd sanity checks during the configure
+          action. Asserts but never auto-fixes — BIOS/UEFI and host reboots are out of scope.
+        type: bool
+        default: true
+      kvm_platform_confirm_delete:
+        description: >-
+          Must be explicitly set true or the remove action refuses to run its destructive
+          block (stop/disable libvirtd, package removal, optional pool/network purge).
+        type: bool
+        default: false
+      kvm_platform_purge_storage_pool:
+        description: Also delete the default storage pool during the remove action.
+        type: bool
+        default: false
+      kvm_platform_purge_network:
+        description: Also delete the default network during the remove action.
+        type: bool
+        default: false

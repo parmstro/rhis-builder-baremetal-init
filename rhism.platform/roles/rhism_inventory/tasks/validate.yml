@@ -1,0 +1,73 @@
+---
+# ---------------------------------------------------------------------------
+# validate — read-only schema check of every SELECTED catalogue entry against
+# the SOE bundle model (upstream schema/soe_bundle_model.md §3.1). No object
+# is ever created here; infrastructure_refs in particular are assertions
+# against existing site infrastructure, never things a bundle creates (§3.3).
+# ---------------------------------------------------------------------------
+
+- name: Assert every selected entry has a name and at least one model section
+  ansible.builtin.assert:
+    that:
+      - item.name is defined
+      - item.name is string
+      - item.name | length > 0
+      - (item.content is defined) or (item.templates is defined) or (item.lifecycle is defined)
+    fail_msg: >-
+      invalid SOE catalogue entry: every entry needs a name and at least one
+      of content/templates/lifecycle sections
+      (offending entry: {{ item | to_json | truncate(160) }})
+    quiet: true
+  loop: "{{ _rhism_inventory_selected }}"
+  loop_control:
+    label: "{{ item.name | default('(unnamed entry)') }}"
+
+- name: Assert lifecycle_state values come from the known set
+  ansible.builtin.assert:
+    that:
+      - item.lifecycle_state | default('active') in ['active', 'deprecated', 'experimental']
+    fail_msg: >-
+      invalid SOE catalogue entry {{ item.name | default('(unnamed entry)') }}:
+      lifecycle_state must be one of active/deprecated/experimental
+      (got {{ item.lifecycle_state | default('undefined') }})
+    quiet: true
+  loop: "{{ _rhism_inventory_selected }}"
+  loop_control:
+    label: "{{ item.name | default('(unnamed entry)') }}"
+
+- name: Assert snippet items are priority-plus-name pairs with integer priority
+  ansible.builtin.assert:
+    that:
+      - item.1.name is defined
+      - item.1.priority is defined
+      - item.1.priority is integer
+    fail_msg: >-
+      invalid SOE catalogue entry {{ item.0.name | default('(unnamed entry)') }}:
+      templates.snippets items must each carry name plus an INTEGER priority
+      (got {{ item.1 }})
+    quiet: true
+  loop: "{{ _rhism_inventory_selected | subelements('templates.snippets', skip_missing=True) }}"
+  loop_control:
+    label: "{{ item.0.name | default('(unnamed entry)') }} / {{ item.1.name | default('(unnamed snippet)') }}"
+
+- name: Assert infrastructure_refs carries only the four known reference keys
+  ansible.builtin.assert:
+    that:
+      - (item.infrastructure_refs | default({})).keys() | list
+        | difference(['compute_resource', 'subnet', 'domain', 'realm']) | length == 0
+    fail_msg: >-
+      invalid SOE catalogue entry {{ item.name | default('(unnamed entry)') }}:
+      infrastructure_refs may only reference compute_resource/subnet/domain/realm —
+      they are assertions against existing site infrastructure, never created
+      (got keys: {{ (item.infrastructure_refs | default({})).keys() | list | join(', ') }})
+    quiet: true
+  loop: "{{ _rhism_inventory_selected }}"
+  loop_control:
+    label: "{{ item.name | default('(unnamed entry)') }}"
+
+- name: Report the validation summary
+  ansible.builtin.debug:
+    msg:
+      - "SOE catalogue OK: {{ _rhism_inventory_selected | length }} entries validated"
+      - "entries: {{ _rhism_inventory_selected | map(attribute='name') | list | join(', ') }}"
+      - "dropped (deprecated): {{ _rhism_inventory_dropped_deprecated | join(', ') | default('none', true) }}"

@@ -1,0 +1,16 @@
+---
+- name: rhism Deploy — reads deployment manifest and drives all component roles
+  hosts: "{{ pb_target_hosts | default('localhost') }}"
+  connection: "{{ 'local' if (pb_target_hosts is not defined or pb_target_hosts == 'localhost') else 'ssh' }}"
+  gather_facts: true
+
+  pre_tasks:
+    - name: Validate required variables
+      ansible.builtin.assert:
+        that:
+          - pb_action is defined
+          - pb_action in ['plan', 'deploy', 'verify', 'teardown']
+        fail_msg: "pb_action must be one of: plan, deploy, verify, teardown."
+
+  roles:
+    - role: rhism.platform.builder

@@ -1,0 +1,167 @@
+---
+# Action + variable interface are validated by meta/argument_specs.yml (ansible-core
+# runs the validation automatically at role entry — no manual assert needed).
+
+# OCP/OKD: expose internal registry route and create service account
+- name: Expose internal registry route (OCP/OKD)
+  when:
+    - action in ['present', 'registry']
+    - cp_registry_execute | bool
+    - cp_type | default('k3s') in ['ocp', 'okd']
+  block:
+    - name: Enable OCP internal registry with defaultRoute
+      kubernetes.core.k8s:
+        kubeconfig: "{{ cp_kubeconfig_path | default('/usr/local/bin/oc') }}"
+        state: present
+        definition:
+          apiVersion: imageregistry.operator.openshift.io/v1
+          kind: Config
+          metadata:
+            name: cluster
+          spec:
+            defaultRoute: true
+            managementState: Managed
+      become: true
+
+    - name: Wait for internal registry route to become available
+      kubernetes.core.k8s_info:
+        kubeconfig: "{{ cp_kubeconfig_path | default('/usr/local/bin/oc') }}"
+        api_version: route.openshift.io/v1
+        kind: Route
+        namespace: "{{ cp_registry_namespace | default('openshift-image-registry') }}"
+      register: _registry_internal_routes
+      until: _registry_internal_routes.resources | default([]) | length > 0
+      retries: 15
+      delay: 10
+      become: true
+
+    - name: Create registry service account
+      kubernetes.core.k8s:
+        kubeconfig: "{{ cp_kubeconfig_path | default('/usr/local/bin/oc') }}"
+        state: present
+        definition:
+          apiVersion: v1
+          kind: ServiceAccount
+          metadata:
+            name: registry-sa
+            namespace: "{{ cp_registry_namespace | default('openshift-image-registry') }}"
+      become: true
+
+    - name: Grant registry-editor role to service account
+      kubernetes.core.k8s:
+        kubeconfig: "{{ cp_kubeconfig_path | default('/usr/local/bin/oc') }}"
+        state: present
+        definition:
+          apiVersion: rbac.authorization.k8s.io/v1
+          kind: ClusterRoleBinding
+          metadata:
+            name: registry-sa-editor
+          roleRef:
+            apiGroup: rbac.authorization.k8s.io
+            kind: ClusterRole
+            name: registry-editor
+          subjects:
+            - kind: ServiceAccount
+              name: registry-sa
+              namespace: "{{ cp_registry_namespace | default('openshift-image-registry') }}"
+      become: true
+
+    - name: Retrieve internal registry route hostname
+      kubernetes.core.k8s_info:
+        kubeconfig: "{{ cp_kubeconfig_path | default('/usr/local/bin/oc') }}"
+        api_version: route.openshift.io/v1
+        kind: Route
+        namespace: "{{ cp_registry_namespace | default('openshift-image-registry') }}"
+      register: _registry_internal_route_info
+      become: true
+
+    - name: Retrieve service account token
+      kubernetes.core.k8s_info:
+        kubeconfig: "{{ cp_kubeconfig_path | default('/usr/local/bin/oc') }}"
+        api_version: v1
+        kind: Secret
+        namespace: "{{ cp_registry_namespace | default('openshift-image-registry') }}"
+        label_selectors:
+          - "kubernetes.io/service-account.name=registry-sa"
+      register: _registry_internal_sa_secret
+      become: true
+
+    - name: Output internal registry credentials
+      ansible.builtin.debug:
+        msg:
+          registry_host: >-
+            {{
+              (_registry_internal_route_info.resources | default([{}]))[0].spec.host
+              | default('route not yet available')
+            }}
+          service_account: registry-sa
+          token: >-
+            {{
+              (_registry_internal_sa_secret.resources | default([{}]))[0].data.token
+              | default('') | b64decode
+              if (_registry_internal_sa_secret.resources | default([]) | length > 0)
+              else 'token not yet available'
+            }}
+      no_log: false
+      notify: registry_internal - configure registry
+
+# k3s / rke2: configure registry mirror pointing to local registry
+- name: Configure k3s/rke2 internal registry mirror
+  when:
+    - action in ['present', 'registry']
+    - cp_registry_execute | bool
+    - cp_type | default('k3s') in ['k3s', 'rke2']
+    - cp_registry_url | default('') | length > 0
+  block:
+    - name: Report k3s/rke2 internal registry configuration
+      ansible.builtin.debug:
+        msg: >-
+          For k3s/rke2, use the registry_generic role to configure registry mirrors.
+          Set cp_registry_url to your registry endpoint and use registry_generic.
+          This role (registry_internal) is primarily for OCP/OKD built-in registry.
+
+# absent: disable OCP internal registry
+- name: Disable OCP internal registry
+  kubernetes.core.k8s:
+    kubeconfig: "{{ cp_kubeconfig_path | default('/usr/local/bin/oc') }}"
+    state: present
+    definition:
+      apiVersion: imageregistry.operator.openshift.io/v1
+      kind: Config
+      metadata:
+        name: cluster
+      spec:
+        defaultRoute: false
+        managementState: Removed
+  become: true
+  when:
+    - action == 'absent'
+    - cp_registry_execute | bool
+    - cp_type | default('k3s') in ['ocp', 'okd']
+
+- name: Remove registry service account
+  kubernetes.core.k8s:
+    kubeconfig: "{{ cp_kubeconfig_path | default('/usr/local/bin/oc') }}"
+    api_version: v1
+    kind: ServiceAccount
+    name: registry-sa
+    namespace: "{{ cp_registry_namespace | default('openshift-image-registry') }}"
+    state: absent
+  become: true
+  when:
+    - action == 'absent'
+    - cp_registry_execute | bool
+    - cp_type | default('k3s') in ['ocp', 'okd']
+
+- name: Remove registry-sa-editor ClusterRoleBinding
+  kubernetes.core.k8s:
+    kubeconfig: "{{ cp_kubeconfig_path | default('/usr/local/bin/oc') }}"
+    api_version: rbac.authorization.k8s.io/v1
+    kind: ClusterRoleBinding
+    name: registry-sa-editor
+    state: absent
+  become: true
+  when:
+    - action == 'absent'
+    - cp_registry_execute | bool
+    - cp_type | default('k3s') in ['ocp', 'okd']

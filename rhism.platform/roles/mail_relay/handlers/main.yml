@@ -1,0 +1,28 @@
+---
+- name: mail_relay - restart postfix
+  when: mail_manage_service | bool
+  ansible.builtin.service:
+    name: postfix
+    state: restarted
+  become: true
+  listen: mail_relay - restart postfix
+
+- name: mail_relay - reload postfix
+  when: mail_manage_service | bool
+  ansible.builtin.service:
+    name: postfix
+    state: reloaded
+  become: true
+  listen: mail_relay - reload postfix
+
+- name: mail_relay - rebuild sasl db
+  ansible.builtin.command:
+    cmd: postmap /etc/postfix/sasl_passwd
+  become: true
+  listen: mail_relay - rebuild sasl db
+
+- name: mail_relay - newaliases
+  ansible.builtin.command:
+    cmd: newaliases
+  become: true
+  listen: mail_relay - newaliases

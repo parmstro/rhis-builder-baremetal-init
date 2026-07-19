@@ -1,0 +1,12 @@
+---
+# ── Shared: execute kubectl commands on control plane ────────────────────────
+# Included by remove_node.yml (and available for future cluster-level actions).
+# Expects _kubectl_commands list variable.
+
+- name: Execute kubectl command on control plane
+  ansible.builtin.command:
+    cmd: "{{ item }}"
+  changed_when: true
+  delegate_to: "{{ groups['control_plane'] | first | default(inventory_hostname) }}"
+  become: true
+  loop: "{{ _kubectl_commands }}"

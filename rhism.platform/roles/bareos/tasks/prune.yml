@@ -1,0 +1,23 @@
+---
+# ---------------------------------------------------------------------------
+# prune.yml — Prune expired volumes via bconsole
+# ---------------------------------------------------------------------------
+
+- name: Prune volumes via bconsole
+  ansible.builtin.include_tasks: bconsole.yml
+  vars:
+    _bconsole_name: Prune volumes via bconsole
+    _bconsole_commands:
+      - "prune volume=all yes"
+    _bconsole_timeout: 120
+
+- name: Fail if prune failed
+  ansible.builtin.fail:
+    msg: "Failed to prune expired volumes"
+  when:
+    - _bconsole_result.rc is defined
+    - _bconsole_result.rc != 0
+
+- name: Report prune output
+  ansible.builtin.debug:
+    msg: "{{ _bconsole_result.stdout_lines | default([]) }}"

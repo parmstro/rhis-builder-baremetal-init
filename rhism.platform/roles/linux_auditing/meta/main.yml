@@ -1,0 +1,26 @@
+---
+galaxy_info:
+  role_name: linux_auditing
+  namespace: cx_ansible_galaxy
+  author: cx_ansible_galaxy
+  description: >-
+    Auditd configuration for EL 8/9/10 — installs the audit package, deploys
+    CIS/STIG-aligned audit rules, and manages the auditd service. Dispatcher
+    driven by linux_auditing_action variable.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: EL
+      versions:
+        - "8"
+        - "9"
+        - "10"
+  galaxy_tags:
+    - linux
+    - security
+    - auditing
+    - auditd
+    - cis
+    - stig
+
+dependencies: []

@@ -1,0 +1,6 @@
+---
+- name: ingress_default - restart ingress
+  ansible.builtin.debug:
+    msg: >-
+      Built-in ingress controller is managed by the platform; no manual restart required.
+  listen: ingress_default - restart ingress

@@ -1,0 +1,72 @@
+---
+- name: Locate deployment manifest
+  ansible.builtin.stat:
+    path: "{{ pb_manifest_path }}"
+  register: _pb_manifest_stat
+
+- name: Assert manifest exists
+  ansible.builtin.assert:
+    that:
+      - _pb_manifest_stat.stat.exists
+    fail_msg: >-
+      Deployment manifest not found: {{ pb_manifest_path }}.
+      Run infra_wizard first: ansible-playbook playbooks/infra_wizard.yml
+
+- name: Load deployment manifest
+  ansible.builtin.include_vars:
+    file: "{{ pb_manifest_path }}"
+    name: pb_manifest
+
+- name: Validate manifest has components
+  ansible.builtin.assert:
+    that:
+      - pb_manifest.components is defined
+      - pb_manifest.profile is defined
+    fail_msg: "Manifest is missing required 'components' and/or 'profile' keys."
+
+- name: Display deployment plan
+  ansible.builtin.debug:
+    msg: |
+      ============================================================
+      PLATFORM BUILDER — DEPLOYMENT PLAN
+      ============================================================
+      Profile  : {{ pb_manifest.profile }}
+      Manifest : {{ pb_manifest_path }}
+      Dry-run  : {{ not (pb_deploy_execute | bool) }}
+
+      Components selected:
+      {% for component, config in pb_manifest.components.items() %}
+      {% if config.enabled | default(false) %}
+        [ENABLED]  {{ component }} ({{ config.type | default('default') }})
+      {% else %}
+        [SKIPPED]  {{ component }}
+      {% endif %}
+      {% endfor %}
+      {% set _ad_trust = pb_manifest.components.identity.ad_trust | default({}) %}
+      {% if _ad_trust.enabled | default(false) %}
+
+      AD trust (rhism Phase D)   : ENABLED -> {{ _ad_trust.domain | default('(domain not set)') }}
+      {% endif %}
+      {% set _prov_hosts = pb_manifest.components.provisioning.hosts | default([]) %}
+      {% if _prov_hosts | length > 0 %}
+
+      Bare hosts queued ({{ pb_manifest.components.provisioning.type | default('dnsmasq') }}): {{ _prov_hosts | length }}
+      {% endif %}
+
+      Deployment order:
+        1. linux_security    (baseline hardening)
+        1b. tang             (NBDE key escrow, when tang.enabled)
+        1c. kvm_platform     (hypervisor install + configure, when hypervisor.enabled & type=kvm)
+        2. identity_management (+ AD trust, when ad_trust.enabled)
+        3. provisioning_services
+        3b. bare-host provisioning (cobbler add_systems | satellite host)
+        4. content_management
+        5. mail_server
+        6. scm_deploy
+        7. backup_management
+        8. container_platform
+        9. monitoring_stack
+        10. aap              (install + config-as-code, when automation.enabled & type=aap)
+
+      To deploy: set pb_action=deploy (add pb_deploy_execute=true to apply)
+      ============================================================

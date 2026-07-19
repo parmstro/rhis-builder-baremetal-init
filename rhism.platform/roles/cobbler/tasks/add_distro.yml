@@ -1,0 +1,22 @@
+---
+- name: Validate add_distro variables
+  ansible.builtin.assert:
+    that:
+      - prov_cobbler_distro is defined
+      - prov_cobbler_distro.name is defined
+      - prov_cobbler_distro.kernel is defined
+      - prov_cobbler_distro.initrd is defined
+    fail_msg: "add_distro requires prov_cobbler_distro with name, kernel, and initrd"
+
+- name: Add cobbler distro
+  ansible.builtin.command:
+    cmd: >-
+      cobbler distro add
+      --name="{{ prov_cobbler_distro.name }}"
+      --kernel="{{ prov_cobbler_distro.kernel }}"
+      --initrd="{{ prov_cobbler_distro.initrd }}"
+      --arch="{{ prov_cobbler_distro.arch | default('x86_64') }}"
+      --breed="{{ prov_cobbler_distro.breed | default('redhat') }}"
+      --os-version="{{ prov_cobbler_distro.os_version }}"
+  become: true
+  changed_when: true

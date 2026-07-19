@@ -1,0 +1,8 @@
+---
+- name: Prepare
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Install sudo (for become), postfix, and iproute (ss)
+      ansible.builtin.raw: dnf install -y sudo postfix iproute 2>/dev/null
+      changed_when: false

@@ -1,0 +1,101 @@
+---
+# rhism_ui — role defaults (the questionnaire). Every value here is
+# overridable by inventory; nothing is a hard-coded environment fact.
+
+rhism_ui_action: install
+
+# --- Build (built from source, never pulled) --------------------------------
+# The Containerfile lives alongside this role at files/rhism_ui/ — already
+# security-fixed (real auth in auth.js, restricted CORS in app.js, path-
+# traversal guards in utils.js used by routes/{deployment,deployments,catalog}.js,
+# loopback-only bind in index.js, --chown=1001:0 build fix in the Containerfile
+# itself — see collection commit faf40d7). role_path resolves this correctly
+# regardless of where the collection checkout lives.
+rhism_ui_build_context: "{{ role_path }}/files/rhism_ui"
+rhism_ui_image_repository: localhost/rhism-ui
+rhism_ui_image_tag: latest
+# No usable default (empty) — a locally-built image has no pre-known digest to
+# pin ahead of time (unlike tang_image_digest/quay_image_digest, which pin an
+# OFFICIAL PULLED image resolved via `podman manifest inspect` before this
+# role ever runs). Reserved for a future path where this image is pushed to a
+# registry and re-consumed by digest; install falls back to
+# rhism_ui_image_tag when this is empty (same fallback roles/quay uses for
+# quay_redis_image_digest).
+rhism_ui_image_digest: ""
+
+rhism_ui_container_name: rhism-ui
+# Matches the app's own fallback default (backend/src/index.js:
+# `Number(process.env.PORT ?? 3001)`) — the Containerfile separately bakes
+# ENV PORT=8080, but the container's PORT env var (set by install below) always
+# overrides that baked default, so this value is what actually applies.
+rhism_ui_port: 3001
+
+# Persistent session-lock database (backend/src/db.js — better-sqlite3 at
+# DB_PATH) — a named volume so session state survives a container
+# restart/recreate rather than being lost with the container's writable layer.
+rhism_ui_data_volume_name: rhism-ui-data
+rhism_ui_container_data_dir: /app/backend/data
+
+# --- Secrets / access control — NO usable default, fail closed -------------
+# RHISM_UI_ADMIN_SECRET gates POST /api/session/claim (first claim only —
+# reconnect via an already-valid X-Session-Token skips it) and
+# POST /api/session/steal (always) — see files/rhism_ui/backend/src/auth.js.
+# Baking a fixed value into tracked defaults would make every standalone
+# deployment share the same admin secret — refused outright, same posture as
+# roles/tang's tang_key_backup_vault_password_file / roles/quay's
+# quay_secret_key. install fails closed whenever rhism_ui_deploy_execute is
+# true and this is unset.
+rhism_ui_admin_secret: ""
+
+# Empty = CORS disabled — the app's own default posture (see
+# files/rhism_ui/backend/src/app.js: `process.env.RHISM_UI_ALLOWED_ORIGIN ||
+# false`). Only needed for local dev where the frontend is served from a
+# different origin than the backend API; production serves same-origin.
+rhism_ui_allowed_origin: ""
+
+# Mount source for CATALOG_PATH (read-only) — a real rhis-builder-inventory
+# checkout's schema/soe_catalog directory (see
+# roles/rhism/rhis-builder-inventory-heads-main/schema/ in the orchestration
+# repo for an example layout). No default: depends entirely on where an
+# operator's own checkout lives. Required (fail-closed) whenever
+# rhism_ui_deploy_execute is true — the UI has nothing to browse without it.
+rhism_ui_catalog_path: ""
+
+# Mount source for DEPLOYMENT_PATH (read-write) — enables the export action to
+# write files server-side instead of returning them for browser download.
+# Empty = optional, matching the app's own optional DEPLOYMENT_PATH env var
+# (backend/src/routes/deployment.js: `process.env.DEPLOYMENT_PATH ?? null`).
+rhism_ui_deployment_path: ""
+
+# --- Dry-run gate ------------------------------------------------------------
+# install/status both touch genuinely external infrastructure — install needs
+# a target with a REAL podman binary (roles/podman's containers.podman
+# modules shell out to it; the EE itself does not have one — BUG-160), and
+# status needs an already-running instance. Every real action stays a no-op
+# until this is true — keeps a Tier-1 contract run side-effect-free. Unlike
+# roles/tang and roles/quay (which stay Tier-1-only, deferring real proof to a
+# Tier-3 lab), this role's own molecule scenario exercises the REAL path —
+# BUG-160's "heavy nested-podman test platform" option — since this is a
+# self-contained Node app with no external infra dependency beyond podman
+# itself, making a genuine Tier-2 functional test practical in CI.
+rhism_ui_deploy_execute: false
+
+# Base URL used by the status action's health check.
+rhism_ui_base_url: "http://127.0.0.1:{{ rhism_ui_port }}"
+
+# ===========================================================================
+# Capacity planning — t-shirt sizing (docs/capacity-planning.md in the
+# orchestration repo). ADDITIVE figures: the shared OS baseline (1 vCPU /
+# 2 GB RAM / 20 GB disk, RHEL 9) is EXCLUDED. No vendor sizing guidance
+# exists for this bespoke Node.js/SQLite app (unlike nagios/splunk/elastic's
+# vendor-published tables) — figures below are this platform's own measured/
+# estimated sizing, labeled honestly per capacity-planning.md's rule for
+# that case, keyed by catalog size and concurrent session count (this app
+# has no real multi-session concurrency model today — see README's "Known
+# gaps" — so "concurrent operators" here means separate claim/steal cycles
+# over time, not simultaneous sessions).
+rhism_ui_sizing: s
+rhism_ui_sizing_profiles:
+  s: {cpu: 1, ram_mb: 512, disk_gb: 1}
+  m: {cpu: 2, ram_mb: 1024, disk_gb: 5}
+  l: {cpu: 2, ram_mb: 2048, disk_gb: 20}

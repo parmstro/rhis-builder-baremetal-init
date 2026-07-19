@@ -1,0 +1,238 @@
+---
+argument_specs:
+  main:
+    short_description: Install and operate OpenShift API for Data Protection (OADP / Velero).
+    description: >-
+      Standalone-first backup product role. Installs the OADP operator via OLM, configures the
+      Velero stack through the DataProtectionApplication CR, and drives the Velero
+      Backup/Restore/Schedule lifecycle. Consumes the shared backup family interface
+      (backup_oadp_* vars), the SAME names the backup_management dispatcher exposes, so the
+      dispatcher selects this product with one call passing only action and every value flows
+      straight through. The argument spec enforces the action + variable contract at role entry,
+      so no hand-written assert is needed.
+    options:
+      action:
+        description: >-
+          Lifecycle action (bare shared var). server installs the operator + DPA (full Velero
+          stack); client enables an application namespace; backup creates an on-demand Backup;
+          schedule applies a recurring Schedule; restore recreates workloads from a Backup;
+          verify is a read-only health check; baseline orchestrates server, schedule, and verify.
+        type: str
+        default: verify
+        choices:
+          - server
+          - client
+          - schedule
+          - backup
+          - restore
+          - verify
+          - baseline
+      backup_oadp_kubeconfig:
+        description: Path to a kubeconfig; empty uses the ambient kube context (in-cluster or KUBECONFIG env).
+        type: str
+        default: ""
+      backup_oadp_namespace:
+        description: Namespace all OADP/Velero resources live in.
+        type: str
+        default: openshift-adp
+      backup_oadp_wait:
+        description: Wait for CSV/BackupStorageLocation/Backup/Restore readiness.
+        type: bool
+        default: true
+      backup_oadp_wait_timeout:
+        description: Readiness wait budget in seconds (divided by the 10s poll to derive retries).
+        type: int
+        default: 600
+      backup_oadp_operator_package:
+        description: OLM package name for the OADP operator.
+        type: str
+        default: redhat-oadp-operator
+      backup_oadp_operator_channel:
+        description: Operator Subscription channel.
+        type: str
+        default: stable
+      backup_oadp_operator_source:
+        description: CatalogSource the operator is served from.
+        type: str
+        default: redhat-operators
+      backup_oadp_operator_source_namespace:
+        description: Namespace of the CatalogSource.
+        type: str
+        default: openshift-marketplace
+      backup_oadp_operator_group_name:
+        description: OperatorGroup name created in the OADP namespace.
+        type: str
+        default: oadp-operator-group
+      backup_oadp_dpa_name:
+        description: DataProtectionApplication CR name.
+        type: str
+        default: dpa-sample
+      backup_oadp_default_plugins:
+        description: Velero defaultPlugins; always include openshift. aws is the object-store plugin, csi enables CSI snapshots.
+        type: list
+        elements: str
+        default:
+          - aws
+          - openshift
+          - csi
+      backup_oadp_node_agent_enable:
+        description: Enable the node-agent DaemonSet for filesystem (pod volume) backup.
+        type: bool
+        default: true
+      backup_oadp_node_agent_uploader_type:
+        description: Filesystem backup uploader — kopia (default) or restic.
+        type: str
+        default: kopia
+        choices:
+          - kopia
+          - restic
+      backup_oadp_provider:
+        description: Velero storage provider name (aws for any S3-compatible store, MinIO/ODF included).
+        type: str
+        default: aws
+      backup_oadp_bucket:
+        description: Object-store bucket for the BackupStorageLocation.
+        type: str
+        default: ""
+      backup_oadp_prefix:
+        description: Key prefix within the bucket.
+        type: str
+        default: velero
+      backup_oadp_region:
+        description: Object-store region for the BackupStorageLocation config.
+        type: str
+        default: us-east-1
+      backup_oadp_s3_url:
+        description: Explicit S3 endpoint URL (set for MinIO/ODF S3-compatible stores).
+        type: str
+        default: ""
+      backup_oadp_s3_force_path_style:
+        description: Use path-style S3 addressing (typically true for MinIO).
+        type: bool
+        default: false
+      backup_oadp_insecure_skip_tls_verify:
+        description: Skip TLS verification against the object store (self-signed endpoints).
+        type: bool
+        default: false
+      backup_oadp_credential_secret:
+        description: Name of the object-store credentials Secret consumed by the BackupStorageLocation.
+        type: str
+        default: cloud-credentials
+      backup_oadp_credential_key:
+        description: Key within the credentials Secret holding the credentials file.
+        type: str
+        default: cloud
+      backup_oadp_cloud_credentials:
+        description: Raw credentials-file content written into the Secret by server (vault-backed); empty assumes out-of-band provisioning.
+        type: str
+        default: ""
+      backup_oadp_snapshot_location_enabled:
+        description: Declare a VolumeSnapshotLocation in the DPA (omit for CSI/filesystem-only).
+        type: bool
+        default: false
+      backup_oadp_snapshot_provider:
+        description: VolumeSnapshotLocation provider name.
+        type: str
+        default: aws
+      backup_oadp_snapshot_region:
+        description: VolumeSnapshotLocation region.
+        type: str
+        default: us-east-1
+      backup_oadp_client_namespace:
+        description: Application namespace to enable for backup (client action).
+        type: str
+        default: ""
+      backup_oadp_client_labels:
+        description: Labels applied to the application namespace (client action).
+        type: dict
+        default: {}
+      backup_oadp_client_annotations:
+        description: Annotations applied to the application namespace (client action).
+        type: dict
+        default: {}
+      backup_oadp_backup_name:
+        description: Name of the on-demand Backup CR (backup action; also read by verify when set).
+        type: str
+        default: ""
+      backup_oadp_included_namespaces:
+        description: Namespaces included in a Backup/Schedule; empty backs up all namespaces.
+        type: list
+        elements: str
+        default: []
+      backup_oadp_included_resources:
+        description: Resource types included in a Backup/Schedule.
+        type: list
+        elements: str
+        default:
+          - "*"
+      backup_oadp_label_selector:
+        description: matchLabels selector limiting which resources are backed up; empty selects all.
+        type: dict
+        default: {}
+      backup_oadp_snapshot_volumes:
+        description: Take volume snapshots as part of the Backup.
+        type: bool
+        default: true
+      backup_oadp_default_volumes_to_fs_backup:
+        description: Back up all pod volumes via the node-agent filesystem uploader by default.
+        type: bool
+        default: false
+      backup_oadp_ttl:
+        description: Backup retention (Velero duration string; 720h0m0s = 30 days).
+        type: str
+        default: 720h0m0s
+      backup_oadp_storage_location:
+        description: BackupStorageLocation the Backup/Schedule writes to.
+        type: str
+        default: default
+      backup_oadp_schedule_name:
+        description: Name of the Schedule CR (schedule action).
+        type: str
+        default: ""
+      backup_oadp_schedule_cron:
+        description: Cron expression for the Schedule.
+        type: str
+        default: "0 1 * * *"
+      backup_oadp_schedule_paused:
+        description: Create the Schedule in a paused state.
+        type: bool
+        default: false
+      backup_oadp_schedule_ttl:
+        description: Retention for Backups created by the Schedule (Velero duration string).
+        type: str
+        default: 720h0m0s
+      backup_oadp_restore_name:
+        description: Name of the Restore CR (restore action).
+        type: str
+        default: ""
+      backup_oadp_restore_backup_name:
+        description: Backup name to restore from (or a Schedule name to restore its latest Backup).
+        type: str
+        default: ""
+      backup_oadp_restore_namespace_mapping:
+        description: Source-to-target namespace remapping applied on restore.
+        type: dict
+        default: {}
+      backup_oadp_restore_pvs:
+        description: Restore persistent volumes as part of the Restore.
+        type: bool
+        default: true
+      backup_oadp_restore_existing_policy:
+        description: Handling of already-present resources — none (leave) or update (patch).
+        type: str
+        default: none
+        choices:
+          - none
+          - update
+      backup_oadp_apply_server:
+        description: baseline — install the operator + DPA.
+        type: bool
+        default: true
+      backup_oadp_apply_schedule:
+        description: baseline — apply the recurring Schedule.
+        type: bool
+        default: false
+      backup_oadp_apply_verify:
+        description: baseline — verify the stack after applying.
+        type: bool
+        default: true

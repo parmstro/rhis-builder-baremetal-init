@@ -1,0 +1,49 @@
+---
+- name: Check manifest file exists
+  ansible.builtin.stat:
+    path: "{{ wizard_output_dir }}/{{ wizard_output_file }}"
+  register: _wizard_manifest_stat
+  tags: infra_wizard
+
+- name: Assert manifest file present
+  ansible.builtin.assert:
+    that:
+      - _wizard_manifest_stat.stat.exists
+    fail_msg: >-
+      Manifest not found at {{ wizard_output_dir }}/{{ wizard_output_file }}.
+      Run wizard_action=interactive first.
+  tags: infra_wizard
+
+- name: Read manifest
+  ansible.builtin.slurp:
+    src: "{{ wizard_output_dir }}/{{ wizard_output_file }}"
+  register: _wizard_manifest_raw
+  tags: infra_wizard
+
+- name: Parse manifest
+  ansible.builtin.set_fact:
+    _wizard_manifest: "{{ _wizard_manifest_raw.content | b64decode | from_yaml }}"
+  tags: infra_wizard
+
+- name: Ensure inventory output directory exists
+  ansible.builtin.file:
+    path: "{{ wizard_output_dir }}/inventory"
+    state: directory
+    mode: "0750"
+  tags: infra_wizard
+
+- name: Generate Ansible inventory from manifest
+  ansible.builtin.template:
+    src: inventory-from-manifest.yml.j2
+    dest: "{{ wizard_output_dir }}/inventory/hosts.yml"
+    mode: "0640"
+  vars:
+    manifest: "{{ _wizard_manifest }}"
+  tags: infra_wizard
+
+- name: Report inventory path
+  ansible.builtin.debug:
+    msg: >-
+      Ansible inventory written to:
+      {{ wizard_output_dir }}/inventory/hosts.yml
+  tags: infra_wizard

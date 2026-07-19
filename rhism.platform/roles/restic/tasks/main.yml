@@ -1,0 +1,66 @@
+---
+# Restic product role — action-driven dispatch.
+#
+# Standalone-first: runnable on its own in a playbook (roles: [restic]) and also
+# selectable by the backup_management dispatcher (backup_type: restic), which passes
+# the action via include_role vars: {action: "..."}.
+#
+# The action + variable interface is validated by meta/argument_specs.yml — ansible-core
+# runs the validation at role entry, so no manual assert is needed here.
+
+# ---------------------------------------------------------------------------
+# Dispatch — package actions use install.yml (state maps to action).
+# All other actions get their own file.
+# ---------------------------------------------------------------------------
+
+- name: Include server tasks
+  ansible.builtin.include_tasks: server.yml
+  when: action == 'server'
+
+- name: Include client tasks
+  ansible.builtin.include_tasks: client.yml
+  when: action == 'client'
+
+- name: Include install tasks
+  ansible.builtin.include_tasks: install.yml
+  when: action in ['present', 'absent']
+
+- name: Include configure tasks
+  ansible.builtin.include_tasks: configure.yml
+  when: action == 'configure'
+
+- name: Include backup tasks
+  ansible.builtin.include_tasks: backup.yml
+  when: action == 'backup'
+
+- name: Include restore tasks
+  ansible.builtin.include_tasks: restore.yml
+  when: action == 'restore'
+
+- name: Include forget tasks
+  ansible.builtin.include_tasks: forget.yml
+  when: action == 'forget'
+
+- name: Include prune tasks
+  ansible.builtin.include_tasks: prune.yml
+  when: action == 'prune'
+
+- name: Include snapshots tasks
+  ansible.builtin.include_tasks: snapshots.yml
+  when: action == 'snapshots'
+
+- name: Include verify tasks
+  ansible.builtin.include_tasks: verify.yml
+  when: action == 'verify'
+
+- name: Include unlock tasks
+  ansible.builtin.include_tasks: unlock.yml
+  when: action == 'unlock'
+
+- name: Include schedule tasks
+  ansible.builtin.include_tasks: schedule.yml
+  when: action == 'schedule'
+
+- name: Include deploy_scripts tasks
+  ansible.builtin.include_tasks: deploy_scripts.yml
+  when: action == 'deploy_scripts'

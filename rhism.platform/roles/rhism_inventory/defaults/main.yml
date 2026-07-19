@@ -1,0 +1,56 @@
+---
+# ---------------------------------------------------------------------------
+# rhism_inventory — SOE catalogue owner: validate | aggregate | generate | publish.
+#
+# Standalone capability role. Every default here is duplicated (identically) in
+# meta/argument_specs.yml — argument-spec validation never injects defaults into
+# the runtime namespace, so this file alone is what makes a bare standalone run
+# work (BUG-159).
+# ---------------------------------------------------------------------------
+
+# Action to run: validate (read-only schema check, the safe default), aggregate
+# (merge selected bundles into the flat Satellite list shapes), generate (derive
+# deployment inventory content from an estate manifest), publish (copy catalogue
+# entries to the rhism_ui-served directory).
+rhism_inventory_action: validate
+
+# Directory of SOE catalogue entry files (one *.yml file per entry). Empty means
+# use the role's bundled reference catalogue at files/catalog/.
+rhism_inventory_catalog_dir: ""
+
+# Bundle names to select from the catalogue. Empty list means all entries.
+rhism_inventory_bundles: []
+
+# Drop catalogue entries carrying lifecycle_state: deprecated before any action.
+rhism_inventory_lifecycle_filter: true
+
+# Optional wizard deployment manifest consumed by the generate action. When set,
+# domain / network are read from its network: section (network.domain,
+# network.subnet, optional network.realm) — the same keys the wizard role's
+# interactive action writes into its deployment manifest.
+rhism_inventory_manifest_path: ""
+
+# Standalone fallbacks for generate when no manifest is given: both must be set.
+rhism_inventory_domain: ""
+rhism_inventory_network_cidr: ""
+
+# Host offset (from the network address) of the estate DNS server — upstream
+# parity with next_nth_usable(10). Applied as nthhost(offset) on the full CIDR.
+rhism_inventory_dns_host_offset: 10
+
+# Host offset of the default gateway.
+rhism_inventory_gateway_offset: 1
+
+# Optional NTP servers passed through into the generated derivations.
+rhism_inventory_time_servers: []
+
+# Where aggregate/generate write their output.
+rhism_inventory_output_dir: "{{ playbook_dir }}/../output/rhism_inventory"
+
+# Where publish copies catalogue entries for the rhism_ui backend to serve
+# (flat directory, one entry per <name>.yml file — its loadCatalog contract).
+rhism_inventory_publish_dir: "{{ rhism_inventory_output_dir }}/soe_catalog"
+
+# Mode of the generated vault/ skeleton directory (secrets travel outside the
+# generated tree; the directory ships restrictive from birth).
+rhism_inventory_vault_dir_mode: "0700"

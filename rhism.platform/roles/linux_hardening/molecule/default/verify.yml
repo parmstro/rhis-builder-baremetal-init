@@ -1,0 +1,58 @@
+---
+- name: Verify — hardening configuration files
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Stat sshd_config
+      ansible.builtin.stat:
+        path: /etc/ssh/sshd_config
+      register: _sshd_config
+
+    - name: Assert sshd_config exists
+      ansible.builtin.assert:
+        that: _sshd_config.stat.exists
+        fail_msg: "/etc/ssh/sshd_config was not created"
+
+    - name: Slurp sshd_config
+      ansible.builtin.slurp:
+        src: /etc/ssh/sshd_config
+      register: _sshd_content
+
+    - name: Assert PermitRootLogin is no
+      ansible.builtin.assert:
+        that: "'PermitRootLogin no' in (_sshd_content.content | b64decode)"
+        fail_msg: "PermitRootLogin not set to no in sshd_config"
+
+    - name: Assert PasswordAuthentication is no
+      ansible.builtin.assert:
+        that: "'PasswordAuthentication no' in (_sshd_content.content | b64decode)"
+        fail_msg: "PasswordAuthentication not set to no in sshd_config"
+
+    - name: Stat pwquality.conf
+      ansible.builtin.stat:
+        path: /etc/security/pwquality.conf
+      register: _pwquality
+
+    - name: Assert pwquality.conf exists
+      ansible.builtin.assert:
+        that: _pwquality.stat.exists
+        fail_msg: "/etc/security/pwquality.conf was not created"
+
+    - name: Slurp pwquality.conf
+      ansible.builtin.slurp:
+        src: /etc/security/pwquality.conf
+      register: _pwquality_content
+
+    - name: Assert minlen is set
+      ansible.builtin.assert:
+        that: "'minlen = 14' in (_pwquality_content.content | b64decode)"
+        fail_msg: "pwquality minlen not set to 14"
+
+- name: Verify — summary
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Print summary
+      ansible.builtin.debug:
+        msg: "linux_hardening verified on EL8, EL9, EL10 containers."

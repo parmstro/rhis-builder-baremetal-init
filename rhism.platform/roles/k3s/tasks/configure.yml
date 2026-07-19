@@ -1,0 +1,38 @@
+---
+# Action: configure — deploy config, validate, set up kubeconfig
+
+- name: Ensure k3s config directory exists
+  ansible.builtin.file:
+    path: "{{ _cp_config_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+
+- name: Deploy k3s config.yaml
+  ansible.builtin.template:
+    src: k3s-config.yaml.j2
+    dest: "{{ _cp_config_file }}"
+    owner: root
+    group: root
+    mode: "0600"
+  become: true
+  notify: k3s - restart server
+
+- name: Run k3s check-config
+  ansible.builtin.command:
+    cmd: "{{ _cp_binary }} check-config"
+  register: _k3s_check_config
+  changed_when: false
+  failed_when: _k3s_check_config.rc != 0
+  become: true
+
+- name: Set up kubeconfig symlink for current user
+  ansible.builtin.file:
+    src: "{{ _cp_kubeconfig_path }}"
+    dest: "{{ cp_kubeconfig_path }}"
+    state: link
+    force: true
+  become: true
+  when: cp_kubeconfig_path | length > 0 and cp_kubeconfig_path != _cp_kubeconfig_path

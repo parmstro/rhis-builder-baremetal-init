@@ -1,0 +1,132 @@
+---
+- name: Validate wizard_profile
+  ansible.builtin.assert:
+    that:
+      - wizard_profile in _wizard_valid_profiles
+    fail_msg: >-
+      wizard_profile must be one of: {{ _wizard_valid_profiles | reject('equalto', '') | join(', ') }},
+      or empty for the fully-interactive path. Got '{{ wizard_profile }}'.
+  tags: infra_wizard
+
+- name: Initialize licensing state
+  ansible.builtin.set_fact:
+    wizard_licensing: {}
+  when: wizard_licensing | length == 0
+  tags: infra_wizard
+
+- name: Ensure output directory exists
+  ansible.builtin.file:
+    path: "{{ wizard_output_dir }}"
+    state: directory
+    mode: "0750"
+  tags: infra_wizard
+
+- name: Load pre-baked profile
+  when: wizard_profile | length > 0 and wizard_profile != 'custom'
+  block:
+    - name: Read profile file
+      ansible.builtin.include_vars:
+        # Explicit role_path — include_vars' relative-path search does not
+        # reliably include files/ when the role is loaded from a collection.
+        file: "{{ role_path }}/files/profiles/{{ wizard_profile }}.yml"
+        name: _wizard_loaded_profile
+
+    # sizing_defaults is keyed by tier (s/m/l — see files/profiles/estate.yml)
+    # since the estate this profile describes has real capacity variation
+    # (a lab-scale IdM+Satellite+AAP+KVM+Tang estate is nowhere near the
+    # same footprint as an enterprise one) — wizard_estate_sizing_tier picks
+    # which one becomes the manifest's real sizing block. custom.yml has no
+    # sizing_defaults at all (the interactive 09_sizing.yml page covers it,
+    # `| default({})` below leaves wizard_sizing empty so that page runs).
+    - name: Apply profile component defaults
+      # templates/deployment-plan.txt.j2 expects a 'tier' key alongside the
+      # per-VM specs in the same dict (it explicitly skips 'tier' when
+      # iterating the rest as VM entries) — combine it back in after
+      # selecting the tier's sub-block from sizing_defaults.
+      ansible.builtin.set_fact:
+        wizard_components: "{{ _wizard_loaded_profile.components }}"
+        wizard_sizing: >-
+          {{ ({'tier': wizard_estate_sizing_tier}
+              | combine(_wizard_loaded_profile.sizing_defaults[wizard_estate_sizing_tier]))
+             if _wizard_loaded_profile.sizing_defaults is defined
+             else {} }}
+
+    # The pre-baked-profile path skips the interactive licensing page (00_licensing.yml
+    # only runs in the fully-interactive branch), so subscription-required flags must be
+    # derived here from the component types the profile selected.
+    - name: Derive licensing flags from profile components
+      ansible.builtin.set_fact:
+        wizard_licensing: "{{ wizard_licensing | combine({
+          'rhsm': wizard_components.identity.type | default('') == 'rh_idm',
+          'satellite': wizard_components.content.type | default('') == 'satellite',
+          'ocp': wizard_components.container_platform.type | default('') in ['ocp', 'okd'],
+          'gitlab_ee': wizard_components.scm.type | default('') == 'gitlab_ee',
+        }) }}"
+      when: _wizard_loaded_profile.profile_license_required | default(false) | bool
+
+- name: Run interactive component pages
+  when: wizard_profile | length == 0 or wizard_profile == 'custom'
+  block:
+    - name: Welcome and profile selection
+      ansible.builtin.include_tasks: pages/01_welcome.yml
+
+    - name: Hypervisor selection
+      ansible.builtin.include_tasks: pages/02_hypervisor.yml
+
+    - name: Identity layer selection
+      ansible.builtin.include_tasks: pages/03_identity.yml
+
+    - name: Content management selection
+      ansible.builtin.include_tasks: pages/04_content.yml
+
+    - name: Provisioning service selection (when Satellite/Foreman not chosen)
+      ansible.builtin.include_tasks: pages/04b_provisioning.yml
+      when: >-
+        wizard_components.content is not defined
+        or not wizard_components.content.enabled
+        or wizard_components.content.type == 'none'
+
+    - name: SCM platform selection
+      ansible.builtin.include_tasks: pages/05_scm.yml
+
+    - name: Backup system selection
+      ansible.builtin.include_tasks: pages/06_backup.yml
+
+    - name: Secrets management backend selection
+      ansible.builtin.include_tasks: pages/06b_secrets.yml
+
+    - name: Container platform selection
+      ansible.builtin.include_tasks: pages/07_container.yml
+
+    - name: Mail service selection
+      ansible.builtin.include_tasks: pages/07b_mail.yml
+
+    # Licensing runs after all components are known — needs container_platform
+    # to determine whether an OCP pull secret is also required.
+    - name: Licensing and subscription collection
+      ansible.builtin.include_tasks: pages/00_licensing.yml
+      when: >-
+        (wizard_components.identity is defined and wizard_components.identity.type in ['rh_idm'])
+        or (wizard_components.content is defined and wizard_components.content.type == 'satellite')
+        or (wizard_components.container_platform is defined and wizard_components.container_platform.type in ['ocp', 'okd'])
+
+- name: Collect environment-specific settings
+  block:
+    - name: Network configuration
+      ansible.builtin.include_tasks: pages/08_network.yml
+      when: wizard_network | length == 0
+
+    - name: VM sizing
+      ansible.builtin.include_tasks: pages/09_sizing.yml
+      when: wizard_sizing | length == 0
+
+    - name: Credentials
+      ansible.builtin.include_tasks: pages/10_credentials.yml
+      when: wizard_credentials | length == 0
+
+    - name: Review and confirm
+      ansible.builtin.include_tasks: pages/11_review.yml
+      when: not (wizard_skip_confirm | bool)
+
+- name: Write deployment manifest
+  ansible.builtin.include_tasks: write_manifest.yml

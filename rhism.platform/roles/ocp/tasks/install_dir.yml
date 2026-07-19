@@ -1,0 +1,12 @@
+---
+# Shared: ensure OCP install directory exists
+# Included by: present, configure
+
+- name: Ensure install directory exists
+  ansible.builtin.file:
+    path: "{{ cp_install_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+  become: true

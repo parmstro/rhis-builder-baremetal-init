@@ -1,0 +1,7 @@
+---
+- name: Manage IPA service
+  ansible.builtin.service:
+    name: "{{ _idm_service_name }}"
+    state: "{{ action }}"
+    enabled: "{{ action == 'started' }}"
+  become: true

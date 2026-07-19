@@ -1,0 +1,24 @@
+---
+# mail_relay — queue_purge action (destructive — requires confirmation)
+
+- name: Purge mail queue
+  become: true
+  block:
+    - name: Verify queue purge confirmation
+      ansible.builtin.assert:
+        that: mail_queue_purge_confirm | bool
+        fail_msg: >-
+          Queue purge is destructive. Set mail_queue_purge_confirm: true to confirm.
+
+    - name: Flush pending queue before purge
+      ansible.builtin.command:
+        cmd: postfix flush
+      changed_when: false
+      failed_when: false
+      when: mail_execute | bool
+
+    - name: Purge all queued messages
+      ansible.builtin.command:
+        cmd: postsuper -d ALL
+      changed_when: true
+      when: mail_execute | bool

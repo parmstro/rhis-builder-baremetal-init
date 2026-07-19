@@ -1,0 +1,11 @@
+---
+- name: Converge — interactive TUI wizard (manual test)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    wizard_action: interactive
+    wizard_output_dir: /tmp/wizard-interactive
+    wizard_output_file: rhism-deployment-manifest.yml
+  roles:
+    - role: rhism.platform.wizard

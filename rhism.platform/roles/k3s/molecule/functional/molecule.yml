@@ -1,0 +1,58 @@
+---
+# Functional scenario (Tier 2) — installs a real single-node k3s cluster in a privileged
+# container and asserts the node reaches Ready. The high-leverage unlock: once k3s runs,
+# storage_*/ingress_*/registry_* can be tested against a real cluster.
+#
+# Runs under ROOTLESS podman (the podman-machine VM) with zero host security relaxation:
+#   - PRIVATE cgroup namespace (no cgroupns_mode: host, no /sys/fs/cgroup volume) — kubelet
+#     builds its cgroups inside the container's own delegated subtree.
+#   - The container host must delegate `cpuset` to the rootless user (k3s rootless
+#     prerequisite; `ensure_cgroup_delegation` in bin/ci-lib.sh installs the drop-in).
+#   - The KubeletInUserNamespace feature gate (set via INSTALL_K3S_EXEC in converge) makes
+#     kubelet tolerate the rootless limits (/dev/kmsg read, /proc/sys writes, oom_score_adj)
+#     — kernel.dmesg_restrict=1 stays intact on the VM.
+#   - The native snapshotter avoids overlayfs-in-overlayfs.
+# Full experiment record: docs/k3s-rootless-podman-research.md. Complements the fast
+# `default` contract scenario.
+# Collection-hosted scenario: molecule's collection-under-test auto-install
+# (prerun) would try to ansible-galaxy-install this collection into the
+# workspace collections path, clobbering the loader symlink at
+# collections/ansible_collections/rhism/<name> ("Cannot call rmtree on
+# a symbolic link"). Disabled — local collection checkouts already resolve
+# via ANSIBLE_COLLECTIONS_PATH.
+prerun: false
+
+dependency:
+  name: galaxy
+  enabled: false
+
+driver:
+  name: docker
+
+platforms:
+  - name: k3s-func
+    image: docker.io/almalinux:9
+    command: /sbin/init
+    privileged: true
+    pre_build_image: true
+    tmpfs:
+      - /run
+
+provisioner:
+  name: ansible
+  inventory:
+    group_vars:
+      all:
+        ansible_python_interpreter: /usr/bin/python3
+        ansible_remote_tmp: /tmp
+
+scenario:
+  test_sequence:
+    - dependency
+    - destroy
+    - syntax
+    - create
+    - prepare
+    - converge
+    - verify
+    - destroy

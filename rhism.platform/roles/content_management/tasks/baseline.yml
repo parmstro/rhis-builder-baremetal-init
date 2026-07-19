@@ -1,0 +1,24 @@
+---
+- name: Install content management server
+  ansible.builtin.include_tasks: install.yml
+  when: content_apply_install | bool
+
+- name: Configure organization and location
+  ansible.builtin.include_tasks: configure.yml
+  when: content_apply_configure | bool
+
+- name: Manage products and repositories
+  ansible.builtin.include_tasks: repos.yml
+  when: content_apply_repos | bool
+
+- name: Configure sync plans
+  ansible.builtin.include_tasks: sync.yml
+  when: content_apply_sync | bool
+
+- name: Manage content views
+  ansible.builtin.include_tasks: content_views.yml
+  when: content_apply_content_views | bool
+
+- name: Manage activation keys
+  ansible.builtin.include_tasks: activation_keys.yml
+  when: content_apply_activation_keys | bool

@@ -1,0 +1,42 @@
+---
+- name: Verify type vars loading
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Load foreman vars
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../../vars/foreman.yml"
+      delegate_to: localhost
+
+    - name: Assert foreman collection is theforeman.foreman
+      ansible.builtin.assert:
+        that:
+          - _content_collection is defined
+          - _content_collection == 'theforeman.foreman'
+          - _content_rhsm_required == false
+          - _content_cdn_supported == false
+        fail_msg: "foreman.yml did not load expected vars"
+      delegate_to: localhost
+
+    - name: Load satellite vars
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../../vars/satellite.yml"
+      delegate_to: localhost
+
+    - name: Assert satellite collection is redhat.satellite
+      ansible.builtin.assert:
+        that:
+          - _content_collection is defined
+          - _content_collection == 'redhat.satellite'
+          - _content_rhsm_required == true
+          - _content_cdn_supported == true
+        fail_msg: "satellite.yml did not load expected vars"
+      delegate_to: localhost
+
+    - name: Report verification passed
+      ansible.builtin.debug:
+        msg: >-
+          PASS — content_management type vars verified.
+          foreman collection: theforeman.foreman
+          satellite collection: redhat.satellite
+      delegate_to: localhost

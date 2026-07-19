@@ -1,0 +1,6 @@
+---
+- name: linux_auditing - restart auditd
+  ansible.builtin.service:
+    name: auditd
+    state: restarted
+  when: ansible_service_mgr == 'systemd' and linux_auditing_start_service | bool

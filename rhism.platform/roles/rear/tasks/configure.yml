@@ -1,0 +1,39 @@
+---
+# configure — render the ReaR configuration into backup_rear_config_dir.
+# Edits local.conf (per-host) and optionally site.conf (fleet-wide); never
+# /usr/share/rear/conf/default.conf. OUTPUT and BACKUP are modelled as two
+# separate variable groups (the design fault line).
+
+- name: Validate ReaR backup target is set
+  ansible.builtin.assert:
+    that:
+      - backup_rear_backup_url | length > 0
+    fail_msg: "backup_rear_backup_url is required to render the ReaR configuration"
+
+- name: Ensure the ReaR config directory exists
+  ansible.builtin.file:
+    path: "{{ backup_rear_config_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+
+- name: Render per-host local.conf
+  ansible.builtin.template:
+    src: local.conf.j2
+    dest: "{{ backup_rear_config_dir }}/local.conf"
+    owner: root
+    group: root
+    mode: "0600"
+  become: true
+
+- name: Render fleet-wide site.conf
+  ansible.builtin.template:
+    src: site.conf.j2
+    dest: "{{ backup_rear_config_dir }}/site.conf"
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  when: backup_rear_manage_site_conf | bool

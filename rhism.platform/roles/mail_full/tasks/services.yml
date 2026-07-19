@@ -1,0 +1,57 @@
+---
+# tasks/services.yml — Service management for started/stopped/restarted actions.
+# Consolidated: all three differ only by the state param passed to the service module.
+# All tasks gated on mail_manage_service (BUG-117 class — containers have no systemd).
+
+- name: Manage Postfix service
+  ansible.builtin.service:
+    name: postfix
+    state: "{{ action }}"
+    enabled: "{{ action == 'started' }}"
+  become: true
+  when:
+    - mail_execute | bool
+    - mail_manage_service | bool
+
+- name: Manage Dovecot service
+  ansible.builtin.service:
+    name: dovecot
+    state: "{{ action }}"
+    enabled: "{{ action == 'started' }}"
+  become: true
+  when:
+    - mail_execute | bool
+    - mail_manage_service | bool
+
+- name: Manage OpenDKIM service
+  ansible.builtin.service:
+    name: opendkim
+    state: "{{ action }}"
+    enabled: "{{ action == 'started' }}"
+  become: true
+  when:
+    - mail_execute | bool
+    - mail_manage_service | bool
+    - mail_dkim_enabled | bool
+
+- name: Manage SpamAssassin service
+  ansible.builtin.service:
+    name: spamassassin
+    state: "{{ action }}"
+    enabled: "{{ action == 'started' }}"
+  become: true
+  when:
+    - mail_execute | bool
+    - mail_manage_service | bool
+    - mail_spamassassin_enabled | bool
+
+- name: Manage ClamAV daemon service
+  ansible.builtin.service:
+    name: clamd
+    state: "{{ action }}"
+    enabled: "{{ action == 'started' }}"
+  become: true
+  when:
+    - mail_execute | bool
+    - mail_manage_service | bool
+    - mail_clamav_enabled | bool

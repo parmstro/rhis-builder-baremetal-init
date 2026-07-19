@@ -1,0 +1,29 @@
+---
+- name: Verify standalone variable contract
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Load role defaults
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../../defaults/main.yml"
+      delegate_to: localhost
+
+    - name: Assert standalone interface defaults resolve
+      ansible.builtin.assert:
+        that:
+          - action == 'server'
+          - backup_bareos_director_port | int == 9101
+          - backup_bareos_storage_port | int == 9103
+          - backup_bareos_file_daemon_port | int == 9102
+          - backup_bareos_max_concurrent_jobs | int == 20
+          - backup_bareos_storage_device == '/var/lib/bareos/storage'
+          - backup_bareos_verify_level == 'InitCatalog'
+          - _bareos_director_packages | length > 0
+          - _bareos_fd_packages | length > 0
+        fail_msg: "bareos defaults did not resolve to the expected standalone contract"
+      delegate_to: localhost
+
+    - name: Report verification passed
+      ansible.builtin.debug:
+        msg: "PASS — bareos standalone contract verified"
+      delegate_to: localhost

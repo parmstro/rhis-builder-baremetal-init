@@ -1,0 +1,46 @@
+---
+# Secrets scenario — tests all KV secret operations (create/read/audit/rotate/delete)
+# against a HashiCorp Vault dev server running in a container.
+# All pm_vault tasks run on localhost (the EE/control node) via community.hashi_vault.
+# The vault container is the service; no separate test platform is needed.
+# Collection-hosted scenario: molecule's collection-under-test auto-install
+# (prerun) would try to ansible-galaxy-install this collection and its
+# dependency into the workspace collections path, clobbering the loader
+# symlink at collections/ansible_collections/rhism/<name> ("Cannot call
+# rmtree on a symbolic link"). Disabled — local collection checkouts already
+# resolve via ANSIBLE_COLLECTIONS_PATH.
+prerun: false
+
+dependency:
+  name: galaxy
+  enabled: false
+
+driver:
+  name: docker
+platforms:
+  - name: vault-dev
+    image: hashicorp/vault:latest
+    pre_build_image: true
+    override_command: false
+    capabilities:
+      - IPC_LOCK
+    env:
+      VAULT_DEV_ROOT_TOKEN_ID: "root"
+      VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
+    published_ports:
+      - "18200:8200"
+provisioner:
+  name: ansible
+verifier:
+  name: ansible
+scenario:
+  test_sequence:
+    - dependency
+    - destroy
+    - syntax
+    - create
+    - prepare
+    - converge
+    - converge
+    - verify
+    - destroy

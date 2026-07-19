@@ -1,0 +1,17 @@
+DEFAULT menu.c32
+PROMPT 0
+TIMEOUT 300
+ONTIMEOUT local
+
+MENU TITLE ACME PXE Boot — {{ prov_domain }}
+
+LABEL local
+  MENU LABEL Boot from local disk
+  LOCALBOOT 0
+
+{% if prov_pxe_kernel | length > 0 %}
+LABEL rhel9
+  MENU LABEL Install RHEL 9
+  KERNEL {{ prov_pxe_kernel }}
+  APPEND initrd={{ prov_pxe_initrd }} {{ prov_pxe_kernel_args }}
+{% endif %}

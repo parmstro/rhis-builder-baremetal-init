@@ -1,0 +1,93 @@
+---
+# --------------------------------------------------------------------------- #
+# transfer_media — copy an exported content tree onto removable/transport    #
+# media, then verify it landed correctly (rhism alignment Phase C item 3,    #
+# pipeline stage 2 of 3: export_content -> transfer_media -> import_content).#
+#                                                                             #
+# Pure filesystem work — NO Satellite API call at all, matching upstream's   #
+# copy_rhis_to_transfer_media.sh exactly in spirit (rsync + checksum verify),#
+# just done with real Ansible modules instead of bash. Fails closed:         #
+# content_transfer_media_path has no default — this role never guesses a    #
+# destination for an air-gapped media copy.                                 #
+# --------------------------------------------------------------------------- #
+- name: Fail closed if no transfer media destination is configured
+  ansible.builtin.assert:
+    that:
+      - content_transfer_media_path | length > 0
+    fail_msg: >-
+      action=transfer_media requires content_transfer_media_path — refusing
+      to guess a destination for an air-gapped media copy.
+
+- name: Confirm the source export tree exists
+  ansible.builtin.stat:
+    path: "{{ content_transfer_source_dir }}"
+  register: _content_transfer_source_stat
+
+- name: Fail if the source export tree does not exist
+  ansible.builtin.assert:
+    that:
+      - _content_transfer_source_stat.stat.exists
+      - _content_transfer_source_stat.stat.isdir
+    fail_msg: >-
+      content_transfer_source_dir ({{ content_transfer_source_dir }}) does
+      not exist or is not a directory — run export_content first.
+
+- name: Ensure the transfer media destination exists
+  ansible.builtin.file:
+    path: "{{ content_transfer_media_path }}"
+    state: directory
+    mode: "0750"
+
+- name: Copy the export tree onto the transfer media
+  ansible.posix.synchronize:
+    src: "{{ content_transfer_source_dir }}/"
+    dest: "{{ content_transfer_media_path }}/"
+    recursive: true
+    checksum: true
+  register: _content_transfer_sync
+
+- name: Find every file in the source export tree
+  ansible.builtin.find:
+    paths: "{{ content_transfer_source_dir }}"
+    recurse: true
+    file_type: file
+  register: _content_transfer_source_files
+
+- name: Checksum each source file
+  ansible.builtin.stat:
+    path: "{{ item.path }}"
+    checksum_algorithm: sha256
+  loop: "{{ _content_transfer_source_files.files }}"
+  loop_control:
+    label: "{{ item.path }}"
+  register: _content_transfer_source_checksums
+
+- name: Checksum the corresponding destination file
+  ansible.builtin.stat:
+    path: >-
+      {{ content_transfer_media_path }}/{{
+        item.item.path | relpath(content_transfer_source_dir) }}
+    checksum_algorithm: sha256
+  loop: "{{ _content_transfer_source_checksums.results }}"
+  loop_control:
+    label: "{{ item.item.path }}"
+  register: _content_transfer_dest_checksums
+
+- name: Verify every transferred file's checksum matches the source
+  ansible.builtin.assert:
+    that:
+      - item.0.stat.checksum == item.1.stat.checksum
+    fail_msg: >-
+      checksum mismatch for {{ item.0.item.path }} — the transfer media copy
+      does not match the source export
+    success_msg: "PASS — {{ item.0.item.path }} checksum verified"
+  loop: "{{ _content_transfer_source_checksums.results | zip(_content_transfer_dest_checksums.results) | list }}"
+  loop_control:
+    label: "{{ item.0.item.path }}"
+
+- name: Report transfer summary
+  ansible.builtin.debug:
+    msg: >-
+      PASS — {{ _content_transfer_source_files.files | length }} file(s)
+      transferred and checksum-verified from {{ content_transfer_source_dir }}
+      to {{ content_transfer_media_path }}.

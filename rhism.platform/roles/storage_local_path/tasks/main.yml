@@ -1,0 +1,73 @@
+---
+# Action + variable interface are validated by meta/argument_specs.yml (ansible-core
+# runs the validation automatically at role entry — no manual assert needed).
+
+# present / storage: ensure local-path StorageClass is present and optionally default.
+- name: Configure local-path StorageClass
+  when:
+    - action in ['storage', 'present']
+    - cp_storage_execute | bool
+  block:
+    - name: Verify local-path StorageClass exists
+      kubernetes.core.k8s_info:
+        kubeconfig: "{{ cp_kubeconfig_path }}"
+        api_version: storage.k8s.io/v1
+        kind: StorageClass
+        name: local-path
+      register: _storage_local_path_sc
+      become: true
+
+    - name: Report local-path StorageClass not found
+      ansible.builtin.debug:
+        msg: >-
+          StorageClass 'local-path' was not found. Ensure the k3s local-path-provisioner is running.
+          It is installed automatically with k3s clusters.
+      when: _storage_local_path_sc.resources | default([]) | length == 0
+
+    - name: Patch local-path StorageClass as cluster default
+      kubernetes.core.k8s:
+        kubeconfig: "{{ cp_kubeconfig_path }}"
+        state: present
+        definition:
+          apiVersion: storage.k8s.io/v1
+          kind: StorageClass
+          metadata:
+            name: local-path
+            annotations:
+              storageclass.kubernetes.io/is-default-class: "true"
+          provisioner: rancher.io/local-path
+          volumeBindingMode: WaitForFirstConsumer
+          reclaimPolicy: Delete
+      become: true
+      when:
+        - cp_storage_make_default | bool
+        - _storage_local_path_sc.resources | default([]) | length > 0
+      notify: storage_local_path - configure storage
+
+    - name: Remove default annotation from local-path StorageClass
+      kubernetes.core.k8s:
+        kubeconfig: "{{ cp_kubeconfig_path }}"
+        state: present
+        definition:
+          apiVersion: storage.k8s.io/v1
+          kind: StorageClass
+          metadata:
+            name: local-path
+            annotations:
+              storageclass.kubernetes.io/is-default-class: "false"
+      become: true
+      when:
+        - not (cp_storage_make_default | bool)
+        - _storage_local_path_sc.resources | default([]) | length > 0
+      notify: storage_local_path - configure storage
+
+# absent: local-path is k3s built-in; removal is informational only.
+- name: Report local-path removal warning
+  ansible.builtin.debug:
+    msg: >-
+      The local-path StorageClass is built in to k3s. Removing it may break workloads.
+      To remove: kubectl delete storageclass local-path
+      This role does not remove it automatically to avoid data loss.
+  when:
+    - action == 'absent'
+    - cp_storage_execute | bool

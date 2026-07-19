@@ -1,0 +1,188 @@
+---
+# Tier 2 functional converge — the role's real target IS the control node, so
+# every play runs on localhost and does the REAL work: catalogue load +
+# lifecycle filtering, schema validation (positive and negative), aggregation
+# with cross-bundle dedup, /22 network derivation, and publish. The molecule
+# platform container is never targeted.
+#
+# Workspace layout (molecule-ephemeral, never the repo output/ dir):
+#   /tmp/rhism_inventory_molecule/catalog_combined  shipped catalogue + fixtures
+#   /tmp/rhism_inventory_molecule/catalog_bad       the invalid entry only
+#   /tmp/rhism_inventory_molecule/output|publish    action outputs
+
+- name: Prepare the molecule workspace (combined + bad catalogues, manifest)
+  hosts: localhost
+  gather_facts: false
+  vars:
+    work_dir: /tmp/rhism_inventory_molecule
+  tasks:
+    - name: Remove any previous workspace
+      ansible.builtin.file:
+        path: "{{ work_dir }}"
+        state: absent
+
+    - name: Create the workspace directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ work_dir }}/catalog_combined"
+        - "{{ work_dir }}/catalog_bad"
+
+    - name: Copy the shipped reference catalogue into the combined catalogue
+      ansible.builtin.copy:
+        src: "{{ item }}"
+        dest: "{{ work_dir }}/catalog_combined/{{ item | basename }}"
+        mode: "0644"
+      loop: "{{ lookup('ansible.builtin.fileglob', playbook_dir ~ '/../../files/catalog/*.yml', wantlist=True) | sort }}"
+      loop_control:
+        label: "{{ item | basename }}"
+
+    - name: Add the duplicate-object and deprecated fixture entries
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/fixtures/{{ item }}"
+        dest: "{{ work_dir }}/catalog_combined/{{ item }}"
+        mode: "0644"
+      loop:
+        - rhel9_soe_extra.yml
+        - rhel8_soe_deprecated.yml
+
+    - name: Stage the invalid entry in its own catalogue
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/fixtures/bad_entry.yml"
+        dest: "{{ work_dir }}/catalog_bad/bad_entry.yml"
+        mode: "0644"
+
+    - name: Stage the /22 wizard manifest
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/fixtures/manifest.yml"
+        dest: "{{ work_dir }}/manifest.yml"
+        mode: "0644"
+
+- name: Validate the combined catalogue (positive — deprecated entry filtered)
+  hosts: localhost
+  gather_facts: false
+  vars:
+    work_dir: /tmp/rhism_inventory_molecule
+  tasks:
+    - name: Run rhism_inventory validate
+      ansible.builtin.include_role:
+        name: rhism.platform.rhism_inventory
+      vars:
+        rhism_inventory_action: validate
+        rhism_inventory_catalog_dir: "{{ work_dir }}/catalog_combined"
+
+    - name: Assert the deprecated entry was filtered before validation
+      ansible.builtin.assert:
+        that:
+          - "'rhel8_soe' in _rhism_inventory_dropped_deprecated"
+          - _rhism_inventory_selected | map(attribute='name') | list | sort
+            == ['rhel10_soe', 'rhel9_soe', 'rhel9_soe_extra']
+        fail_msg: "lifecycle filter did not drop exactly the deprecated entry"
+
+- name: Negative test — an invalid catalogue entry must be rejected
+  hosts: localhost
+  gather_facts: false
+  vars:
+    work_dir: /tmp/rhism_inventory_molecule
+  tasks:
+    - name: Expect validate to fail on the bad catalogue
+      block:
+        - name: Run rhism_inventory validate against the bad catalogue
+          ansible.builtin.include_role:
+            name: rhism.platform.rhism_inventory
+          vars:
+            rhism_inventory_action: validate
+            rhism_inventory_catalog_dir: "{{ work_dir }}/catalog_bad"
+
+        - name: Fail if validation did not catch the invalid entry
+          ansible.builtin.fail:
+            msg: "validate should have rejected the sectionless entry"
+      rescue:
+        - name: Confirm the failure was the schema check
+          # A looped assert reports "One or more items failed" at the top level;
+          # the real per-item message lives under results[*].msg.
+          ansible.builtin.assert:
+            that:
+              - "'invalid SOE catalogue entry' in (ansible_failed_result.msg | default(''))
+                 or 'invalid SOE catalogue entry' in
+                    (ansible_failed_result.results | default([]) | map(attribute='msg', default='') | join(' '))"
+            fail_msg: >-
+              validate failed, but NOT with the schema-check message
+              (got: {{ ansible_failed_result.msg | default('unknown') }})
+            success_msg: "PASS — invalid entry correctly rejected by the schema check"
+
+- name: Negative test — the argument spec must reject a bogus action
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Expect role entry to fail on a bogus action
+      block:
+        - name: Call the role with an invalid action
+          ansible.builtin.include_role:
+            name: rhism.platform.rhism_inventory
+          vars:
+            rhism_inventory_action: bogus_action
+
+        - name: Fail if the argument spec did not catch the invalid action
+          ansible.builtin.fail:
+            msg: "argument_spec should have rejected the bogus action"
+      rescue:
+        - name: Confirm the failure was the argument spec rejecting the action
+          ansible.builtin.assert:
+            that:
+              - "'must be one of' in (ansible_failed_result.msg | default(''))
+                 or 'Invalid value' in (ansible_failed_result.msg | default(''))
+                 or 'argument_spec' in (ansible_failed_result.msg | default('') | lower)"
+            fail_msg: >-
+              role failed, but NOT because the argument spec rejected the bogus
+              action (got: {{ ansible_failed_result.msg | default('unknown') }})
+            success_msg: "PASS — bogus action correctly rejected by the argument spec"
+
+- name: Aggregate the combined catalogue into the flat Satellite shapes
+  hosts: localhost
+  gather_facts: false
+  vars:
+    work_dir: /tmp/rhism_inventory_molecule
+  tasks:
+    - name: Run rhism_inventory aggregate
+      ansible.builtin.include_role:
+        name: rhism.platform.rhism_inventory
+      vars:
+        rhism_inventory_action: aggregate
+        rhism_inventory_catalog_dir: "{{ work_dir }}/catalog_combined"
+        rhism_inventory_output_dir: "{{ work_dir }}/output"
+
+- name: Generate the deployment inventory content from the /22 manifest
+  hosts: localhost
+  gather_facts: false
+  vars:
+    work_dir: /tmp/rhism_inventory_molecule
+  tasks:
+    - name: Run rhism_inventory generate
+      ansible.builtin.include_role:
+        name: rhism.platform.rhism_inventory
+      vars:
+        rhism_inventory_action: generate
+        rhism_inventory_catalog_dir: "{{ work_dir }}/catalog_combined"
+        rhism_inventory_manifest_path: "{{ work_dir }}/manifest.yml"
+        rhism_inventory_output_dir: "{{ work_dir }}/output"
+        rhism_inventory_time_servers:
+          - ntp1.soe.example.com
+          - ntp2.soe.example.com
+
+- name: Publish the catalogue for the rhism_ui backend
+  hosts: localhost
+  gather_facts: false
+  vars:
+    work_dir: /tmp/rhism_inventory_molecule
+  tasks:
+    - name: Run rhism_inventory publish
+      ansible.builtin.include_role:
+        name: rhism.platform.rhism_inventory
+      vars:
+        rhism_inventory_action: publish
+        rhism_inventory_catalog_dir: "{{ work_dir }}/catalog_combined"
+        rhism_inventory_output_dir: "{{ work_dir }}/output"
+        rhism_inventory_publish_dir: "{{ work_dir }}/publish"

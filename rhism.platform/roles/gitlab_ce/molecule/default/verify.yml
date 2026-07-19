@@ -1,0 +1,29 @@
+---
+- name: Verify standalone variable contract
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Load role defaults
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../../defaults/main.yml"
+      delegate_to: localhost
+
+    - name: Assert shared interface defaults resolve for standalone use
+      ansible.builtin.assert:
+        that:
+          - action == 'present'
+          - scm_external_url == 'http://localhost'
+          - scm_backup_path == '/var/opt/gitlab/backups'
+          - scm_runners == []
+          - scm_open_http | bool
+          - not (scm_upgrade_execute | bool)
+          - _scm_package_name == 'gitlab-ce'
+          - _scm_edition == 'ce'
+          - _gitlab_ce_action_map['present'] == 'present.yml'
+        fail_msg: "gitlab_ce defaults did not resolve to the expected standalone contract"
+      delegate_to: localhost
+
+    - name: Report verification passed
+      ansible.builtin.debug:
+        msg: "PASS — gitlab_ce standalone contract verified"
+      delegate_to: localhost

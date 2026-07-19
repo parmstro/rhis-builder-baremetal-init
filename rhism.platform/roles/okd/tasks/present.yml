@@ -1,0 +1,73 @@
+---
+# Action: present — install OKD binaries and prerequisites
+# Action: absent — remove OKD binaries
+# Consolidated: differ only by state-like conditionals within a single block
+
+- name: Ensure install directory
+  ansible.builtin.include_tasks: install_dir.yml
+  when:
+    - action == 'present'
+    - cp_install_execute | bool
+
+- name: Manage OKD binaries and prerequisites
+  become: true
+  block:
+    - name: Download OKD openshift-install binary from GitHub releases
+      ansible.builtin.get_url:
+        url: "{{ _cp_okd_releases_url }}/{{ cp_ocp_version }}/openshift-install-linux-{{ cp_ocp_version }}.tar.gz"
+        dest: /tmp/okd-openshift-install.tar.gz
+        mode: "0644"
+      when:
+        - action == 'present'
+        - cp_install_execute | bool
+
+    - name: Extract OKD openshift-install binary
+      ansible.builtin.unarchive:
+        src: /tmp/okd-openshift-install.tar.gz
+        dest: /usr/local/bin
+        remote_src: true
+        include:
+          - openshift-install
+      when:
+        - action == 'present'
+        - cp_install_execute | bool
+
+    - name: Download OKD oc CLI binary from GitHub releases
+      ansible.builtin.get_url:
+        url: "{{ _cp_okd_releases_url }}/{{ cp_ocp_version }}/openshift-client-linux-{{ cp_ocp_version }}.tar.gz"
+        dest: /tmp/okd-openshift-client.tar.gz
+        mode: "0644"
+      when:
+        - action == 'present'
+        - cp_install_execute | bool
+
+    - name: Extract OKD oc CLI binary
+      ansible.builtin.unarchive:
+        src: /tmp/okd-openshift-client.tar.gz
+        dest: /usr/local/bin
+        remote_src: true
+        include:
+          - oc
+          - kubectl
+      when:
+        - action == 'present'
+        - cp_install_execute | bool
+
+    - name: Remove OKD openshift binaries
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /usr/local/bin/openshift-install
+        - /usr/local/bin/oc
+        - /usr/local/bin/kubectl
+      when: action == 'absent'
+
+    - name: Manage firewall ports for OKD
+      ansible.posix.firewalld:
+        port: "{{ item }}"
+        state: "{{ 'enabled' if action == 'present' else 'disabled' }}"
+        permanent: true
+        immediate: true
+      loop: "{{ _cp_firewall_ports }}"
+      when: ansible_facts.services['firewalld.service'] is defined

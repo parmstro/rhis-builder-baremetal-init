@@ -1,0 +1,72 @@
+---
+- name: Verify supported-profile manifest structure and rhism component selection
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Load supported-profile manifest
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/files/supported-manifest.yml"
+        name: rhism_manifest
+      delegate_to: localhost
+
+    - name: Assert profile is supported
+      ansible.builtin.assert:
+        that:
+          - rhism_manifest.profile == 'supported'
+        fail_msg: "manifest has wrong profile: {{ rhism_manifest.profile }}"
+      delegate_to: localhost
+
+    - name: Assert all rhism components are enabled
+      ansible.builtin.assert:
+        that:
+          - rhism_manifest.components.hypervisor.enabled | bool
+          - rhism_manifest.components.identity.enabled | bool
+          - rhism_manifest.components.provisioning.enabled | bool
+          - rhism_manifest.components.content.enabled | bool
+          - rhism_manifest.components.mail.enabled | bool
+          - rhism_manifest.components.scm.enabled | bool
+          - rhism_manifest.components.backup.enabled | bool
+          - rhism_manifest.components.container_platform.enabled | bool
+          - rhism_manifest.components.security.enabled | bool
+          - rhism_manifest.components.monitoring.enabled | bool
+          - rhism_manifest.components.automation.enabled | bool
+        fail_msg: "One or more rhism components are unexpectedly disabled"
+      delegate_to: localhost
+
+    - name: Assert rhism component types match Red Hat stack
+      ansible.builtin.assert:
+        that:
+          - rhism_manifest.components.hypervisor.type == 'kvm'
+          - rhism_manifest.components.identity.type == 'rh_idm'
+          - rhism_manifest.components.content.type == 'satellite'
+          - rhism_manifest.components.scm.type == 'gitlab_ee'
+          - rhism_manifest.components.backup.type == 'bareos'
+          - rhism_manifest.components.container_platform.type == 'ocp'
+          - rhism_manifest.components.automation.type == 'aap'
+        fail_msg: "rhism component types do not match expected Red Hat stack"
+      delegate_to: localhost
+
+    - name: Assert licensing flags are set for subscription-required components
+      ansible.builtin.assert:
+        that:
+          - rhism_manifest.licensing.rhsm | bool
+          - rhism_manifest.licensing.satellite | bool
+          - rhism_manifest.licensing.ocp | bool
+          - rhism_manifest.licensing.gitlab_ee | bool
+        fail_msg: "rhism licensing flags missing — the supported profile requires active RHSM subscriptions"
+      delegate_to: localhost
+
+    - name: Assert AD trust / bare-host provisioning stay off by default (rhism Phase D)
+      ansible.builtin.assert:
+        that:
+          - rhism_manifest.components.identity.ad_trust.enabled == false
+          - rhism_manifest.components.provisioning.hosts | length == 0
+        fail_msg: "supported profile's AD trust / bare-host provisioning schema is unexpected"
+      delegate_to: localhost
+
+    - name: Report supported-profile manifest verification passed
+      ansible.builtin.debug:
+        msg: >-
+          PASS — supported-profile manifest verified: all rhism components enabled with
+          correct Red Hat stack types (rh_idm / satellite / gitlab_ee / bareos / ocp)
+      delegate_to: localhost

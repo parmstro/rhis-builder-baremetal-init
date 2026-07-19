@@ -1,0 +1,22 @@
+---
+galaxy_info:
+  author: rhism
+  description: >-
+    rhism estate builder orchestrator — reads an rhism.platform.wizard
+    deployment manifest and drives all component roles (security, Tang/NBDE,
+    identity, provisioning, secrets, content, mail, SCM, backup, container
+    platform, monitoring) in dependency order.
+  license: Apache-2.0
+  min_ansible_version: "2.14"
+  platforms:
+    - name: EL
+      versions:
+        - "8"
+        - "9"
+  galaxy_tags:
+    - platform_builder
+    - orchestrator
+    - infrastructure
+    - kubernetes
+    - openshift
+dependencies: []

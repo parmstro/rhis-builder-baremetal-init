@@ -1,0 +1,12 @@
+---
+# Action: remove_node — scale MachineSet down to remove nodes
+
+- name: Scale MachineSet down to 0
+  ansible.builtin.command:
+    cmd: >
+      oc scale machineset {{ cp_node_machineset }}
+      --replicas=0
+      -n openshift-machine-api
+  environment:
+    KUBECONFIG: "{{ _cp_kubeconfig_path }}"
+  changed_when: true

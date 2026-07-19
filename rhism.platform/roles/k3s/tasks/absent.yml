@@ -1,0 +1,13 @@
+---
+# Action: absent — remove k3s and disable firewall ports
+
+- name: Disable firewall ports
+  ansible.builtin.include_tasks: firewall.yml
+  vars:
+    _k3s_firewall_state: disabled
+
+- name: Remove k3s via uninstall script
+  ansible.builtin.command:
+    cmd: /usr/local/bin/k3s-uninstall.sh
+    removes: "{{ _cp_binary }}"
+  become: true

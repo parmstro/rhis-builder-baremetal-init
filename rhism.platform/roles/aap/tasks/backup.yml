@@ -1,0 +1,44 @@
+---
+# backup — version-aware AAP backup via Red Hat's installer tooling (gated).
+# containerized: the installer's backup playbook. openshift: an AAPBackup CR.
+
+- name: Ensure the AAP work directory exists
+  ansible.builtin.file:
+    path: "{{ aap_work_dir }}"
+    state: directory
+    mode: "0700"
+
+- name: Run the containerized AAP backup (real run)
+  ansible.builtin.command:
+    cmd: >-
+      ansible-playbook -i {{ aap_work_dir }}/installer_inventory.ini
+      {{ aap_version_profile.containerized.installer_backup_playbook }}
+    chdir: "{{ aap_work_dir }}"
+  register: aap_backup_run
+  changed_when: aap_backup_run.rc == 0
+  no_log: true
+  when:
+    - aap_install_method == 'containerized'
+    - aap_execute | bool
+
+- name: Create an AAPBackup custom resource (real run, OpenShift)
+  kubernetes.core.k8s:
+    state: present
+    namespace: "{{ aap_openshift_namespace }}"
+    validate_certs: "{{ aap_validate_certs }}"
+    definition:
+      apiVersion: "{{ aap_version_profile.openshift.cr_api_version }}"
+      kind: AnsibleAutomationPlatformBackup
+      metadata:
+        name: "{{ aap_openshift_cr_name }}-backup"
+        namespace: "{{ aap_openshift_namespace }}"
+      spec:
+        deployment_name: "{{ aap_openshift_cr_name }}"
+  when:
+    - aap_install_method == 'openshift'
+    - aap_execute | bool
+
+- name: Report dry-run (backup NOT invoked)
+  ansible.builtin.debug:
+    msg: "aap_execute is false — AAP {{ aap_version }} backup ({{ aap_install_method }}) NOT invoked."
+  when: not (aap_execute | bool)

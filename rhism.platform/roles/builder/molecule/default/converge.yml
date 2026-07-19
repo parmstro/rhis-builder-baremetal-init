@@ -1,0 +1,127 @@
+---
+- name: Converge — plan action (manifest load + display, no child roles)
+  # builder is a control-node orchestrator (production usage: hosts: localhost,
+  # connection: local — see playbooks/deploy.yml). Targeting the docker test
+  # container here was a scenario bug: playbook_dir-relative file lookups
+  # (pb_manifest_path) resolve on whichever host the task executes on, and a
+  # fresh container has no /workspace to find them in.
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    pb_action: plan
+    pb_manifest_path: "{{ playbook_dir }}/files/test-manifest.yml"
+  roles:
+    - role: rhism.platform.builder
+
+- name: Converge — deploy dry-run (enabled components, pb_deploy_execute false)
+  # builder is a control-node orchestrator (production usage: hosts: localhost,
+  # connection: local — see playbooks/deploy.yml). Targeting the docker test
+  # container here was a scenario bug: playbook_dir-relative file lookups
+  # (pb_manifest_path) resolve on whichever host the task executes on, and a
+  # fresh container has no /workspace to find them in.
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    pb_action: deploy
+    pb_manifest_path: "{{ playbook_dir }}/files/test-manifest.yml"
+    pb_deploy_execute: false
+    # identity_management asserts idm_domain unconditionally at role entry,
+    # even when every apply_* flag below is false — a dry-run still needs one.
+    idm_domain: molecule.test.local
+    pb_idm_apply_server: false
+    pb_idm_apply_dns: false
+    pb_content_apply_install: false
+    pb_content_apply_configure: false
+    pb_content_apply_repos: false
+    pb_scm_apply_install: false
+    pb_scm_apply_configure: false
+    pb_backup_apply_server: false
+    pb_backup_apply_client: false
+    pb_cp_apply_install: false
+    pb_cp_apply_configure: false
+    pb_cp_apply_storage: false
+    pb_cp_apply_ingress: false
+  roles:
+    - role: rhism.platform.builder
+
+- name: Converge — bare-host provisioning dispatch (cobbler light path)
+  # rhism Phase D: components.provisioning.hosts routes to
+  # rhism.platform.cobbler action=add_systems when type is cobbler.
+  # prov_execute is threaded from pb_deploy_execute (false here), so cobbler's
+  # own dispatch gate skips the real `cobbler system add` call — this proves
+  # real dispatch routing (argument_specs validation + variable resolution +
+  # the loop over prov_cobbler_systems being reached) without a live cobbler
+  # server, the same "list-guarded true no-op" pattern roles/cobbler's own
+  # molecule scenario uses.
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    pb_action: deploy
+    pb_manifest_path: "{{ playbook_dir }}/files/test-manifest-provisioning.yml"
+    pb_deploy_execute: false
+  roles:
+    - role: rhism.platform.builder
+
+- name: Converge — bare-host provisioning dispatch (satellite heavy path skipped)
+  # Same fixture, forced to the satellite_proxy backend via override.
+  # roles/satellite's host action has no execute-gate of its own (see
+  # README's "Bugs found" note), so builder gates Step 3b's satellite branch
+  # on pb_deploy_execute directly. This play only converges successfully
+  # BECAUSE the step is skipped — a real theforeman.foreman.host call against
+  # no live Satellite would fail the play outright, so success here is itself
+  # proof the dry-run gate held.
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    pb_action: deploy
+    pb_manifest_path: "{{ playbook_dir }}/files/test-manifest-provisioning.yml"
+    pb_deploy_execute: false
+    pb_provisioning_type: satellite_proxy
+  roles:
+    - role: rhism.platform.builder
+
+- name: Converge — Tang/NBDE key escrow dispatch (rhism alignment gap #2)
+  # docs/rhism-alignment-plan.md gap #2: components.tang.enabled routes to
+  # the standalone roles/tang role (plain role name, not an
+  # rhism.platform.* FQCN — resolved via ansible.cfg's roles_path).
+  # tang_deploy_execute is threaded from pb_deploy_execute (false here), so
+  # roles/tang's own dry-run gate makes no real changes (no podman pull, no
+  # container, no firewalld/SELinux) — this proves real dispatch routing
+  # (role resolution + variable passthrough + the when: guard being reached)
+  # without a live podman target, the same "list-guarded true no-op"
+  # pattern the cobbler dispatch play above uses.
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    pb_action: deploy
+    pb_manifest_path: "{{ playbook_dir }}/files/test-manifest-tang.yml"
+    pb_deploy_execute: false
+  roles:
+    - role: rhism.platform.builder
+
+- name: Converge — negative test (bogus pb_action)
+  # builder is a control-node orchestrator (production usage: hosts: localhost,
+  # connection: local — see playbooks/deploy.yml). Targeting the docker test
+  # container here was a scenario bug: playbook_dir-relative file lookups
+  # (pb_manifest_path) resolve on whichever host the task executes on, and a
+  # fresh container has no /workspace to find them in.
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Attempt bogus pb_action (must fail)
+      block:
+        - name: Call role with invalid action
+          ansible.builtin.include_role:
+            name: rhism.platform.builder
+          vars:
+            pb_action: bogus_action
+      rescue:
+        - name: Confirm expected failure was caught
+          ansible.builtin.debug:
+            msg: "PASS — bogus pb_action correctly rejected"

@@ -1,0 +1,19 @@
+---
+# --------------------------------------------------------------------------- #
+# compute_resource — register / manage compute resources                      #
+# --------------------------------------------------------------------------- #
+- name: Register compute resource
+  theforeman.foreman.compute_resource:
+    server_url: "{{ content_server_url }}"
+    username: "{{ content_username }}"
+    password: "{{ content_password }}"
+    validate_certs: "{{ content_validate_certs }}"
+    name: "{{ item.name }}"
+    provider: "{{ item.provider }}"
+    provider_params: "{{ item.provider_params | default(omit) }}"
+    locations: "{{ item.locations | default(omit) }}"
+    organizations: "{{ item.organizations | default(omit) }}"
+    state: "{{ item.state | default('present') }}"
+  loop: "{{ content_compute_resources }}"
+  no_log: "{{ content_no_log }}"
+  when: content_compute_resources | length > 0

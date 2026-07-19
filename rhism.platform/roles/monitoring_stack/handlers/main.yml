@@ -1,0 +1,53 @@
+---
+# ── Nagios ───────────────────────────────────────────────────────────
+- name: monitoring_stack - restart nagios
+  ansible.builtin.service:
+    name: nagios
+    state: restarted
+  become: true
+
+- name: monitoring_stack - restart nrpe
+  ansible.builtin.service:
+    name: nrpe
+    state: restarted
+  become: true
+
+- name: monitoring_stack - restart httpd
+  ansible.builtin.service:
+    name: httpd
+    state: restarted
+  become: true
+
+# ── Splunk ───────────────────────────────────────────────────────────
+- name: monitoring_stack - restart splunk
+  ansible.builtin.command:
+    cmd: "{{ mon_splunk_home }}/bin/splunk restart"
+  become: true
+  become_user: "{{ mon_splunk_user }}"
+  changed_when: true
+
+- name: monitoring_stack - restart splunk forwarder
+  ansible.builtin.command:
+    cmd: "{{ mon_splunk_fwd_home }}/bin/splunk restart"
+  become: true
+  become_user: "{{ mon_splunk_fwd_user }}"
+  changed_when: true
+
+# ── Elasticsearch ────────────────────────────────────────────────────
+- name: monitoring_stack - restart elasticsearch
+  ansible.builtin.service:
+    name: elasticsearch
+    state: restarted
+  become: true
+
+- name: monitoring_stack - restart kibana
+  ansible.builtin.service:
+    name: kibana
+    state: restarted
+  become: true
+
+- name: monitoring_stack - restart filebeat
+  ansible.builtin.service:
+    name: filebeat
+    state: restarted
+  become: true

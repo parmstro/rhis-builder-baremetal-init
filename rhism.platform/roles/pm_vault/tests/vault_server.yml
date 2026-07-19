@@ -1,0 +1,31 @@
+---
+# HashiCorp Vault server management playbook.
+# Drives the pm_vault role for server lifecycle operations.
+#
+# Required variables:
+#   pm_vault_action — install | configure | start | stop | remove | baseline
+#
+# Run examples:
+#   # Full deployment
+#   ansible-playbook playbooks/vault_server.yml -e pm_vault_action=baseline \
+#     -e pm_vault_tls_enabled=false   # set true + supply certs for production
+#
+#   # Start / stop
+#   ansible-playbook playbooks/vault_server.yml -e pm_vault_action=start
+#   ansible-playbook playbooks/vault_server.yml -e pm_vault_action=stop
+#
+#   # Remove (data preserved by default — add -e pm_vault_purge_data=true to wipe)
+#   ansible-playbook playbooks/vault_server.yml -e pm_vault_action=remove
+
+- name: HashiCorp Vault server management
+  hosts: "{{ vault_target_hosts | default('vault_servers') }}"
+  gather_facts: true
+
+  pre_tasks:
+    - name: Load environment credentials from vault
+      ansible.builtin.include_vars:
+        file: "inventories/{{ env | default('dev') }}/group_vars/all/vault.yml"
+      failed_when: false
+
+  roles:
+    - role: pm_vault

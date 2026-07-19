@@ -1,0 +1,11 @@
+---
+# baseline — full standalone lifecycle: install, then configure. Each stage is
+# delegated to its own action file so either is independently runnable.
+
+- name: Install AAP
+  ansible.builtin.include_tasks:
+    file: install.yml
+
+- name: Configure AAP
+  ansible.builtin.include_tasks:
+    file: configure.yml

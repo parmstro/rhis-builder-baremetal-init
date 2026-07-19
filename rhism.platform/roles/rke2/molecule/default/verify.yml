@@ -1,0 +1,25 @@
+---
+- name: Verify standalone variable contract
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Load role defaults
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../../defaults/main.yml"
+      delegate_to: localhost
+
+    - name: Assert shared interface defaults resolve for standalone use
+      ansible.builtin.assert:
+        that:
+          - action == 'present'
+          - cp_node_role == 'control_plane'
+          - cp_kubeconfig_path == '/etc/rancher/rke2/rke2.yaml'
+          - not (cp_reset_confirm | bool)
+          - cp_install_version == ''
+        fail_msg: "rke2 defaults did not resolve to the expected standalone contract"
+      delegate_to: localhost
+
+    - name: Report verification passed
+      ansible.builtin.debug:
+        msg: "PASS — rke2 standalone contract verified"
+      delegate_to: localhost

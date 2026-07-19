@@ -1,0 +1,25 @@
+---
+argument_specs:
+  main:
+    short_description: Declarative firewalld rule management.
+    description: >-
+      Applies a list of firewalld rule-set entries (zones, sources,
+      interfaces, masquerade, services, ports, ICMP blocks, rich rules).
+      Single-purpose capability role — there is deliberately no action
+      variable: the one thing it does is apply the firewall list, and the
+      linux_security orchestrator includes it bare for exactly that
+      (assessed 2026-07-11; adding an artificial action would be interface
+      noise, not sameness).
+    options:
+      firewall:
+        type: list
+        elements: dict
+        default: []
+        description: >-
+          Rule-set entries. Recognised keys per entry — zone (str),
+          source (str or list), interface (str), masquerade (bool),
+          service (str or list), port (str or list, e.g. "8080/tcp"),
+          icmp_block (str), rich_rule (str; legacy alias key "rule" is
+          also honoured), state (default enabled), permanent (default
+          true), immediate (bool). Every key optional; each present key
+          produces its firewalld call.

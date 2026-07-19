@@ -1,0 +1,17 @@
+---
+- name: Verify — storage_local_path goal (local-path is the default StorageClass)
+  hosts: all
+  become: true
+  gather_facts: false
+  tasks:
+    - name: List storage classes
+      ansible.builtin.command: /usr/local/bin/k3s kubectl get storageclass
+      register: _sc
+      changed_when: false
+
+    - name: Assert storage_local_path functional goal is met
+      ansible.builtin.assert:
+        that:
+          - "'local-path (default)' in _sc.stdout"
+        fail_msg: "local-path is not the default StorageClass. Got:\n{{ _sc.stdout }}"
+        success_msg: "PASS — local-path is present and marked the cluster-default StorageClass"

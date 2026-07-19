@@ -1,0 +1,8 @@
+---
+_scm_package_repo_script: https://packages.gitlab.com/install/repositories/gitlab/gitlab-ce/script.rpm.sh
+_scm_package_name: gitlab-ce
+_scm_edition: ce
+_scm_rhsm_required: false
+_scm_service_name: gitlab-runsvdir
+_scm_ctl_cmd: gitlab-ctl
+_scm_rake_cmd: gitlab-rake

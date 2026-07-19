@@ -1,0 +1,14 @@
+---
+_cp_valid_actions:
+  - install
+  - configure
+  - storage
+  - registry
+  - ingress
+  - baseline
+
+_cp_valid_types:
+  - ocp
+  - okd
+  - k3s
+  - rke2

@@ -1,0 +1,9 @@
+---
+_mail_packages:
+  - postfix
+  - mailx
+_mail_service_name: postfix
+_mail_full_stack: false
+_mail_firewall_services:
+  - smtp
+  - smtp-submission

@@ -1,0 +1,3 @@
+---
+# No handlers — SELinux state changes are handled by ansible.posix.selinux
+# which may queue a reboot notification internally when mode changes.

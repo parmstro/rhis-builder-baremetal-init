@@ -1,0 +1,69 @@
+---
+- name: Verify platform_builder manifest structure
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Load test manifest
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/files/test-manifest.yml"
+        name: pb_manifest_verify
+      delegate_to: localhost
+
+    - name: Assert manifest has expected structure
+      ansible.builtin.assert:
+        that:
+          - pb_manifest_verify.profile is defined
+          - pb_manifest_verify.profile == 'oss'
+          - pb_manifest_verify.components is defined
+          - pb_manifest_verify.components.identity.type == 'freeipa'
+          - pb_manifest_verify.components.container_platform.type == 'k3s'
+          - pb_manifest_verify.components.identity.enabled == true
+          - pb_manifest_verify.components.scm.enabled == false
+        fail_msg: "Test manifest structure is invalid"
+      delegate_to: localhost
+
+    - name: Assert AD trust and bare-host provisioning schema (rhism Phase D)
+      ansible.builtin.assert:
+        that:
+          - pb_manifest_verify.components.identity.ad_trust is defined
+          - pb_manifest_verify.components.identity.ad_trust.enabled == false
+          - pb_manifest_verify.components.provisioning.hosts is defined
+          - pb_manifest_verify.components.provisioning.hosts | length == 0
+        fail_msg: "ad_trust / provisioning.hosts schema is missing or unexpected"
+      delegate_to: localhost
+
+    - name: Load bare-host provisioning test manifest
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/files/test-manifest-provisioning.yml"
+        name: pb_manifest_prov_verify
+      delegate_to: localhost
+
+    - name: Assert bare-host provisioning manifest structure
+      ansible.builtin.assert:
+        that:
+          - pb_manifest_prov_verify.components.provisioning.enabled == true
+          - pb_manifest_prov_verify.components.provisioning.type == 'cobbler'
+          - pb_manifest_prov_verify.components.provisioning.hosts | length == 1
+          - pb_manifest_prov_verify.components.provisioning.hosts[0].name == 'pxe-test01'
+        fail_msg: "Bare-host provisioning test manifest structure is invalid"
+      delegate_to: localhost
+
+    - name: Load Tang/NBDE dispatch test manifest
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/files/test-manifest-tang.yml"
+        name: pb_manifest_tang_verify
+      delegate_to: localhost
+
+    - name: Assert Tang/NBDE dispatch test manifest structure
+      ansible.builtin.assert:
+        that:
+          - pb_manifest_tang_verify.profile == 'rhis'
+          - pb_manifest_tang_verify.components.tang is defined
+          - pb_manifest_tang_verify.components.tang.enabled == true
+        fail_msg: "Tang/NBDE dispatch test manifest structure is invalid"
+      delegate_to: localhost
+
+    - name: Report verification passed
+      ansible.builtin.debug:
+        msg: "PASS — platform_builder manifest structure verified"
+      delegate_to: localhost

@@ -1,0 +1,31 @@
+{# Managed by Ansible — role mail_full. Do not edit by hand. #}
+# OpenDKIM configuration — managed by Ansible (mail_full role)
+# Do not edit manually; changes will be overwritten.
+
+Syslog                  yes
+UMask                   007
+Mode                    sv
+Canonicalization        relaxed/simple
+SubDomains              no
+AutoRestart             yes
+AutoRestartRate         10/1h
+Background              yes
+
+# Milter socket — must match smtpd_milters in main.cf (inet:localhost:8891)
+Socket                  inet:8891@localhost
+PidFile                 /run/opendkim/opendkim.pid
+UserID                  opendkim:opendkim
+
+# Signing configuration
+Selector                {{ mail_dkim_selector }}
+Domain                  {{ mail_domain }}
+KeyFile                 /etc/opendkim/keys/{{ mail_dkim_selector }}.private
+
+KeyTable                /etc/opendkim/KeyTable
+SigningTable            refile:/etc/opendkim/SigningTable
+
+# Trusted hosts allowed to sign
+InternalHosts           /etc/opendkim/TrustedHosts
+ExternalIgnoreList      /etc/opendkim/TrustedHosts
+
+OversignHeaders         From

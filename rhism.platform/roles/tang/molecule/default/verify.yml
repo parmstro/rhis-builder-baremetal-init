@@ -1,0 +1,16 @@
+---
+# Contract-only scenario — the real assertions (argument-spec negative test,
+# dispatch-file-exists, dry-run-makes-no-changes) already ran and asserted
+# in converge.yml. Nothing further to independently verify here since no
+# real state was created; this stage is kept only because molecule's
+# standard test_sequence expects a verify playbook to exist.
+- name: No additional independent verification for a contract-only scenario
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Report
+      ansible.builtin.debug:
+        msg: >-
+          Contract-only scenario — converge.yml already asserted the
+          argument spec, dispatch files, and dry-run-makes-no-changes
+          behavior. No real state exists to independently verify.

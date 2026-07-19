@@ -1,0 +1,161 @@
+---
+# rh_idm — standalone-first defaults over the SHARED identity-management interface.
+#
+# rh_idm and freeipa are the two identity PRODUCTS selected by the identity_management
+# dispatcher (idm_type: rh_idm | freeipa). Both consume the SAME variable names — bare
+# `action` plus the `idm_*` interface vars — so the dispatcher selects either with one
+# identical `include_role: name="{{ idm_type }}"` call and no per-product code. Standalone
+# callers set these same vars directly; the defaults below make rh_idm runnable on its own.
+#
+# rh_idm is the subscription Red Hat Identity Management product: same IPA modules as freeipa,
+# but built on the RHEL `ipa-server` packages and requiring RHSM registration + the idm:DL1
+# module stream before install.
+
+# ---------------------------------------------------------------------------
+# Product-internal vars (this product's package/command identity). Not part of
+# the caller interface — the dispatcher supplies the same names via vars/rh_idm.yml.
+# ---------------------------------------------------------------------------
+_idm_server_packages:
+  - ipa-server
+  - ipa-server-dns
+  - ipa-server-trust-ad
+
+_idm_client_packages:
+  - ipa-client
+
+_idm_installer_cmd: ipa-server-install
+_idm_client_installer_cmd: ipa-client-install
+_idm_replica_installer_cmd: ipa-replica-install
+_idm_admin_cmd: ipa
+_idm_service_name: ipa
+_idm_rhsm_required: true
+
+# ---------------------------------------------------------------------------
+# Shared action (dispatched by tasks/main.yml). The dispatcher passes `action`
+# derived from idm_action; this default covers standalone use.
+# ---------------------------------------------------------------------------
+action: server
+
+# ---------------------------------------------------------------------------
+# Shared domain / realm (consumed by every action).
+# ---------------------------------------------------------------------------
+idm_domain: ""                          # e.g. corp.example.com
+idm_realm: ""                           # derived as uppercase domain if empty
+idm_hostname: ""                        # server FQDN (default: inventory_hostname)
+
+# ---------------------------------------------------------------------------
+# Execute gates — false = dry-run (the role logs what it WOULD do without
+# touching the host). Molecule leaves these false. NOT new gates: the product
+# task files already honour them.
+# ---------------------------------------------------------------------------
+idm_server_install: false               # gate for server install (action: server)
+idm_replica_install: false              # gate for replica promotion (action: replica)
+idm_client_install: false               # gate for client enrolment (action: client)
+
+# ---------------------------------------------------------------------------
+# RHSM registration (rh_idm-specific — subscription required before install)
+# ---------------------------------------------------------------------------
+idm_rhsm_org_id: ""                     # vault — RHSM organization ID
+idm_rhsm_activation_key: ""             # vault — RHSM activation key
+idm_rhsm_skip_registration: false       # true if host is already registered
+
+# ---------------------------------------------------------------------------
+# Server install settings (action: server)
+# ---------------------------------------------------------------------------
+idm_admin_password: ""                  # vault — admin Kerberos principal password
+idm_ds_password: ""                     # vault — Directory Server (LDAP) password
+idm_setup_dns: true                     # configure integrated BIND DNS
+idm_auto_forwarders: false              # auto-detect forwarders from /etc/resolv.conf
+idm_forwarders: []                      # explicit DNS forwarders, e.g. [8.8.8.8]
+idm_no_forwarders: false                # use root DNS hints only
+idm_ip_addresses: []                    # IP addresses to register (default: autodetect)
+idm_idstart: 100000                     # starting UID/GID for IPA-managed users
+                                        # (must exceed /etc/login.defs UID_MAX,
+                                        # 60000 on EL — BUG-115)
+idm_idmax: 199999                       # ending UID/GID range
+idm_mkhomedir: true                     # auto-create home directories on login
+idm_manage_firewall: true               # open IdM service ports via firewalld;
+                                        # false where no firewalld runs (containers,
+                                        # externally-managed firewalls)
+
+# ---------------------------------------------------------------------------
+# Replica settings (action: replica)
+# ---------------------------------------------------------------------------
+idm_master_server: ""                   # FQDN of existing server to replicate from
+idm_replica_setup_dns: true
+idm_replica_setup_ca: true
+
+# ---------------------------------------------------------------------------
+# Client / enroll settings (action: client, enroll)
+# ---------------------------------------------------------------------------
+idm_server_hostname: ""                 # FQDN of IDM server to enroll with
+
+# ---------------------------------------------------------------------------
+# AD trust settings (action: trust)
+# ---------------------------------------------------------------------------
+idm_trust_type: ad                      # trust type for ipa trust-add
+idm_ad_trust_domain: ""                 # AD domain to establish trust with
+idm_ad_trust_admin: Administrator       # AD admin user
+idm_ad_trust_password: ""               # vault
+idm_ad_trust_range_type: ipa-ad-trust    # ipa-ad-trust | ipa-ad-trust-posix
+
+# ---------------------------------------------------------------------------
+# OTP token settings (action: otp)
+# ---------------------------------------------------------------------------
+# List of token definitions, e.g.:
+# idm_otp_tokens:
+#   - owner: jsmith
+#     type: totp               # totp | hotp
+#     description: "Phone authenticator"
+idm_otp_tokens: []
+
+# ---------------------------------------------------------------------------
+# Smart card / PIV settings (action: smart_card)
+# ---------------------------------------------------------------------------
+idm_smart_card_ca_cert: ""              # PEM string of the CA that issued smart cards
+idm_smart_card_ca_cert_file: ""         # or path to a CA cert file
+idm_smart_card_server_configure: true   # run ipa-advise config-server-for-smart-card-auth
+idm_smart_card_configure_clients: false # run ipa-advise config-client-for-smart-card-auth
+idm_smart_card_password_fallback: true  # allow password as fallback (false = card required)
+idm_smart_card_required_users: []       # users who must use smart card login
+idm_smart_card_cert_map_rules: []       # cert mapping rules for user matching
+
+# ---------------------------------------------------------------------------
+# RADIUS proxy settings (action: radius_proxy)
+# ---------------------------------------------------------------------------
+# idm_radius_servers:
+#   - name: rsa-securid
+#     server: 192.168.1.50
+#     secret: "VaultedSecret"
+#     type: rsa                # rsa | safenet | yubikey | generic (informational)
+idm_radius_servers: []
+# idm_radius_user_mappings:
+#   - user: jsmith
+#     proxy_name: rsa-securid
+idm_radius_user_mappings: []
+
+# ---------------------------------------------------------------------------
+# DNS zone / record settings (action: dns)
+# ---------------------------------------------------------------------------
+idm_dns_zones: []                       # list of zone dicts: {name, forwarders, forward_policy}
+idm_dns_records: []                     # list of record dicts: {zone, name, type, value}
+
+# ---------------------------------------------------------------------------
+# Directory object settings (actions: user, group, hbac, sudo)
+# ---------------------------------------------------------------------------
+idm_users: []                           # freeipa.ansible_freeipa.ipauser 'users' list
+idm_groups: []                          # ipagroup 'groups' list
+idm_hbac_rules: []                      # list of HBAC rule dicts
+idm_sudo_rules: []                      # list of sudo rule dicts
+
+# --- ACME (action: acme) — IPA/IdM's integrated ACME CA (Dogtag ACMEv2) ------
+# Mode: enable|disable|status (server-side, ipa-acme-manage on a CA) |
+#       request (client-side, ipa-getcert — certmonger-tracked, auto-renewing).
+idm_acme_mode: status
+# Dry-run gate for enable/disable/request (status is always read-only).
+idm_acme_execute: false
+# request-mode cert placement + identity (defaults suit an enrolled host):
+idm_acme_cert_file: "/etc/pki/tls/certs/{{ inventory_hostname }}.crt"
+idm_acme_key_file: "/etc/pki/tls/private/{{ inventory_hostname }}.key"
+idm_acme_cert_subject: "{{ inventory_hostname }}"
+idm_acme_cert_principal: "host/{{ inventory_hostname }}"

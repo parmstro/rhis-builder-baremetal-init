@@ -1,0 +1,17 @@
+---
+- name: Verify — contract assertions
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Re-assert the role ships its required scaffolding
+      ansible.builtin.stat:
+        path: "{{ playbook_dir }}/../../{{ item }}"
+      register: _fw_scaffold
+      failed_when: not _fw_scaffold.stat.exists
+      loop:
+        - meta/main.yml
+        - meta/argument_specs.yml
+        - defaults/main.yml
+        - README.md
+        - CHANGELOG.md

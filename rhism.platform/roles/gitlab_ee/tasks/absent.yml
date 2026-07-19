@@ -1,0 +1,21 @@
+---
+# gitlab_ee — absent
+# Remove GitLab EE package, optionally purge configuration, disable firewall.
+
+- name: Remove GitLab EE package
+  ansible.builtin.dnf:
+    name: "{{ _scm_package_name }}"
+    state: absent
+  become: true
+
+- name: Purge GitLab EE configuration on absent
+  ansible.builtin.file:
+    path: /etc/gitlab
+    state: absent
+  become: true
+  when: scm_purge_config | default(false)
+
+- name: Disable GitLab EE firewall rules
+  ansible.builtin.include_tasks: firewall.yml
+  vars:
+    _firewall_state: disabled

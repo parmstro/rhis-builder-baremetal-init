@@ -1,0 +1,46 @@
+---
+# action: server — install Red Hat IDM server
+
+- name: Configure Red Hat IDM server
+  become: true
+  block:
+    - name: Prepare Red Hat IDM server host
+      ansible.builtin.include_tasks: prepare_server.yml
+
+    - name: Skip IDM server install (dry-run mode)
+      ansible.builtin.debug:
+        msg: >-
+          DRY RUN — idm_server_install=false.
+          Would run: {{ _idm_installer_cmd }} on {{ idm_hostname | default(inventory_hostname) }}
+          Domain: {{ idm_domain }}, Realm: {{ idm_realm }},
+          DNS: {{ idm_setup_dns }}, Forwarders: {{ idm_forwarders | join(', ') or 'none' }}
+      when: not (idm_server_install | bool)
+
+    # BUG-114: this task previously called freeipa.ansible_freeipa.ipaserver
+    # as a module with install parameters — but that module manages server
+    # TOPOLOGY objects (hidden/location/service_weight); it cannot install
+    # anything, so every install param was unsupported and the action could
+    # never deploy a server. The collection's supported install path is its
+    # `ipaserver` ROLE — include it, mapping the shared idm_* interface onto
+    # ipaserver_* vars.
+    - name: Install Red Hat IDM server
+      ansible.builtin.include_role:
+        name: freeipa.ansible_freeipa.ipaserver
+        apply:
+          become: true
+      vars:
+        ipaserver_hostname: "{{ idm_hostname | default(inventory_hostname) }}"
+        ipaserver_domain: "{{ idm_domain }}"
+        ipaserver_realm: "{{ idm_realm }}"
+        ipadm_password: "{{ idm_ds_password }}"
+        ipaadmin_password: "{{ idm_admin_password }}"
+        ipaserver_setup_dns: "{{ idm_setup_dns | bool }}"
+        ipaserver_auto_forwarders: "{{ idm_auto_forwarders | bool }}"
+        ipaserver_forwarders: "{{ idm_forwarders }}"
+        ipaserver_no_forwarders: "{{ idm_no_forwarders | bool }}"
+        ipaserver_ip_addresses: "{{ idm_ip_addresses }}"
+        ipaserver_idstart: "{{ idm_idstart }}"
+        ipaserver_idmax: "{{ idm_idmax }}"
+        ipaserver_mkhomedir: "{{ idm_mkhomedir | bool }}"
+        ipaserver_setup_firewalld: "{{ idm_manage_firewall | bool }}"
+      when: idm_server_install | bool

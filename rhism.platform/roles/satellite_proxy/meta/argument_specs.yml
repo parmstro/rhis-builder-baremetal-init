@@ -1,0 +1,80 @@
+---
+argument_specs:
+  main:
+    short_description: Red Hat Satellite smart proxy provisioning service.
+    description: >-
+      Standalone-first provisioning backend for provisioning_services. Installs, configures,
+      and registers a Red Hat Satellite smart proxy (foreman-proxy) that fronts DNS, DHCP, and
+      TFTP/PXE for a remote network segment. Consumes the shared provisioning-services
+      interface (bare action, prov_* vars) so the provisioning_services dispatcher can select
+      any backend with identical code.
+    options:
+      action:
+        description: >-
+          Lifecycle action, shared across all provisioning backends. 'present'/'absent'
+          install or remove packages + firewall; 'configure' deploys the smart proxy
+          configuration; 'register' registers this proxy with a Satellite server; 'status'
+          queries proxy registration via the Satellite API; 'started'/'stopped'/'restarted'
+          manage the foreman-proxy service.
+        type: str
+        default: configure
+        choices:
+          - present
+          - absent
+          - started
+          - stopped
+          - restarted
+          - configure
+          - register
+          - status
+      prov_execute:
+        description: >-
+          Dry-run gate honoured by every provisioning backend. false validates action dispatch
+          and variable resolution without installing packages or writing node config (used by
+          molecule).
+        type: bool
+        default: true
+      prov_smartproxy_url:
+        description: This proxy's own URL registered with the Satellite server.
+        type: str
+        default: ""
+      prov_smartproxy_dns:
+        description: Advertise DNS capability for this smart proxy.
+        type: bool
+        default: true
+      prov_smartproxy_dhcp:
+        description: Advertise DHCP capability for this smart proxy.
+        type: bool
+        default: true
+      prov_smartproxy_tftp:
+        description: Advertise TFTP/PXE capability for this smart proxy.
+        type: bool
+        default: true
+      prov_smartproxy_realm:
+        description: Advertise realm (identity enrolment) capability for this smart proxy.
+        type: bool
+        default: false
+      prov_content_server_url:
+        description: Satellite server URL used by the register and status actions.
+        type: str
+        default: ""
+      prov_content_username:
+        description: Satellite API username for register and status.
+        type: str
+        default: admin
+      prov_content_password:
+        description: Satellite API password for register and status (supply via vault).
+        type: str
+        default: ""
+      prov_content_validate_certs:
+        description: Validate TLS certificates when talking to the Satellite API.
+        type: bool
+        default: true
+      prov_content_organization:
+        description: Satellite organization the smart proxy is registered into.
+        type: str
+        default: "Default Organization"
+      prov_content_location:
+        description: Satellite location the smart proxy is registered into.
+        type: str
+        default: "Default Location"

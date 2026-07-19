@@ -1,0 +1,87 @@
+---
+- name: Validate Elasticsearch output host is set
+  ansible.builtin.assert:
+    that:
+      - mon_filebeat_output_host | length > 0
+    fail_msg: "mon_filebeat_output_host must be set (e.g. elastic.example.com:9200)"
+
+# ── Install Filebeat ─────────────────────────────────────────────────
+- name: Add Elasticsearch GPG key
+  ansible.builtin.rpm_key:
+    key: https://artifacts.elastic.co/GPG-KEY-elasticsearch
+    state: present
+  become: true
+
+- name: Add Elasticsearch repo
+  ansible.builtin.yum_repository:
+    name: elasticsearch
+    description: Elasticsearch repository for {{ mon_elastic_version }}.x
+    baseurl: "https://artifacts.elastic.co/packages/{{ mon_elastic_version }}/yum"
+    gpgcheck: true
+    gpgkey: https://artifacts.elastic.co/GPG-KEY-elasticsearch
+    enabled: true
+  become: true
+
+- name: Install Filebeat
+  ansible.builtin.package:
+    name: filebeat
+    state: present
+  become: true
+
+# ── Configure Filebeat ───────────────────────────────────────────────
+- name: Deploy Filebeat configuration
+  ansible.builtin.template:
+    src: filebeat.yml.j2
+    dest: /etc/filebeat/filebeat.yml
+    owner: root
+    group: root
+    mode: "0600"
+  become: true
+  notify: monitoring_stack - restart filebeat
+
+- name: Enable Filebeat modules
+  ansible.builtin.command:
+    cmd: "filebeat modules enable {{ item.name }}"
+  loop: "{{ mon_filebeat_modules }}"
+  loop_control:
+    label: "{{ item.name }}"
+  become: true
+  changed_when: true
+  failed_when: false
+
+- name: Deploy Filebeat module configs
+  ansible.builtin.template:
+    src: "filebeat_module_{{ item.name }}.yml.j2"
+    dest: "/etc/filebeat/modules.d/{{ item.name }}.yml"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ mon_filebeat_modules }}"
+  loop_control:
+    label: "{{ item.name }}"
+  become: true
+  notify: monitoring_stack - restart filebeat
+
+# ── Setup index patterns ────────────────────────────────────────────
+- name: Run Filebeat setup
+  ansible.builtin.command:
+    cmd: >-
+      filebeat setup
+      -e
+      -E output.elasticsearch.hosts=["{{ mon_filebeat_output_protocol }}://{{ mon_filebeat_output_host }}"]
+      -E output.elasticsearch.username={{ mon_filebeat_output_username }}
+      -E output.elasticsearch.password={{ mon_filebeat_output_password }}
+      -E output.elasticsearch.ssl.verification_mode=none
+      -E setup.kibana.host={{ mon_filebeat_output_host | regex_replace(':[0-9]+$', '') }}:5601
+  become: true
+  changed_when: true
+  no_log: true
+  failed_when: false
+
+# ── Enable and start ────────────────────────────────────────────────
+- name: Enable and start Filebeat
+  ansible.builtin.service:
+    name: filebeat
+    state: started
+    enabled: true
+  become: true

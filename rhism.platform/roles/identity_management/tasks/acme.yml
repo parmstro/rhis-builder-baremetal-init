@@ -1,0 +1,15 @@
+---
+# Dispatch to type-specific ACME management (IPA/IdM integrated Dogtag ACME CA).
+- name: Validate acme action applies to this idm_type
+  ansible.builtin.assert:
+    that:
+      - idm_type in ['freeipa', 'rh_idm']
+    fail_msg: >-
+      idm_action: acme requires an IPA server (idm_type: freeipa or rh_idm) —
+      it drives ipa-acme-manage (server) / ipa-getcert (client).
+
+- name: Manage {{ idm_type }} ACME service / request a cert
+  ansible.builtin.include_role:
+    name: "{{ idm_type }}"
+  vars:
+    action: acme

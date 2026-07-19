@@ -1,0 +1,15 @@
+---
+# pm_vault — baseline action.
+# Orchestrates a full Vault deployment: install → configure.
+# Individual toggles allow skipping phases already completed.
+
+- name: Install Vault
+  ansible.builtin.include_tasks: install.yml
+  when: pm_vault_baseline_install | bool
+
+- name: Start Vault service (needed before configure)
+  ansible.builtin.include_tasks: start.yml
+
+- name: Configure Vault (init, unseal, KV engine, auth, policy)
+  ansible.builtin.include_tasks: configure.yml
+  when: pm_vault_baseline_configure | bool

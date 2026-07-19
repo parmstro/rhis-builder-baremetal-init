@@ -1,0 +1,37 @@
+---
+# tasks/add_domain.yml — Add a virtual mail domain to Postfix maps.
+
+- name: Add virtual mail domain
+  become: true
+  block:
+    - name: Validate mail_new_domain is set
+      ansible.builtin.assert:
+        that: mail_new_domain | length > 0
+        fail_msg: "mail_new_domain must be set for the add_domain action"
+
+    - name: Add domain to virtual_domains map
+      ansible.builtin.lineinfile:
+        path: /etc/postfix/virtual_domains
+        line: "{{ mail_new_domain }}"
+        state: present
+        create: true
+        owner: root
+        group: root
+        mode: "0644"
+      when: mail_execute | bool
+
+    - name: Run postmap on virtual_domains
+      ansible.builtin.command:
+        cmd: postmap {{ mail_db_type }}:/etc/postfix/virtual_domains
+      changed_when: true
+      notify: mail_full - reload postfix
+      when: mail_execute | bool
+
+    - name: Create virtual mailbox base for new domain
+      ansible.builtin.file:
+        path: "{{ mail_virtual_mailbox_base }}/{{ mail_new_domain }}"
+        state: directory
+        owner: "{{ mail_vmail_user }}"
+        group: "{{ mail_vmail_user }}"
+        mode: "0750"
+      when: mail_execute | bool

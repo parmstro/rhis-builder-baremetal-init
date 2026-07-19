@@ -1,0 +1,24 @@
+---
+# Dispatcher variable — selects which task file(s) to run.
+# 'all' runs enforce, booleans, and fcontexts in sequence.
+linux_selinux_action: all
+
+# Desired SELinux enforcement state: enforcing, permissive, or disabled.
+linux_selinux_state: enforcing
+
+# SELinux policy type (targeted is standard for EL workloads).
+linux_selinux_policy: targeted
+
+# SELinux booleans to set. Each entry: {name, state, persistent}.
+# Example:
+#   - name: httpd_can_network_connect
+#     state: "on"
+#     persistent: true
+linux_selinux_booleans: []
+
+# File contexts to manage. Each entry: {target, setype}.
+# After context assignment, restorecon runs on the target path.
+# Example:
+#   - target: /srv/myapp(/.*)?
+#     setype: httpd_sys_content_t
+linux_selinux_fcontexts: []

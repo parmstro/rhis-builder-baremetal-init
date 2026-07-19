@@ -1,0 +1,12 @@
+---
+# Action: add_node — scale MachineSet up to add nodes
+
+- name: Scale MachineSet to add node
+  ansible.builtin.command:
+    cmd: >
+      oc scale machineset {{ cp_node_machineset }}
+      --replicas={{ cp_node_replicas | default(1) }}
+      -n openshift-machine-api
+  environment:
+    KUBECONFIG: "{{ _cp_kubeconfig_path }}"
+  changed_when: true

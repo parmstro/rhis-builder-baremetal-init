@@ -1,0 +1,23 @@
+---
+galaxy_info:
+  namespace: rhism
+  role_name: ocp
+  author: rhism
+  description: >-
+    Install and manage a Red Hat OpenShift (OCP) cluster via openshift-install and oc — RHSM
+    registration, binaries, install-config, gated cluster install/destroy, node scaling, etcd
+    backup/restore, and upgrades. Standalone-first product role, also selectable by the
+    container_platform dispatcher (cp_type: ocp).
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: EL
+      versions:
+        - "9"
+  galaxy_tags:
+    - kubernetes
+    - openshift
+    - ocp
+    - redhat
+    - cluster
+dependencies: []

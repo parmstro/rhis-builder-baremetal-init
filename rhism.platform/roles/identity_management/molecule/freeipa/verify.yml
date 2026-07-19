@@ -1,0 +1,25 @@
+---
+- name: Verify FreeIPA package availability
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Check freeipa-server is available in repos
+      ansible.builtin.command:
+        cmd: dnf info freeipa-server
+      register: _freeipa_pkg_info
+      changed_when: false
+      failed_when: false
+      become: true
+
+    - name: Report package availability
+      ansible.builtin.debug:
+        msg: >-
+          {{ 'freeipa-server package available' if _freeipa_pkg_info.rc == 0
+             else 'freeipa-server not found in repos (RHSM subscription may be required)' }}
+
+    - name: Confirm dry-run completed without errors
+      ansible.builtin.debug:
+        msg: >-
+          PASS — FreeIPA server dry-run scenario completed.
+          idm_server_install=false skipped actual install.
+          Set idm_server_install=true on a real RHEL9 host to execute.

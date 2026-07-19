@@ -1,0 +1,130 @@
+# Managed by Ansible — rhism bareos role ( Director)
+
+Director {
+  Name = bareos-dir
+  DIRport = {{ backup_bareos_director_port }}
+  QueryFile = "/usr/lib/bareos/scripts/query.sql"
+  WorkingDirectory = "/var/lib/bareos"
+  Maximum Concurrent Jobs = {{ backup_bareos_max_concurrent_jobs }}
+  Password = "{{ backup_bareos_director_password }}"
+  Messages = Daemon
+  Auditing = yes
+}
+
+{% for pool in backup_bareos_pools %}
+Pool {
+  Name = {{ pool.name }}
+  Pool Type = {{ pool.pool_type | default('Backup') }}
+  Recycle = {{ pool.recycle | default('yes') }}
+  AutoPrune = {{ pool.autoprune | default('yes') }}
+  Volume Retention = {{ pool.volume_retention | default('365 days') }}
+  Maximum Volume Bytes = {{ pool.max_volume_bytes | default('50G') }}
+  Maximum Volumes = {{ pool.max_volumes | default(100) }}
+  Label Format = "${Pool}-Vol-"
+}
+
+{% endfor %}
+{% for fs in backup_bareos_filesets %}
+FileSet {
+  Name = {{ fs.name }}
+  Include {
+    Options {
+      Signature = MD5
+      Compression = LZO
+    }
+{% for path in fs.include | default([]) %}
+    File = {{ path }}
+{% endfor %}
+  }
+  Exclude {
+{% for path in fs.exclude | default(['/proc', '/sys', '/dev', '/run']) %}
+    File = {{ path }}
+{% endfor %}
+  }
+}
+
+{% endfor %}
+{% for sched in backup_bareos_schedules %}
+Schedule {
+  Name = {{ sched.name }}
+{% for run in sched.run | default([]) %}
+  Run = {{ run }}
+{% endfor %}
+}
+
+{% endfor %}
+{# The director's own file daemon — without at least one Client resource no
+   Job can reference anything and the director refuses to start (BUG-118). #}
+Client {
+  Name = {{ backup_bareos_client_name }}
+  Address = {{ backup_bareos_self_client_address }}
+  FDPort = {{ backup_bareos_file_daemon_port }}
+  Password = "{{ backup_bareos_file_daemon_password }}"
+}
+
+{# Type-aware job rendering (BUG-120): Level only for Backup/Verify (invalid
+   on Restore), Schedule only for Backup (a scheduled Restore/Verify would
+   fire weekly), Where for Restore, Verify Job for Verify. #}
+{% for job in backup_bareos_jobs %}
+{% set _jtype = job.type | default('Backup') %}
+Job {
+  Name = {{ job.name }}
+  Type = {{ _jtype }}
+{% if _jtype == 'Backup' %}
+  Level = {{ job.level | default('Incremental') }}
+  Schedule = {{ job.schedule | default('WeeklyCycle') }}
+{% elif _jtype == 'Verify' %}
+  Level = {{ job.level | default(backup_bareos_verify_level) }}
+  Verify Job = {{ job.verify_job }}
+{% elif _jtype == 'Restore' %}
+  Where = {{ job.where | default(backup_bareos_restore_where) }}
+{% endif %}
+  Client = {{ job.client | default(backup_bareos_client_name) }}
+  FileSet = {{ job.fileset | default('LinuxAll') }}
+  Storage = {{ job.storage | default('File1') }}
+  Pool = {{ job.pool | default('Default') }}
+  Priority = {{ job.priority | default(10) }}
+  Messages = Standard
+  Write Bootstrap = "/var/lib/bareos/%c.bsr"
+}
+
+{% endfor %}
+
+Catalog {
+  Name = MyCatalog
+  dbname = {{ backup_bareos_catalog_db_name }}
+  dbuser = {{ backup_bareos_catalog_db_user }}
+  dbpassword = "{{ backup_bareos_catalog_db_password }}"
+{% if backup_bareos_catalog_db_address | length > 0 %}
+  DbAddress = {{ backup_bareos_catalog_db_address }}
+  DbPort = {{ backup_bareos_catalog_db_port }}
+{% endif %}
+}
+
+Storage {
+  Name = File1
+  Address = {{ backup_bareos_storage_host }}
+  SDport = {{ backup_bareos_storage_port }}
+  Password = "{{ backup_bareos_storage_password }}"
+  Device = FileChgr1-Dev1
+  Media Type = File
+}
+
+Messages {
+  Name = Standard
+  mailcommand = "/usr/bin/bsmtp -h localhost -f \"\(Bareos\) %r\" -s \"Bareos: %t %e of %c %l\" %r"
+  operatorcommand = "/usr/bin/bsmtp -h localhost -f \"\(Bareos\) %r\" -s \"Bareos: Intervention needed for %j\" %r"
+  Mail On Error = root = all, !skipped
+  operator = root = mount
+  console = all, !skipped, !saved
+  append = "/var/log/bareos/bareos.log" = all, !skipped
+  catalog = all
+}
+
+Messages {
+  Name = Daemon
+  mailcommand = "/usr/bin/bsmtp -h localhost -f \"\(Bareos\) %r\" -s \"Bareos daemon message\" %r"
+  mail = root = all, !skipped
+  console = all, !skipped, !saved
+  append = "/var/log/bareos/bareos.log" = all, !skipped
+}

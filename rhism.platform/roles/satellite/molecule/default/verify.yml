@@ -1,0 +1,31 @@
+---
+- name: Verify standalone variable contract
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Load role defaults
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../../defaults/main.yml"
+      delegate_to: localhost
+
+    - name: Assert shared interface defaults resolve for standalone use
+      ansible.builtin.assert:
+        that:
+          - action == 'status'
+          - content_username == 'admin'
+          - content_validate_certs | bool
+          - not (content_install_execute | bool)
+          - content_organization == 'Default Organization'
+          - content_cdn_repository_sets == []
+          - content_rhsm_manifest_path == ''
+          - not (content_rhsm_skip_registration | bool)
+          - _content_installer_cmd == 'satellite-installer'
+          - _content_rhsm_required | bool
+          - _content_cdn_supported | bool
+        fail_msg: "satellite defaults did not resolve to the expected standalone contract"
+      delegate_to: localhost
+
+    - name: Report verification passed
+      ansible.builtin.debug:
+        msg: "PASS — satellite standalone contract verified"
+      delegate_to: localhost

@@ -1,0 +1,5 @@
+# Managed by Ansible — cx_ansible_galaxy.linux_users
+# /etc/sudoers.d/linux_users_users
+{% for user in linux_users_sudo_nopasswd_users %}
+{{ user }} ALL=(ALL) NOPASSWD: ALL
+{% endfor %}

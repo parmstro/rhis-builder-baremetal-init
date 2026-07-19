@@ -1,0 +1,161 @@
+---
+# Functional requirements — bareos (requirements→test-case layer, owner rule
+# 2026-07-12).
+functional_requirements:
+  - req_id: BAREOS-FR-001
+    statement: >-
+      The role SHALL consume the shared backup_bareos_* family interface
+      (BUG-040 fix) and run standalone or via the backup_management
+      dispatcher.
+    tier: 1
+    verified_by:
+      - molecule: default
+      - molecule: backup_management/default
+
+  - req_id: BAREOS-FR-002
+    statement: >-
+      verify SHALL default to a REAL integrity check — VolumeToCatalog
+      (attribute+checksum comparison against the catalog), never the no-op
+      InitCatalog (the pre-2026-07-11 defect).
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: BAREOS-FR-003
+    statement: >-
+      A real Bareos deployment SHALL back up and restore data end-to-end
+      (director+storage+client).
+    tier: 3
+    verified_by:
+      - lab: playbooks/backup_management.yml#bareos_directors
+
+  # --- Image-factory pilot (FPS.md, owner brief 2026-07-13) ---------------
+  # Capability-derived rows: verified_by stays empty until P4 executes the
+  # FPS cases — UNCOVERED rendering is deliberate (honest gaps). Sources and
+  # container-scope expectations per row: see FPS.md.
+  - req_id: BAREOS-FR-004
+    statement: "The role SHALL deploy a complete stack — Director, Storage Daemon, File Daemon, PostgreSQL catalog."
+    tier: 2
+    verified_by: []
+  - req_id: BAREOS-FR-005
+    statement: "The system SHALL run Full, Incremental and Differential backup levels."
+    tier: 2
+    verified_by: []
+  - req_id: BAREOS-FR-006
+    statement: "The system SHALL synthesise a VirtualFull without re-reading the client."
+    tier: 2
+    verified_by: []
+  - req_id: BAREOS-FR-007
+    statement: "The system SHALL restore a full job to the original path."
+    tier: 2
+    verified_by: []
+  - req_id: BAREOS-FR-008
+    statement: "The system SHALL restore selected files to a redirected location (where=)."
+    tier: 2
+    verified_by: []
+  - req_id: BAREOS-FR-009
+    statement: "The system SHALL verify DiskToCatalog in addition to the VolumeToCatalog default."
+    tier: 2
+    verified_by: []
+  - req_id: BAREOS-FR-010
+    statement: "The system SHALL run jobs automatically from Schedule resources."
+    tier: 2
+    verified_by: []
+  - req_id: BAREOS-FR-011
+    statement: "The system SHALL manage volume lifecycle — pools, retention, recycling, prune/purge."
+    tier: 2
+    verified_by: []
+  - req_id: BAREOS-FR-012
+    statement: "The system SHALL operate the Always Incremental scheme with Consolidate jobs."
+    tier: 2
+    verified_by: []
+  - req_id: BAREOS-FR-013
+    statement: "The system SHALL copy jobs to a second pool (Copy job type)."
+    tier: 2
+    verified_by: []
+  - req_id: BAREOS-FR-014
+    statement: "The system SHALL migrate jobs between pools (Migration job type)."
+    tier: 2
+    verified_by: []
+  - req_id: BAREOS-FR-015
+    statement: "The system SHALL encrypt daemon-to-daemon transport with TLS."
+    tier: 2
+    verified_by: []
+  - req_id: BAREOS-FR-016
+    statement: "The system SHALL encrypt backup data client-side (PKI) and verify signatures on restore."
+    tier: 2
+    verified_by: []
+  - req_id: BAREOS-FR-017
+    statement: "The system SHALL compress (LZ4/GZIP) and checksum (SHA) file data per FileSet options."
+    tier: 2
+    verified_by: []
+  - req_id: BAREOS-FR-018
+    statement: "The system SHALL detect moved/deleted files via Accurate mode."
+    tier: 2
+    verified_by: []
+  - req_id: BAREOS-FR-019
+    statement: "The system SHALL restrict named consoles via Profile/ACL resources."
+    tier: 2
+    verified_by: []
+  - req_id: BAREOS-FR-020
+    statement: "The system SHALL write an audit log of console commands."
+    tier: 2
+    verified_by: []
+  - req_id: BAREOS-FR-021
+    statement: "The system SHALL serve the WebUI for operating and restore browsing."
+    tier: 2
+    verified_by: []
+  - req_id: BAREOS-FR-022
+    statement: "The system SHALL back up arbitrary command streams via the bpipe plugin."
+    tier: 2
+    verified_by: []
+  - req_id: BAREOS-FR-023
+    statement: "The system SHALL back up a live PostgreSQL database via the postgresql plugin."
+    tier: 2
+    verified_by: []
+  - req_id: BAREOS-FR-024
+    statement: "The system SHALL protect its own catalog via the BackupCatalog job."
+    tier: 2
+    verified_by: []
+  - req_id: BAREOS-FR-025
+    statement: "The system SHALL back up NDMP filers (expected FAIL in container scope — no NDMP filer)."
+    tier: 3
+    verified_by: []
+  - req_id: BAREOS-FR-026
+    statement: "The system SHALL drive tape drives and autochangers (expected FAIL — no tape hardware in container scope)."
+    tier: 3
+    verified_by: []
+  - req_id: BAREOS-FR-027
+    statement: "The system SHALL store volumes on S3-compatible object storage (droplet/dplcompat; MinIO-sibling follow-up candidate)."
+    tier: 3
+    verified_by: []
+  - req_id: BAREOS-FR-028
+    statement: "The system SHALL limit client bandwidth and spool data before despooling to volumes."
+    tier: 2
+    verified_by: []
+  - req_id: BAREOS-FR-029
+    statement: "The system SHALL support passive clients / client-initiated connections."
+    tier: 2
+    verified_by: []
+  - req_id: BAREOS-FR-030
+    statement: "The system SHALL check and repair catalog integrity with bareos-dbcheck."
+    tier: 2
+    verified_by: []
+
+# Non-functional requirements (image-factory pilot; full targets in FPS.md).
+# Not yet consumed by the renderer — FPS.md is authoritative until the
+# traceability template learns this key.
+non_functional_requirements:
+  - {req_id: BAREOS-NFR-001, statement: "Built FROM all three ubi{8,9,10}-secure bases; per-base differences recorded in FPS.md."}
+  - {req_id: BAREOS-NFR-002, statement: "Official bareos.org repo, GPG-verified, version pinned; base digest-pinned."}
+  - {req_id: BAREOS-NFR-003, statement: "Image size <= 600 MB per image."}
+  - {req_id: BAREOS-NFR-004, statement: "Director answers bconsole status <= 30 s from container start."}
+  - {req_id: BAREOS-NFR-005, statement: "Idle RSS <= 512 MB (S t-shirt; runtime tuning, never baked)."}
+  - {req_id: BAREOS-NFR-006, statement: "no-new-privileges, SELinux confined, minimal ports, bareos user where supported."}
+  - {req_id: BAREOS-NFR-007, statement: "No secrets/keys baked into any image — per-instance at runtime."}
+  - {req_id: BAREOS-NFR-008, statement: "0 fixable Critical CVEs; fixable Highs treated via the hardening loop."}
+  - {req_id: BAREOS-NFR-009, statement: "CycloneDX SBOM per image in sbom/."}
+  - {req_id: BAREOS-NFR-010, statement: "Reproducible via Dockerfile built through roles/podman."}
+  - {req_id: BAREOS-NFR-011, statement: "Role double-converge clean during the live-role-test build."}
+  - {req_id: BAREOS-NFR-012, statement: "1 GB reference dataset restored in-container <= 5 min."}
+  - {req_id: BAREOS-NFR-013, statement: "Registered in platform_images.yml + periodic hardening loop."}

@@ -1,0 +1,13 @@
+---
+- name: Validate remove_system variables
+  ansible.builtin.assert:
+    that:
+      - prov_cobbler_system_name is defined
+      - prov_cobbler_system_name | length > 0
+    fail_msg: "remove_system requires prov_cobbler_system_name"
+
+- name: Remove cobbler system
+  ansible.builtin.command:
+    cmd: "cobbler system remove --name={{ prov_cobbler_system_name }}"
+  become: true
+  changed_when: true

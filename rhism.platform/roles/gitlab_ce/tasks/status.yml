@@ -1,0 +1,17 @@
+---
+# ---------------------------------------------------------------------------
+# gitlab_ce — status: show gitlab-ctl status output
+# ---------------------------------------------------------------------------
+
+- name: Get GitLab CE status
+  become: true
+  block:
+    - name: Run gitlab-ctl status
+      ansible.builtin.command:
+        cmd: "{{ _scm_ctl_cmd }} status"
+      changed_when: false
+      register: _gitlab_ce_status
+
+    - name: Display GitLab CE status
+      ansible.builtin.debug:
+        msg: "{{ _gitlab_ce_status.stdout_lines }}"

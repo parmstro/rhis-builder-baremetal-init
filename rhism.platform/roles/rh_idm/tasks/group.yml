@@ -1,0 +1,9 @@
+---
+- name: Manage IPA groups
+  freeipa.ansible_freeipa.ipagroup:
+    ipaadmin_password: "{{ idm_admin_password }}"
+    groups: "{{ idm_groups }}"
+  no_log: true
+  when:
+    - idm_groups is defined
+    - idm_groups | length > 0

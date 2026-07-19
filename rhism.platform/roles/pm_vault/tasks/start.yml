@@ -1,0 +1,23 @@
+---
+# pm_vault — start action.
+# Starts the Vault systemd service and waits for it to report healthy.
+
+- name: Start Vault service
+  ansible.builtin.service:
+    name: vault
+    state: started
+    enabled: true
+  become: true
+  when: pm_vault_manage_service | bool
+
+- name: Wait for Vault API to become reachable
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:8200/v1/sys/health"
+    method: GET
+    status_code: [200, 429, 472, 473, 501, 503]
+  register: _vault_health
+  until: _vault_health.status in [200, 429, 472, 473, 501, 503]
+  retries: 15
+  delay: 2
+  delegate_to: "{{ inventory_hostname }}"
+  when: pm_vault_manage_service | bool

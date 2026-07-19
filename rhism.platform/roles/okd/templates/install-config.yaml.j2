@@ -1,0 +1,32 @@
+# {{ ansible_managed }}
+# OpenShift install-config.yaml (v1) — rendered by the rhism.platform.okd role.
+# Consumed by 'openshift-install create cluster --dir {{ cp_install_dir }}'.
+# NOTE: openshift-install CONSUMES (deletes) this file during 'create'; the role
+# re-renders it via the 'configure' action.
+apiVersion: v1
+baseDomain: {{ cp_base_domain }}
+metadata:
+  name: {{ cp_cluster_name }}
+controlPlane:
+  name: master
+  hyperthreading: Enabled
+  replicas: {{ cp_control_plane_replicas | default(3) }}
+compute:
+  - name: worker
+    hyperthreading: Enabled
+    replicas: {{ cp_compute_replicas | default(3) }}
+networking:
+  networkType: OVNKubernetes
+  clusterNetwork:
+    - cidr: {{ cp_cluster_network_cidr | default('10.128.0.0/14') }}
+      hostPrefix: {{ cp_cluster_network_host_prefix | default(23) }}
+  serviceNetwork:
+    - {{ cp_service_network_cidr | default('172.30.0.0/16') }}
+  machineNetwork:
+    - cidr: {{ cp_machine_network_cidr | default('10.0.0.0/16') }}
+platform:
+  none: {}
+pullSecret: '{{ cp_pull_secret }}'
+{% if cp_ssh_pub_key | length > 0 %}
+sshKey: '{{ cp_ssh_pub_key }}'
+{% endif %}

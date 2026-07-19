@@ -1,0 +1,59 @@
+---
+# rhism deployment manifest (profile: supported) — full Red Hat enterprise stack.
+# All components enabled; types are the Red Hat product for each layer.
+# Used by the supported molecule scenario (dry-run) and supported_rhsm scenario (real install).
+profile: supported
+components:
+  hypervisor:
+    enabled: true
+    type: kvm
+  identity:
+    enabled: true
+    type: rh_idm
+    ad_trust:
+      enabled: false
+      domain: ""
+      admin: Administrator
+      range_type: ipa-ad-trust
+  provisioning:
+    enabled: true
+    type: satellite_proxy
+    hosts: []
+  secrets:
+    enabled: true
+    type: vault
+    target: supported-platform-admin
+  content:
+    enabled: true
+    type: satellite
+  mail:
+    enabled: true
+    type: relay
+  scm:
+    enabled: true
+    type: gitlab_ee
+  backup:
+    enabled: true
+    type: bareos
+  container_platform:
+    enabled: true
+    type: ocp
+  security:
+    enabled: true
+    type: default
+  monitoring:
+    enabled: true
+    type: default
+  automation:
+    enabled: true
+    type: aap
+network:
+  base_domain: lab.example.com
+  management_network: 192.168.100.0/24
+  provision_network: 192.168.200.0/24
+sizing: large
+licensing:
+  rhsm: true
+  satellite: true
+  ocp: true
+  gitlab_ee: true

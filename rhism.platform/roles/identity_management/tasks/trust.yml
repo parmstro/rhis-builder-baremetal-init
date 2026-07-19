@@ -1,0 +1,43 @@
+---
+# Establish a cross-realm trust between FreeIPA/IDM and Active Directory.
+# Requires AD admin credentials and the ipa-server-trust-ad package.
+
+- name: Validate trust action applies to this idm_type
+  ansible.builtin.assert:
+    that:
+      - idm_type in ['freeipa', 'rh_idm']
+    fail_msg: >-
+      idm_action: trust is not applicable for idm_type: {{ idm_type }}.
+      AD trust is established FROM a FreeIPA/IDM server.
+
+- name: Validate required trust variables
+  ansible.builtin.assert:
+    that:
+      - idm_ad_trust_domain | length > 0
+      - idm_ad_trust_password | length > 0
+    fail_msg: "idm_ad_trust_domain and idm_ad_trust_password must be set."
+
+- name: Install AD trust packages
+  ansible.builtin.package:
+    name: "{{ _idm_server_packages | select('match', '.*trust.*') | list }}"
+    state: present
+  become: true
+
+- name: Add IPA DNS forward zone for AD domain
+  freeipa.ansible_freeipa.ipadnsforwardzone:
+    ipaadmin_password: "{{ idm_admin_password }}"
+    name: "{{ idm_ad_trust_domain }}"
+    forwarders: "{{ idm_forwarders }}"
+    forwardpolicy: only
+    state: present
+  when: idm_forwarders | length > 0
+
+- name: Establish AD trust
+  freeipa.ansible_freeipa.ipatrust:
+    ipaadmin_password: "{{ idm_admin_password }}"
+    realm: "{{ idm_ad_trust_domain | upper }}"
+    admin: "{{ idm_ad_trust_admin }}"
+    password: "{{ idm_ad_trust_password }}"
+    range_type: "{{ idm_ad_trust_range_type }}"
+    state: present
+  no_log: true

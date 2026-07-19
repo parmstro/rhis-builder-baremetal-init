@@ -1,0 +1,28 @@
+# Patched by ansible_galaxy (2026-07-16, see ../SECURITY-REVIEW.md "Build
+# finding"): as shipped upstream, this Containerfile fails to build under
+# ANY standard non-root build (Docker, Podman, OpenShift BuildConfig, CI) —
+# ubi9/nodejs-22 defaults to uid=1001/gid=0, but the unpatched COPY
+# instructions leave WORKDIR root-owned, so the following `npm ci` gets
+# EACCES. Fix: --chown=1001:0 on every COPY. Verified against a real build
+# (0 vulnerabilities at build time, npm audit clean on production deps).
+FROM registry.access.redhat.com/ubi9/nodejs-22:latest AS frontend-build
+WORKDIR /app/frontend
+COPY --chown=1001:0 frontend/package*.json ./
+RUN npm ci
+COPY --chown=1001:0 frontend/ ./
+RUN npm run build
+
+FROM registry.access.redhat.com/ubi9/nodejs-22:latest
+WORKDIR /app
+
+COPY --chown=1001:0 backend/package*.json ./backend/
+RUN cd backend && npm ci --omit=dev
+
+COPY --chown=1001:0 backend/ ./backend/
+COPY --chown=1001:0 --from=frontend-build /app/frontend/dist ./frontend/dist
+
+ENV NODE_ENV=production
+ENV PORT=8080
+
+EXPOSE 8080
+CMD ["node", "backend/src/index.js"]

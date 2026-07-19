@@ -1,0 +1,31 @@
+---
+- name: Converge — k3s functional single-node cluster
+  hosts: all
+  become: true
+  # The role installs k3s via the official script, which reads INSTALL_K3S_EXEC from the
+  # environment at install time. Setting it here (native snapshotter, trimmed components,
+  # KubeletInUserNamespace so kubelet tolerates rootless-container limits) makes k3s run
+  # inside a rootless container without changing the role.
+  environment:
+    INSTALL_K3S_EXEC: >-
+      --snapshotter=native
+      --kubelet-arg=feature-gates=KubeletInUserNamespace=true
+      --disable=traefik --disable=servicelb --disable=metrics-server
+  vars:
+    cp_node_role: control_plane
+    cp_kubeconfig_path: /etc/rancher/k3s/k3s.yaml
+  tasks:
+    - name: Install and start k3s (control plane)
+      ansible.builtin.include_role:
+        name: k3s
+      vars:
+        action: present
+
+    # Absolute path — sudo secure_path excludes /usr/local/bin under become (BUG-041)
+    - name: Wait for the k3s node to reach Ready
+      ansible.builtin.command: /usr/local/bin/k3s kubectl get nodes --no-headers
+      register: _nodes
+      until: "'Ready' in _nodes.stdout and 'NotReady' not in _nodes.stdout"
+      retries: 40
+      delay: 10
+      changed_when: false

@@ -1,0 +1,6 @@
+---
+- name: Manage restic packages
+  ansible.builtin.package:
+    name: "{{ _restic_packages }}"
+    state: "{{ action }}"
+  become: true

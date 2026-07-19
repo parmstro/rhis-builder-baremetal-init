@@ -1,0 +1,14 @@
+---
+# Shared: MachineSet scale operations via oc CLI
+# Included by: add_node, remove_node
+# Expects: _cp_node_scale_replicas (set by caller)
+
+- name: "Scale MachineSet to replicas: {{ cp_node_machineset }} / {{ _cp_node_scale_replicas }}"
+  ansible.builtin.command:
+    cmd: >
+      oc scale machineset {{ cp_node_machineset }}
+      --replicas={{ _cp_node_scale_replicas }}
+      -n openshift-machine-api
+  environment:
+    KUBECONFIG: "{{ _cp_kubeconfig_path }}"
+  changed_when: true

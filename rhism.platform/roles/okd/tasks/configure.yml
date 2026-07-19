@@ -1,0 +1,15 @@
+---
+# Action: configure — deploy OKD install-config.yaml
+
+- name: Ensure install directory
+  ansible.builtin.include_tasks: install_dir.yml
+
+- name: Deploy install-config.yaml
+  ansible.builtin.template:
+    src: install-config.yaml.j2
+    dest: "{{ cp_install_dir }}/install-config.yaml"
+    owner: root
+    group: root
+    mode: "0640"
+  become: true
+  no_log: "{{ cp_pull_secret | default('') | length > 0 }}"

@@ -1,0 +1,49 @@
+---
+# Functional requirements — identity_management dispatcher (pilot of the
+# requirements→test-case layer, owner rule 2026-07-12). Same renderer contract
+# as freeipa/REQUIREMENTS.yml.
+functional_requirements:
+  - req_id: IDM-FR-001
+    statement: >-
+      The dispatcher SHALL validate `idm_type` (freeipa | rh_idm |
+      ad_integration) and `idm_action`, failing fast with a clear message on
+      invalid combinations (negative tests are part of the scenario).
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: IDM-FR-002
+    statement: >-
+      The dispatcher SHALL select any product with ONE identical parameterised
+      include_role using the shared family interface — never per-product task
+      code, never tasks_from, action passed via vars (sameness doctrine).
+    tier: 1
+    verified_by:
+      - molecule: default
+      - molecule: freeipa
+
+  - req_id: IDM-FR-003
+    statement: >-
+      Type-specific settings SHALL load dynamically from vars/<idm_type>.yml
+      at run time; adding a product means a new role plus one type-map entry,
+      with no sibling changes.
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: IDM-FR-004
+    statement: >-
+      `idm_action: enroll` with `idm_type: ad_integration` SHALL drive AD
+      enrolment (realmd/adcli path) fully behind `idm_ad_enroll_execute`
+      (BUG-094).
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: IDM-FR-005
+    statement: >-
+      Dispatch into a real product deployment (freeipa server on a live host)
+      SHALL work end-to-end via the dispatcher, not only standalone.
+    tier: 3
+    verified_by:
+      - lab: playbooks/identity_management.yml#freeipa

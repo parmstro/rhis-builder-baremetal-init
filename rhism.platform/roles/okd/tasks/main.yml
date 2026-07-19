@@ -1,0 +1,68 @@
+---
+# OKD product role — action-driven dispatch
+# Called via: include_role: name=okd vars: {action: "install"}
+# Actions: present, absent, configure, install, destroy,
+#          add_node, remove_node, backup, restore, upgrade, status
+#
+# The action + variable interface is validated by meta/argument_specs.yml (ansible-core
+# runs the validation automatically at role entry — no manual assert needed).
+
+# ── present / absent consolidated into one file ──────────────────────────────
+
+- name: Manage OKD binaries and prerequisites
+  ansible.builtin.include_tasks: present.yml
+  when: action in ['present', 'absent']
+
+# ── configure ────────────────────────────────────────────────────────────────
+
+- name: Configure OKD install-config
+  ansible.builtin.include_tasks: configure.yml
+  when: action == 'configure'
+
+# ── install ──────────────────────────────────────────────────────────────────
+
+- name: Install OKD cluster
+  ansible.builtin.include_tasks: install.yml
+  when: action == 'install'
+
+# ── destroy ──────────────────────────────────────────────────────────────────
+
+- name: Destroy OKD cluster
+  ansible.builtin.include_tasks: destroy.yml
+  when: action == 'destroy'
+
+# ── add_node ─────────────────────────────────────────────────────────────────
+
+- name: Add node to OKD cluster
+  ansible.builtin.include_tasks: add_node.yml
+  when: action == 'add_node'
+
+# ── remove_node ──────────────────────────────────────────────────────────────
+
+- name: Remove node from OKD cluster
+  ansible.builtin.include_tasks: remove_node.yml
+  when: action == 'remove_node'
+
+# ── backup ───────────────────────────────────────────────────────────────────
+
+- name: Backup OKD etcd
+  ansible.builtin.include_tasks: backup.yml
+  when: action == 'backup'
+
+# ── restore ──────────────────────────────────────────────────────────────────
+
+- name: Restore OKD etcd
+  ansible.builtin.include_tasks: restore.yml
+  when: action == 'restore'
+
+# ── upgrade ──────────────────────────────────────────────────────────────────
+
+- name: Upgrade OKD cluster
+  ansible.builtin.include_tasks: upgrade.yml
+  when: action == 'upgrade'
+
+# ── status ───────────────────────────────────────────────────────────────────
+
+- name: Report OKD cluster status
+  ansible.builtin.include_tasks: status.yml
+  when: action == 'status'

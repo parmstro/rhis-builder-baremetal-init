@@ -1,0 +1,211 @@
+---
+# Functional requirements — rhism builder (requirements→test-case layer,
+# owner rule 2026-07-12; user-story schema, owner rule 2026-07-16 — see
+# docs/scaffolding-templates.md's REQUIREMENTS.yml template).
+functional_requirements:
+  - req_id: RHISM-BUILDER-FR-001
+    persona: platform administrator
+    capability: >-
+      a plan action that reads the estate manifest and produces the
+      component deploy order without touching anything
+    benefit: >-
+      I can review exactly what will be deployed, and in what order,
+      before committing to a real run
+    acceptance:
+      - given: a valid deployment manifest at pb_manifest_path
+        when: pb_action is plan
+        then: the full component deploy order is rendered, with no real
+          changes made anywhere
+    statement: >-
+      As a platform administrator, I want a plan action that reads the
+      estate manifest and renders the deploy order without making any
+      changes, so that I can review a deployment before committing to it.
+    tier: 2
+    verified_by:
+      - molecule: default
+      - register: TEST-RHISM-BUILDER-DEFAULT
+
+  - req_id: RHISM-BUILDER-FR-002
+    persona: platform administrator
+    capability: >-
+      the estate profile's full component set to plan/deploy with correct
+      RHSM licensing flags intact
+    benefit: >-
+      subscription requirements are derived automatically and correctly
+      for the one real profile this collection ships, not silently dropped
+    acceptance:
+      - given: the estate manifest (identity=rh_idm, content=satellite)
+        when: pb_action is plan or deploy
+        then: every enabled component dispatches correctly and
+          licensing.rhsm / licensing.satellite are both true
+    statement: >-
+      As a platform administrator, I want the estate profile's full
+      component set to plan/deploy with correct RHSM licensing flags, so
+      that subscription requirements are never silently dropped.
+    tier: 2
+    verified_by:
+      - molecule: supported
+      - register: TEST-RHISM-BUILDER-FLAGSHIP
+
+  - req_id: RHISM-BUILDER-FR-003
+    persona: platform administrator
+    capability: >-
+      the components the estate profile actually uses to resolve entirely
+      within this collection, with no runtime dependency on
+      rhism.platform for them
+    benefit: >-
+      rhism.platform is genuinely self-contained for its one real
+      profile — a fresh install of just this collection deploys the full
+      estate without needing rhism.platform installed at all
+    acceptance:
+      - given: only rhism.platform is installed (not rhism.platform)
+        when: pb_action deploy runs against the estate manifest
+        then: linux_security, identity_management, provisioning_services,
+          content_management, and the Step 3b satellite bare-host fork all
+          resolve to rhism.platform.* (or same-collection bare names) —
+          zero rhism.platform.* calls anywhere in that code path
+      - given: a manifest enables a component NOT vendored into
+          rhism.platform (e.g. mail, scm, backup, container_platform,
+          monitoring, secrets, or cobbler-path provisioning)
+        when: pb_action deploy runs
+        then: that component still dispatches correctly via its
+          rhism.platform.* FQCN — an honest, documented boundary, not
+          a silent failure
+    statement: >-
+      As a platform administrator, I want the components the estate
+      profile actually uses to resolve entirely within rhism.platform, so
+      that this collection is genuinely self-contained for its one real
+      profile, while components outside that scope still work correctly
+      via rhism.platform.
+    tier: 2
+    verified_by:
+      - molecule: default
+      - register: TEST-RHISM-BUILDER-SELFCONTAINED
+
+  - req_id: RHISM-BUILDER-FR-004
+    persona: platform administrator
+    capability: >-
+      a full estate deploy (every enabled phase, on real infrastructure)
+      to converge end-to-end
+    benefit: >-
+      confidence that the collection works for real, not just in
+      molecule's dry-run/contract coverage
+    acceptance:
+      - given: a real RHEL 9 target host, real RHSM credentials, and a
+          real IdM admin/DS password
+        when: the supported_rhsm scenario is run
+        then: real RHSM registration and a real IdM server install both
+          converge cleanly
+    statement: >-
+      As a platform administrator, I want a full estate deploy to
+      converge end-to-end on real infrastructure, so that I have
+      confidence beyond molecule's dry-run coverage.
+    tier: 3
+    verified_by:
+      - lab: collections/rhism/platform/roles/builder/molecule/supported_rhsm
+
+  - req_id: RHISM-BUILDER-FR-005
+    persona: platform administrator
+    capability: >-
+      to choose, per estate profile, between a heavy Satellite-integrated
+      bare-host provisioning path and a light no-Satellite PXE-only path,
+      and have the builder register a declared list of bare hosts against
+      whichever path was chosen
+    benefit: >-
+      one manifest expresses both a full-Satellite estate and a
+      Satellite-free/lightweight estate without hand-authoring separate
+      playbooks for host registration
+    acceptance:
+      - given: components.provisioning.type is cobbler and
+          components.provisioning.hosts is non-empty
+        when: pb_action deploy runs
+        then: rhism.platform.cobbler is dispatched with
+          action add_systems and the declared host list
+      - given: components.provisioning.type is satellite_proxy and
+          components.provisioning.hosts is non-empty and
+          pb_deploy_execute is true
+        when: pb_action deploy runs
+        then: rhism.platform.satellite is dispatched with
+          action host and the declared host list
+      - given: components.provisioning.hosts is empty, or
+          pb_deploy_execute is false for the satellite_proxy path
+        when: pb_action deploy runs
+        then: no bare-host provisioning call is made (list-guarded /
+          dry-run-gated no-op)
+    statement: >-
+      As a platform administrator, I want to choose between a heavy
+      Satellite-integrated and a light no-Satellite bare-host provisioning
+      path per estate profile, so that one manifest covers both a
+      full-Satellite estate and a Satellite-free estate.
+    tier: 2
+    verified_by:
+      - molecule: default
+      - register: TEST-RHISM-BUILDER-DEFAULT
+
+  - req_id: RHISM-BUILDER-FR-006
+    persona: platform administrator
+    capability: >-
+      to opt an estate profile into a cross-realm AD trust (from an existing
+      Red Hat IdM server to an existing AD forest) as part of the
+      manifest, off by default
+    benefit: >-
+      estates that need enterprise-AD interop can declare it once in the
+      manifest instead of hand-running a separate trust playbook after the
+      fact, while estates that don't need it see no behavior change
+    acceptance:
+      - given: components.identity.ad_trust.enabled is false or absent
+          (the default)
+        when: pb_action deploy runs
+        then: no AD trust is attempted — identity_management's trust step
+          is skipped
+      - given: components.identity.ad_trust.enabled is true with a domain
+          set, and an admin password supplied via pb_idm_ad_trust_password
+          (never via the manifest)
+        when: pb_action deploy runs
+        then: identity_management is dispatched with idm_apply_trust true
+          and the AD trust connection details from the manifest
+    statement: >-
+      As a platform administrator, I want to opt an estate into a
+      cross-realm AD trust via the manifest, off by default, so that
+      enterprise-AD interop is a one-line manifest choice rather than a
+      separate manual step, and estates that don't need it are unaffected.
+    tier: 2
+    verified_by:
+      - molecule: default
+      - register: TEST-RHISM-BUILDER-DEFAULT
+
+  - req_id: RHISM-BUILDER-FR-007
+    persona: platform administrator
+    capability: >-
+      to declare an NBDE/Tang key-escrow server as an estate component in
+      the manifest and have the builder deploy it in dependency order
+      alongside the rest of the estate
+    benefit: >-
+      estates that need disk-encryption key escrow — this collection's own
+      governed-RHEL estate: IdM + Satellite + AAP + KVM + Tang/NBDE + test
+      hosts — get it as a one-line manifest choice instead of a hand-run
+      separate playbook, while estates that don't need it see no behavior
+      change
+    acceptance:
+      - given: components.tang.enabled is false or absent (the default)
+        when: pb_action deploy runs
+        then: no Tang deploy is attempted
+      - given: components.tang.enabled is true
+        when: pb_action deploy runs
+        then: the vendored tang role is dispatched by plain role name
+          (same-collection resolution — tang is vendored into
+          rhism.platform, not referenced via any platform FQCN) with
+          action deploy and tang_deploy_execute mirroring
+          pb_deploy_execute, so real deployment (image pull, container,
+          SELinux/firewalld) stays gated behind pb_deploy_execute exactly
+          like every other dry-run-gated component
+    statement: >-
+      As a platform administrator, I want to declare an NBDE/Tang
+      key-escrow server as an estate component in the manifest, so that
+      estates needing disk-encryption key escrow get it deployed in
+      dependency order alongside the rest of the estate, with no behavior
+      change for estates that don't need it.
+    tier: 2
+    verified_by:
+      - molecule: default
+      - register: TEST-RHISM-BUILDER-DEFAULT

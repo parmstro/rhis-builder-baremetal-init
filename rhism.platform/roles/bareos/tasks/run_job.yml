@@ -1,0 +1,28 @@
+---
+# ---------------------------------------------------------------------------
+# run_job.yml — Trigger an on-demand backup job via bconsole
+# ---------------------------------------------------------------------------
+
+- name: Validate run_job requirements
+  ansible.builtin.assert:
+    that:
+      - backup_bareos_run_job_name | length > 0
+    fail_msg: "backup_bareos_run_job_name is required for run_job"
+
+- name: Trigger job via bconsole
+  ansible.builtin.include_tasks: bconsole.yml
+  vars:
+    _bconsole_name: Trigger job via bconsole
+    _bconsole_commands:
+      - "run job={{ backup_bareos_run_job_name }} yes"
+
+- name: Fail if run_job failed
+  ansible.builtin.fail:
+    msg: "Failed to trigger job '{{ backup_bareos_run_job_name }}'"
+  when:
+    - _bconsole_result.rc is defined
+    - _bconsole_result.rc != 0
+
+- name: Report run_job output
+  ansible.builtin.debug:
+    msg: "{{ _bconsole_result.stdout_lines | default([]) }}"

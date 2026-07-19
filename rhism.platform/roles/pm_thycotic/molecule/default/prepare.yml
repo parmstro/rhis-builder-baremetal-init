@@ -1,0 +1,11 @@
+---
+- name: Prepare — ensure credential directory exists
+  hosts: all
+  gather_facts: false
+
+  tasks:
+    - name: Create credential directory
+      ansible.builtin.file:
+        path: /root/.pm_credentials
+        state: directory
+        mode: "0700"

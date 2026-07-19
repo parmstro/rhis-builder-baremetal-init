@@ -1,0 +1,23 @@
+---
+galaxy_info:
+  namespace: rhism
+  role_name: registry_generic
+  author: rhism
+  description: >-
+    Configure an external container registry for a Kubernetes cluster — creates a pull secret
+    and writes a containerd registries.yaml mirror on k3s/rke2, or trusts the registry via the
+    cluster Image config on ocp/okd. Standalone-first product role, also selectable by the
+    container_platform dispatcher (cp_registry_type: generic).
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: EL
+      versions:
+        - "9"
+  galaxy_tags:
+    - kubernetes
+    - registry
+    - container
+    - containerd
+    - k3s
+dependencies: []

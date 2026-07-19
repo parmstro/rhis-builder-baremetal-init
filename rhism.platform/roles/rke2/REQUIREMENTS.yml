@@ -1,0 +1,105 @@
+---
+# Functional requirements — rke2 (requirements->test-case layer + Tier-3
+# elevation, owner rules 2026-07-12). Product capability fact-checked against
+# the official RKE2 docs (docs.rke2.io: architecture, install/ha,
+# datastore/backup_restore). Curated against README + meta/argument_specs.yml
+# action set + tasks/.
+functional_requirements:
+  - req_id: RKE2-FR-001
+    statement: >-
+      The role SHALL consume the shared container_platform family interface
+      (bare action + cp_* vars) with absolute binary paths surviving sudo
+      secure_path (BUG-041), and pass its contract scenario — argument-spec
+      validation, standalone default (action=present), and a dispatch task
+      file for every declared action — without a cluster.
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: RKE2-FR-002
+    statement: >-
+      The role SHALL install RKE2 as a single binary and start an rke2-server
+      control-plane node with embedded etcd (cp_node_role=control_plane).
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#rke2
+
+  - req_id: RKE2-FR-003
+    statement: >-
+      The role SHALL install an rke2-agent worker node that joins an existing
+      server using cp_server_url and cp_node_token (cp_node_role=worker).
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#rke2
+
+  - req_id: RKE2-FR-004
+    statement: >-
+      The role SHALL deploy cluster config and expose a standard-path
+      kubeconfig symlink (cp_kubeconfig_path) on 'configure'.
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#rke2
+
+  - req_id: RKE2-FR-005
+    statement: >-
+      The role SHALL manage the rke2 service lifecycle
+      (started/stopped/restarted).
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: RKE2-FR-006
+    statement: >-
+      The role SHALL take an on-demand etcd snapshot on 'backup'
+      (cp_backup_snapshot_name).
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#rke2
+
+  - req_id: RKE2-FR-007
+    statement: >-
+      The role SHALL restore cluster state from a named etcd snapshot on
+      'restore' (cp_restore_snapshot_name).
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#rke2
+
+  - req_id: RKE2-FR-008
+    statement: >-
+      The role SHALL upgrade RKE2 in place to a pinned version
+      (cp_install_version) on 'upgrade'.
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#rke2
+
+  - req_id: RKE2-FR-009
+    statement: >-
+      The role SHALL join (add_node) and evict (remove_node) worker nodes from
+      a running cluster.
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#rke2
+
+  - req_id: RKE2-FR-010
+    statement: >-
+      A highly-available control plane SHALL be reachable with an odd number of
+      server nodes (embedded-etcd quorum) — genuinely uncoverable by a
+      single-node CI run.
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#rke2
+
+  - req_id: RKE2-FR-011
+    statement: >-
+      The destructive 'reset' teardown SHALL be gated behind cp_reset_confirm
+      (fail-closed by default).
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: RKE2-FR-012
+    statement: >-
+      The role SHALL report cluster/node state on 'status'.
+    tier: 3
+    verified_by:
+      - lab: playbooks/container_platform.yml#rke2

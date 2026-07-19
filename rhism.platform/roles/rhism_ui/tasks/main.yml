@@ -1,0 +1,11 @@
+---
+# rhism_ui — shared envelope. Argument-spec validation runs automatically at
+# role entry from meta/argument_specs.yml (no hand-written action assert).
+# Explicit dict form (not the bare-string shorthand) — a bare
+# "{{ rhism_ui_action }}.yml" is parsed via free-form/legacy key=value
+# tokenization and misreads Jinja expressions containing certain operators at
+# --syntax-check time (BUG-084).
+
+- name: Dispatch to the requested action
+  ansible.builtin.include_tasks:
+    file: "{{ rhism_ui_action }}.yml"

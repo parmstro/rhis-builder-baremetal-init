@@ -1,0 +1,19 @@
+---
+# TSS API call for audit — only included when pm_thycotic_skip_api is false.
+- name: Fetch secret metadata from Thycotic Secret Server
+  delinea.tss.secret:
+    server_url: "{{ pm_thycotic_server_url }}"
+    username: "{{ pm_thycotic_username }}"
+    password: "{{ pm_thycotic_password }}"
+    domain: "{{ pm_thycotic_domain | default(omit) }}"
+    state: present
+    id: "{{ pm_thycotic_secret_id }}"
+  register: _pm_tss_secret
+  delegate_to: localhost
+  no_log: true
+
+- name: Parse secret metadata from TSS
+  ansible.builtin.set_fact:
+    _pm_tss_name: "{{ _pm_tss_secret.secret.name | default(pm_target) }}"
+    _pm_tss_last_changed: "{{ _pm_tss_secret.secret.lastPasswordChangeAttempt | default('unknown') }}"
+    _pm_tss_active: "{{ not (_pm_tss_secret.secret.active | default(true) == false) }}"

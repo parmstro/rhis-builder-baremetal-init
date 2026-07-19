@@ -1,0 +1,55 @@
+---
+# tasks/status.yml — Check and display status of all mail stack services.
+
+- name: Show full mail stack status
+  become: true
+  block:
+    - name: Check Postfix status
+      ansible.builtin.command:
+        cmd: postfix status
+      register: _mail_full_postfix_status
+      changed_when: false
+      failed_when: false
+
+    - name: Check Dovecot status
+      ansible.builtin.command:
+        cmd: doveadm service status
+      register: _mail_full_dovecot_status
+      changed_when: false
+      failed_when: false
+
+    # systemd-only leg — gated on mail_manage_service (BUG-117 class: no
+    # systemd in containers; the entrypoint owns daemon lifecycle there).
+    - name: Check OpenDKIM status
+      ansible.builtin.command:
+        cmd: systemctl status opendkim
+      register: _mail_full_dkim_status
+      changed_when: false
+      failed_when: false
+      when:
+        - mail_dkim_enabled | bool
+        - mail_manage_service | bool
+
+    - name: Run mailq
+      ansible.builtin.command:
+        cmd: mailq
+      register: _mail_full_mailq
+      changed_when: false
+      failed_when: false
+
+    - name: Display Postfix status
+      ansible.builtin.debug:
+        msg: "{{ _mail_full_postfix_status.stdout_lines }}"
+
+    - name: Display Dovecot status
+      ansible.builtin.debug:
+        msg: "{{ _mail_full_dovecot_status.stdout_lines }}"
+
+    - name: Display DKIM key status
+      ansible.builtin.debug:
+        msg: "{{ _mail_full_dkim_status.stdout_lines | default([]) }}"
+      when: mail_dkim_enabled | bool
+
+    - name: Display mail queue
+      ansible.builtin.debug:
+        msg: "{{ _mail_full_mailq.stdout_lines }}"

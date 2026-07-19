@@ -1,0 +1,28 @@
+---
+- name: Converge — linux_security orchestrator
+  hosts: all
+  gather_facts: true
+  vars:
+    # Firewall role may not be cloned yet; skip it in the orchestrator test
+    linux_security_apply_firewall: false
+    # Packages — minimal install, no EPEL needed in test
+    linux_packages_action: install
+    linux_packages_install:
+      - audit
+    linux_packages_remove: []
+    # Hardening — skip module blacklisting in containers
+    linux_hardening_action: all
+    linux_hardening_sysctl_apply: false
+    linux_hardening_blacklisted_modules: []
+    linux_hardening_ssh_manage_sftp: false
+    # Auditing — service can't start in containers (kernel audit subsystem not accessible)
+    linux_auditing_action: configure
+    linux_auditing_start_service: false
+    # Users — faillock only; no sudo groups/users in test
+    linux_users_action: faillock
+    # SELinux — skips gracefully when disabled
+    linux_selinux_action: all
+    linux_selinux_booleans: []
+    linux_selinux_fcontexts: []
+  roles:
+    - role: rhism.platform.linux_security

@@ -1,0 +1,147 @@
+---
+# Functional requirements — cobbler (requirements->test-case layer + Tier-3
+# elevation, owner rules 2026-07-12). Product role: Cobbler network-install
+# server (PXE/DHCP/DNS/TFTP) on EL9 — a provisioning_services backend, sibling
+# to dnsmasq/foreman_proxy/satellite_proxy. Capability fact-checked against the
+# official Cobbler docs (cobbler.readthedocs.io: quickstart, managing
+# distros/profiles/systems, `cobbler sync`, settings.yaml) and curated against
+# README + meta/argument_specs.yml action set + tasks/. Family lab:
+# playbooks/provisioning_services.yml (prov_type=cobbler) — the same lab the
+# dnsmasq sibling uses. NOTE: not playbooks/repo_server.yml — cobbler is a
+# provisioning backend, and repo_server.yml validates repo_type in
+# rhel_mirror/wsus/chocolatey_repo and would reject it (see handoff report).
+functional_requirements:
+  - req_id: COBBLER-FR-001
+    statement: >-
+      The role SHALL consume the shared provisioning-services interface (bare
+      action + prov_* vars) and pass its contract scenario — argument-spec
+      validation, the standalone default (action=configure), the prov_execute
+      dry-run gate, and the negative bad-action path — without installing
+      Cobbler or running the cobbler CLI.
+    tier: 1
+    verified_by:
+      - molecule: default
+
+  - req_id: COBBLER-FR-002
+    statement: >-
+      The role SHALL install cobbler, cobbler-web, and httpd on 'present' and
+      open the dns/dhcp/tftp/http/https firewalld services.
+    tier: 3
+    verified_by:
+      - lab: playbooks/provisioning_services.yml#present
+
+  - req_id: COBBLER-FR-003
+    statement: >-
+      The role SHALL render settings.yaml on 'configure' (server, next_server,
+      and manage_dhcp/manage_dns/manage_tftp), ensure the tftpboot directory,
+      and run cobbler sync.
+    tier: 3
+    verified_by:
+      - lab: playbooks/provisioning_services.yml#configure
+
+  - req_id: COBBLER-FR-004
+    statement: >-
+      The role SHALL register a distribution on 'add_distro' via `cobbler distro
+      add` (name/kernel/initrd/arch/breed/os_version).
+    tier: 3
+    verified_by:
+      - lab: playbooks/provisioning_services.yml#add_distro
+
+  - req_id: COBBLER-FR-005
+    statement: >-
+      The role SHALL register a profile bound to a distro on 'add_profile'
+      (optional kickstart).
+    tier: 3
+    verified_by:
+      - lab: playbooks/provisioning_services.yml#add_profile
+
+  - req_id: COBBLER-FR-006
+    statement: >-
+      The role SHALL register a system on 'add_system' via `cobbler system add`
+      (name/profile/mac/ip/hostname).
+    tier: 3
+    verified_by:
+      - lab: playbooks/provisioning_services.yml#add_system
+
+  - req_id: COBBLER-FR-007
+    statement: >-
+      The role SHALL drop the named system on 'remove_system'
+      (prov_cobbler_system_name).
+    tier: 3
+    verified_by:
+      - lab: playbooks/provisioning_services.yml#remove_system
+
+  - req_id: COBBLER-FR-008
+    statement: >-
+      The role SHALL run `cobbler sync` on 'sync' to render the boot
+      configuration into the managed PXE/DHCP/DNS/TFTP infrastructure.
+    tier: 3
+    verified_by:
+      - lab: playbooks/provisioning_services.yml#sync
+
+  - req_id: COBBLER-FR-009
+    statement: >-
+      The role SHALL manage the cobblerd service lifecycle on
+      'started'/'stopped'/'restarted'.
+    tier: 3
+    verified_by:
+      - lab: playbooks/provisioning_services.yml#present
+
+  - req_id: COBBLER-FR-010
+    statement: >-
+      The role SHALL report server state via `cobbler status` on 'status'.
+    tier: 3
+    verified_by:
+      - lab: playbooks/provisioning_services.yml#status
+
+  - req_id: COBBLER-FR-011
+    statement: >-
+      The role SHALL remove the Cobbler packages and close the firewalld
+      services on 'absent' — a teardown the provisioning lab does not exercise.
+    tier: 3
+    verified_by: []
+
+  - req_id: COBBLER-FR-012
+    statement: >-
+      A lab host SHALL PXE-boot a registered system against the deployed Cobbler
+      service (the end-to-end network-install outcome).
+    tier: 3
+    verified_by:
+      - lab: playbooks/provisioning_services.yml#pxe
+
+  # New entry authored in the user-story-lens schema (owner rule 2026-07-16,
+  # docs/scaffolding-templates.md) — added, not retrofitted alongside the
+  # existing entries above (incremental "touch it, fix it" standing rule).
+  - req_id: COBBLER-FR-013
+    persona: administrator
+    capability: >-
+      to register a whole batch of PXE systems in one call, for a site that
+      has no Satellite or Foreman and doesn't want one
+    benefit: >-
+      the same bare-host-provisioning outcome RHIS achieves through
+      Satellite is available on a genuinely lightweight PXE-only stack —
+      the light path in the two-path provisioning outcome (heavy: Satellite;
+      light: this), chosen per site rather than forced
+    acceptance:
+      - given: a list of systems (name, profile, mac, ip, hostname) in
+          prov_cobbler_systems
+        when: the add_systems action runs
+        then: every system in the list is registered, using the same
+          per-system logic add_system already proves works
+      - given: prov_cobbler_systems is empty (the default)
+        when: add_systems runs
+        then: nothing happens — a true no-op
+    statement: >-
+      As an administrator, I want to register a whole batch of PXE systems in
+      one call, so that the same bare-host-provisioning outcome RHIS achieves
+      through Satellite is available on a genuinely lightweight PXE-only
+      stack.
+    tier: 3
+    verified_by:
+      - molecule: default
+      - manual: >-
+          real bulk registration + PXE boot needs a live Cobbler server —
+          rhism alignment Phase C item 2 (light path), Tier-3 lab request
+          not yet prepared for this specific action (COBBLER-FR-012's
+          existing lab path covers single-system PXE boot; bulk-specific
+          verification is a follow-up, not yet executed)

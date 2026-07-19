@@ -1,0 +1,64 @@
+---
+# Role control
+mail_action: baseline
+mail_type: relay
+
+# Install gate — dry-run by default
+mail_install_execute: false
+
+# Identity
+mail_domain: "{{ ansible_domain | default('example.local') }}"
+mail_hostname: "{{ ansible_fqdn | default('mail.example.local') }}"
+
+# Relay host (relay type) — the upstream SMTP smarthost
+mail_relay_host: ""           # e.g. smtp.sendgrid.net or company relay
+mail_relay_port: 587
+mail_relay_user: ""
+mail_relay_password: ""       # vault-backed (no_log)
+
+# TLS — applied to both types
+mail_tls_enabled: true
+mail_tls_cert_file: ""        # PEM certificate path
+mail_tls_key_file: ""         # PEM private key path
+mail_tls_security_level: may  # may | encrypt | dane | dane-only | verify
+
+# Postfix tuning (both types)
+mail_inet_interfaces: all
+mail_inet_protocols: ipv4
+mail_message_size_limit: 10485760   # 10 MB
+mail_mailbox_size_limit: 0          # no mailbox quota (Dovecot manages this for full type)
+
+# Firewall ports
+mail_open_smtp: true      # port 25
+mail_open_submission: true # port 587
+mail_open_smtps: false    # port 465
+
+# Full stack extras (full type)
+mail_dovecot_protocols:
+  - imap
+  - imaps
+mail_dovecot_mail_location: "maildir:~/Maildir"
+mail_dovecot_ssl: required
+mail_virtual_domains: []
+# - name: domain.example.com
+mail_virtual_users: []
+# - user: alice@domain.example.com
+#   password_hash: ""  # dovecotpw -s SHA512-CRYPT
+
+# DKIM (full type)
+mail_dkim_enabled: true
+mail_dkim_selector: mail
+mail_dkim_key_size: 2048
+
+# SpamAssassin (full type)
+mail_spamassassin_enabled: true
+mail_spamassassin_required_score: 5.0
+mail_spamassassin_rewrite_subject: false
+
+# ClamAV (full type)
+mail_clamav_enabled: true
+
+# Baseline toggles
+mail_apply_install: false
+mail_apply_configure: false
+mail_apply_secure: false

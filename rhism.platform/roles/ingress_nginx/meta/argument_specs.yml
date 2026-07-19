@@ -1,0 +1,38 @@
+---
+argument_specs:
+  main:
+    short_description: Deploy the NGINX ingress controller on Kubernetes.
+    description: >-
+      Standalone-first ingress backend for container_platform. Deploys the NGINX ingress
+      controller via Helm and sets it as the default IngressClass. Consumes the shared
+      ingress-backend interface (action, cp_* vars) so the container_platform dispatcher can
+      select any backend with identical code.
+    options:
+      action:
+        description: >-
+          Lifecycle action, shared across all ingress backends. 'ingress' (and its alias
+          'present') deploy NGINX; 'absent' removes it.
+        type: str
+        default: ingress
+        choices:
+          - ingress
+          - present
+          - absent
+      cp_kubeconfig_path:
+        description: Path to the cluster kubeconfig. Shared ingress-interface var.
+        type: str
+        default: /etc/rancher/k3s/k3s.yaml
+      cp_ingress_replicas:
+        description: NGINX controller replica count. Shared ingress-interface var.
+        type: int
+        default: 1
+      cp_ingress_execute:
+        description: >-
+          Dry-run gate honoured by every ingress backend. false validates action dispatch and
+          variable resolution without changing the node or cluster (used by molecule).
+        type: bool
+        default: true
+      cp_ingress_ssl_passthrough:
+        description: Enable NGINX SSL passthrough support.
+        type: bool
+        default: false

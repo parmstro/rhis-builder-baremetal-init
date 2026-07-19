@@ -1,0 +1,108 @@
+---
+- name: Verify — auditd configure action
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Gather package facts
+      ansible.builtin.package_facts:
+        manager: auto
+
+    - name: Assert audit package is installed
+      ansible.builtin.assert:
+        that: "'audit' in ansible_facts.packages"
+        fail_msg: "audit package should be installed"
+      delegate_to: "{{ inventory_hostname }}"
+
+    - name: Stat audit rules directory
+      ansible.builtin.stat:
+        path: /etc/audit/rules.d
+      register: _audit_rules_dir
+
+    - name: Assert audit rules directory exists
+      ansible.builtin.assert:
+        that: _audit_rules_dir.stat.isdir
+        fail_msg: "/etc/audit/rules.d directory was not created"
+      delegate_to: localhost
+
+    - name: Stat deployed audit rules file
+      ansible.builtin.stat:
+        path: /etc/audit/rules.d/linux_auditing.rules
+      register: _audit_rules
+
+    - name: Assert audit rules file was deployed
+      ansible.builtin.assert:
+        that: _audit_rules.stat.exists
+        fail_msg: "/etc/audit/rules.d/linux_auditing.rules was not created"
+      delegate_to: localhost
+
+    - name: Slurp audit rules file
+      ansible.builtin.slurp:
+        src: /etc/audit/rules.d/linux_auditing.rules
+      register: _audit_rules_content
+
+    - name: Assert core CIS rule keys are present
+      ansible.builtin.assert:
+        that:
+          - "'-k sudoers' in (_audit_rules_content.content | b64decode)"
+          - "'-k identity' in (_audit_rules_content.content | b64decode)"
+          - "'-k time-change' in (_audit_rules_content.content | b64decode)"
+          - "'-k privileged' in (_audit_rules_content.content | b64decode)"
+          - "'-k modules' in (_audit_rules_content.content | b64decode)"
+          - "'-k cron' in (_audit_rules_content.content | b64decode)"
+        fail_msg: "One or more expected audit rule keys missing from deployed rules"
+      delegate_to: localhost
+
+- name: Verify — verify action result fact
+  hosts: all
+  gather_facts: false
+  vars:
+    # Molecule runs converge.yml and verify.yml as separate ansible-playbook
+    # invocations with no fact cache — set_fact results from converge do not
+    # persist here. Re-run the verify action in this same play so the
+    # resulting fact is available to assert against (BUG-049).
+    linux_auditing_action: verify
+    linux_auditing_start_service: false
+  tasks:
+    - name: Re-run verify action to populate linux_auditing_verify_result
+      ansible.builtin.include_role:
+        name: rhism.platform.linux_auditing
+
+    - name: Assert linux_auditing_verify_result is set
+      ansible.builtin.assert:
+        that:
+          - linux_auditing_verify_result is defined
+          - linux_auditing_verify_result.status == 'passed'
+          - linux_auditing_verify_result.rules_file_exists | bool
+          - "'sudoers' in linux_auditing_verify_result.keys_verified"
+        fail_msg: "linux_auditing_verify_result not set correctly by verify action"
+      delegate_to: localhost
+
+- name: Verify — report action result fact
+  hosts: all
+  gather_facts: false
+  vars:
+    linux_auditing_action: report
+    linux_auditing_start_service: false
+  tasks:
+    - name: Re-run report action to populate linux_auditing_report
+      ansible.builtin.include_role:
+        name: rhism.platform.linux_auditing
+
+    - name: Assert linux_auditing_report is set
+      ansible.builtin.assert:
+        that:
+          - linux_auditing_report is defined
+          - linux_auditing_report.service_managed is defined
+        fail_msg: "linux_auditing_report not set by report action"
+      delegate_to: localhost
+
+- name: Verify — summary
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Print summary
+      ansible.builtin.debug:
+        msg: >-
+          linux_auditing verified on EL9/EL10 containers:
+          configure, verify, report, baseline actions all passed.

@@ -1,0 +1,27 @@
+---
+- name: Verify standalone variable contract
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Load role defaults
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../../defaults/main.yml"
+      delegate_to: localhost
+
+    - name: Assert shared interface defaults resolve for standalone use
+      ansible.builtin.assert:
+        that:
+          - action == 'storage'
+          - cp_kubeconfig_path == '/root/.kube/config'
+          - cp_type == 'ocp'
+          - cp_storage_execute | bool
+          - not (cp_ocs_install_execute | bool)
+          - cp_storage_ocs_size == '500Gi'
+          - cp_storage_ocs_storage_class == 'gp2'
+        fail_msg: "storage_ocs defaults did not resolve to the expected standalone contract"
+      delegate_to: localhost
+
+    - name: Report verification passed
+      ansible.builtin.debug:
+        msg: "PASS — storage_ocs standalone contract verified"
+      delegate_to: localhost

@@ -1,0 +1,59 @@
+---
+- name: Verify dispatcher and type-driven var loading
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Verify freeipa vars can be loaded
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../../vars/freeipa.yml"
+        name: _freeipa_vars
+      delegate_to: localhost
+
+    - name: Assert freeipa vars have expected keys
+      ansible.builtin.assert:
+        that:
+          - _freeipa_vars._idm_server_packages is defined
+          - _freeipa_vars._idm_client_packages is defined
+          - _freeipa_vars._idm_installer_cmd == 'ipa-server-install'
+          - not _freeipa_vars._idm_rhsm_required
+        fail_msg: "freeipa vars are missing expected keys."
+      delegate_to: localhost
+
+    - name: Verify rh_idm vars can be loaded
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../../vars/rh_idm.yml"
+        name: _rh_idm_vars
+      delegate_to: localhost
+
+    - name: Assert rh_idm vars require RHSM
+      ansible.builtin.assert:
+        that:
+          - _rh_idm_vars._idm_rhsm_required | bool
+          - _rh_idm_vars._idm_installer_cmd == 'ipa-server-install'
+        fail_msg: "rh_idm vars should have _idm_rhsm_required=true."
+      delegate_to: localhost
+
+    - name: Verify ad_integration vars can be loaded
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../../vars/ad_integration.yml"
+        name: _ad_vars
+      delegate_to: localhost
+
+    - name: Assert ad_integration vars have realmd packages
+      ansible.builtin.assert:
+        that:
+          - _ad_vars._idm_join_packages is defined
+          - _ad_vars._idm_join_packages | length > 0
+          - "'realmd' in _ad_vars._idm_join_packages"
+          - "'sssd' in _ad_vars._idm_join_packages"
+          - not _ad_vars._idm_server_applicable
+        fail_msg: "ad_integration vars are missing expected join packages."
+      delegate_to: localhost
+
+    - name: Confirm all verifications passed
+      ansible.builtin.debug:
+        msg: >-
+          PASS — all three idm_type var files load correctly with expected keys.
+          Dispatcher pattern validated via converge negative tests.
+      delegate_to: localhost

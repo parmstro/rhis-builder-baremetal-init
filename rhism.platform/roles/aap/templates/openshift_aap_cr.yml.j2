@@ -1,0 +1,21 @@
+{{ '{#' }} Rendered by rhism.platform.aap for the AAP Operator on OpenShift.
+   2.5+ ships a single unified AnsibleAutomationPlatform CR; 2.4 (pre-gateway)
+   uses per-component CRs (AutomationController/AutomationHub/EDA). The kind and
+   apiVersion come from vars/versions/{{ aap_version }}.yml. Applied via
+   kubernetes.core.k8s — Red Hat's operator does the actual deployment. {{ '#}' }}
+---
+apiVersion: {{ aap_version_profile.openshift.cr_api_version }}
+kind: {{ aap_version_profile.openshift.cr_kind }}
+metadata:
+  name: {{ aap_openshift_cr_name }}
+  namespace: {{ aap_openshift_namespace }}
+spec:
+  # Structural spec only — sizing/replicas/storage are group_vars/t-shirt-sizing
+  # concerns, not baked here. Extend per the AAP {{ aap_version }} operator docs.
+{% if aap_version_profile.gateway_era %}
+  # Gateway-era unified platform CR.
+  no_log: false
+{% else %}
+  # Pre-gateway component CR ({{ aap_version_profile.openshift.cr_kind }}).
+  replicas: 1
+{% endif %}

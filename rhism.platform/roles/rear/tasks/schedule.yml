@@ -1,0 +1,34 @@
+---
+# schedule — install and enable a systemd timer for unattended protection.
+# Renders the config first (so retention/backup-type vars are wired in), then deploys
+# rear-mkbackup.service (Type=oneshot) + rear-mkbackup.timer (OnCalendar) and enables
+# the timer. Disable by setting backup_rear_schedule_enabled: false.
+
+- name: Render the ReaR configuration (wires retention/backup-type into local.conf)
+  ansible.builtin.include_tasks: configure.yml
+
+- name: Deploy the rear-mkbackup systemd service unit
+  ansible.builtin.template:
+    src: rear-mkbackup.service.j2
+    dest: /etc/systemd/system/rear-mkbackup.service
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+
+- name: Deploy the rear-mkbackup systemd timer unit
+  ansible.builtin.template:
+    src: rear-mkbackup.timer.j2
+    dest: /etc/systemd/system/rear-mkbackup.timer
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+
+- name: Enable and start (or disable and stop) the rear-mkbackup timer
+  ansible.builtin.systemd_service:
+    name: rear-mkbackup.timer
+    enabled: "{{ backup_rear_schedule_enabled | bool }}"
+    state: "{{ 'started' if backup_rear_schedule_enabled | bool else 'stopped' }}"
+    daemon_reload: true
+  become: true

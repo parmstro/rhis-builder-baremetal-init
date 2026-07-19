@@ -1,0 +1,31 @@
+---
+galaxy_info:
+  role_name: linux_security
+  namespace: cx_ansible_galaxy
+  author: cx_ansible_galaxy
+  description: >-
+    Linux security orchestrator for EL 8/9/10 — composes linux_packages,
+    linux_hardening, firewall, linux_auditing, linux_users, and linux_selinux
+    roles via include_role. Boolean flags control which domains are applied.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: EL
+      versions:
+        - "8"
+        - "9"
+        - "10"
+  galaxy_tags:
+    - linux
+    - security
+    - hardening
+    - selinux
+    - firewall
+    - auditd
+    - cis
+    - stig
+
+# No meta dependencies (BUG-102): composition is conditional — the apply_*
+# toggles gate include_role calls in tasks/main.yml. A meta dependency runs
+# unconditionally (with role defaults) BEFORE tasks, defeating the gates.
+dependencies: []

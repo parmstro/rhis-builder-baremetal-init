@@ -1,0 +1,110 @@
+---
+- name: Verify manifest generation and content
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Check small-tier estate manifest exists
+      ansible.builtin.stat:
+        path: /tmp/wizard-test/estate-small-manifest.yml
+      register: _manifest_small_stat
+      delegate_to: localhost
+
+    - name: Assert small-tier estate manifest exists
+      ansible.builtin.assert:
+        that:
+          - _manifest_small_stat.stat.exists
+        fail_msg: "small-tier estate manifest was not generated."
+      delegate_to: localhost
+
+    - name: Read small-tier estate manifest
+      ansible.builtin.slurp:
+        src: /tmp/wizard-test/estate-small-manifest.yml
+      register: _manifest_small_raw
+      delegate_to: localhost
+
+    - name: Parse small-tier estate manifest
+      ansible.builtin.set_fact:
+        _manifest_small: "{{ _manifest_small_raw.content | b64decode | from_yaml }}"
+
+    - name: Assert small-tier estate manifest structure and sizing
+      ansible.builtin.assert:
+        that:
+          - _manifest_small.profile == 'estate'
+          - _manifest_small.components is defined
+          - _manifest_small.components.identity.type == 'rh_idm'
+          - _manifest_small.components.content.type == 'satellite'
+          - _manifest_small.components.provisioning.type == 'satellite_proxy'
+          - _manifest_small.components.automation.type == 'aap'
+          - _manifest_small.components.hypervisor.type == 'kvm'
+          - _manifest_small.components.tang is defined
+          - _manifest_small.components.tang.enabled == true
+          - _manifest_small.network.domain == 'test.local'
+          - _manifest_small.network.realm == 'TEST.LOCAL'
+          - _manifest_small.sizing is defined
+          - _manifest_small.sizing.tier == 's'
+          - _manifest_small.sizing.hypervisor_host is defined
+          - _manifest_small.sizing.hypervisor_host.cores == 8
+          - _manifest_small.sizing.tang_host is defined
+          - _manifest_small.licensing.rhsm == true
+          - _manifest_small.licensing.satellite == true
+        fail_msg: "small-tier estate manifest is missing expected keys or has wrong values."
+      delegate_to: localhost
+
+    - name: Check large-tier estate manifest exists
+      ansible.builtin.stat:
+        path: /tmp/wizard-test/estate-large-manifest.yml
+      register: _manifest_large_stat
+      delegate_to: localhost
+
+    - name: Assert large-tier estate manifest exists
+      ansible.builtin.assert:
+        that:
+          - _manifest_large_stat.stat.exists
+        fail_msg: "large-tier (default) estate manifest was not generated."
+      delegate_to: localhost
+
+    - name: Read large-tier estate manifest
+      ansible.builtin.slurp:
+        src: /tmp/wizard-test/estate-large-manifest.yml
+      register: _manifest_large_raw
+      delegate_to: localhost
+
+    - name: Parse large-tier estate manifest
+      ansible.builtin.set_fact:
+        _manifest_large: "{{ _manifest_large_raw.content | b64decode | from_yaml }}"
+
+    - name: Assert large-tier estate manifest sizing differs from small (real tier selection, not a static fixture)
+      ansible.builtin.assert:
+        that:
+          - _manifest_large.sizing.tier == 'l'
+          - _manifest_large.sizing.hypervisor_host.cores == 16
+          - _manifest_large.sizing.hypervisor_host.count == 3
+          - _manifest_large.sizing.hypervisor_host.cores != _manifest_small.sizing.hypervisor_host.cores
+        fail_msg: >-
+          large-tier estate manifest sizing did not differ from small-tier —
+          wizard_estate_sizing_tier is not actually selecting a real tier.
+        success_msg: "PASS — small vs large tier produced genuinely different sizing figures"
+      delegate_to: localhost
+
+    - name: Check generated inventory exists
+      ansible.builtin.stat:
+        path: /tmp/wizard-test/inventory/hosts.yml
+      register: _inventory_stat
+      delegate_to: localhost
+
+    - name: Assert generated inventory exists
+      ansible.builtin.assert:
+        that:
+          - _inventory_stat.stat.exists
+        fail_msg: "generate_inventory did not produce inventory/hosts.yml."
+      delegate_to: localhost
+
+    - name: Confirm all verification passed
+      ansible.builtin.debug:
+        msg: >-
+          PASS — estate profile generated correctly at both a small and
+          large sizing tier (real, distinct figures, not a static fixture),
+          including the tang component slot; validate/show_plan/
+          generate_inventory all ran cleanly against it.
+      delegate_to: localhost

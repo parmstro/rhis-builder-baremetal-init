@@ -1,0 +1,26 @@
+---
+galaxy_info:
+  role_name: monitoring_stack
+  namespace: rhism
+  author: rhism
+  description: >-
+    Monitoring stack deployment — Nagios Core, Splunk Enterprise,
+    Elasticsearch/Kibana with Filebeat, plus EDA rulebooks for
+    event-driven automation.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: EL
+      versions:
+        - "9"
+  galaxy_tags:
+    - monitoring
+    - nagios
+    - splunk
+    - elasticsearch
+    - kibana
+    - filebeat
+    - eda
+    - siem
+
+dependencies: []

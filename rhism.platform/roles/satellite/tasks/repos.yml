@@ -1,0 +1,35 @@
+---
+# --------------------------------------------------------------------------- #
+# repos — custom products and repositories                                    #
+# --------------------------------------------------------------------------- #
+- name: Manage product
+  theforeman.foreman.product:
+    server_url: "{{ content_server_url }}"
+    username: "{{ content_username }}"
+    password: "{{ content_password }}"
+    validate_certs: "{{ content_validate_certs }}"
+    organization: "{{ content_organization }}"
+    name: "{{ item.name }}"
+    label: "{{ item.label | default(omit) }}"
+    description: "{{ item.description | default(omit) }}"
+    state: present
+  loop: "{{ content_products }}"
+  no_log: "{{ content_no_log }}"
+  when: content_products | length > 0
+
+- name: Manage repository
+  theforeman.foreman.repository:
+    server_url: "{{ content_server_url }}"
+    username: "{{ content_username }}"
+    password: "{{ content_password }}"
+    validate_certs: "{{ content_validate_certs }}"
+    organization: "{{ content_organization }}"
+    product: "{{ item.0.name }}"
+    name: "{{ item.1.name }}"
+    content_type: "{{ item.1.content_type | default('yum') }}"
+    url: "{{ item.1.url | default(omit) }}"
+    download_policy: "{{ item.1.download_policy | default('on_demand') }}"
+    state: present
+  loop: "{{ content_products | subelements('repos', skip_missing=True) }}"
+  no_log: "{{ content_no_log }}"
+  when: content_products | length > 0

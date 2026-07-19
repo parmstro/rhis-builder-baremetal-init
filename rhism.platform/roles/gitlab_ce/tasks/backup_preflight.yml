@@ -1,0 +1,23 @@
+---
+# ---------------------------------------------------------------------------
+# gitlab_ce — shared: backup/restore preflight checks
+#
+# Used by: backup.yml, restore.yml
+# Validates GitLab services are reachable and backup path exists.
+# ---------------------------------------------------------------------------
+
+- name: Verify GitLab services are running
+  ansible.builtin.command:
+    cmd: "{{ _scm_ctl_cmd }} status"
+  become: true
+  changed_when: false
+  register: _gitlab_ce_preflight_status
+
+- name: Ensure backup directory exists
+  ansible.builtin.file:
+    path: "{{ scm_backup_path | default('/var/opt/gitlab/backups') }}"
+    state: directory
+    owner: git
+    group: git
+    mode: "0700"
+  become: true

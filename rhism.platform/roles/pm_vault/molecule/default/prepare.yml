@@ -1,0 +1,17 @@
+---
+- name: Prepare — wait for Vault dev server to become ready
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  tasks:
+    - name: Wait for Vault health endpoint
+      ansible.builtin.uri:
+        url: "http://host.containers.internal:18200/v1/sys/health"
+        method: GET
+        status_code: [200, 429, 472, 473, 501, 503]
+      register: _vault_ready
+      until: _vault_ready.status is defined and _vault_ready.status in [200, 429, 472, 473, 501, 503]
+      retries: 30
+      delay: 2
+      failed_when: false

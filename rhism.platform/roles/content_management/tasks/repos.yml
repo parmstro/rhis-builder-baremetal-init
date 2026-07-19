@@ -1,0 +1,6 @@
+---
+- name: Manage products and repositories ({{ content_type }})
+  ansible.builtin.include_role:
+    name: "{{ content_type }}"
+  vars:
+    action: repos

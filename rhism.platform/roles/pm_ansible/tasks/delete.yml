@@ -1,0 +1,31 @@
+---
+# pm_ansible — delete action.
+# Removes credential and metadata files. Optionally locks the system user account.
+
+- name: Remove credential file
+  ansible.builtin.file:
+    path: "{{ pm_ansible_cred_dir }}/{{ pm_target }}.cred"
+    state: absent
+  delegate_to: localhost
+  become: "{{ pm_ansible_become | bool }}"
+
+- name: Remove metadata file
+  ansible.builtin.file:
+    path: "{{ pm_ansible_cred_dir }}/{{ pm_target }}.meta.yml"
+    state: absent
+  delegate_to: localhost
+  become: "{{ pm_ansible_become | bool }}"
+
+- name: Remove password history file
+  ansible.builtin.file:
+    path: "{{ pm_ansible_cred_dir }}/{{ pm_target }}.history"
+    state: absent
+  delegate_to: localhost
+  become: "{{ pm_ansible_become | bool }}"
+
+- name: Lock system user account (ISM-1416 — no shared passwords)
+  ansible.builtin.user:
+    name: "{{ pm_ansible_system_user }}"
+    password_lock: true
+  become: true
+  when: pm_ansible_manage_system_user | bool

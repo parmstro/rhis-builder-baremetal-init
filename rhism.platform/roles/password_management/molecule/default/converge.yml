@@ -1,0 +1,36 @@
+---
+- name: Converge — password_management dispatcher via ansible backend
+  hosts: pm-el9
+  gather_facts: false
+  tasks:
+    - name: Create password for test_svc_account
+      ansible.builtin.include_role:
+        name: password_management
+      vars:
+        pm_action: create
+        pm_type: ansible
+        pm_target: test_svc_account
+
+    - name: Audit password for test_svc_account
+      ansible.builtin.include_role:
+        name: password_management
+      vars:
+        pm_action: audit
+        pm_type: ansible
+        pm_target: test_svc_account
+
+    - name: Rotate password for test_svc_account
+      ansible.builtin.include_role:
+        name: password_management
+      vars:
+        pm_action: rotate
+        pm_type: ansible
+        pm_target: test_svc_account
+
+    - name: Delete password for test_svc_account
+      ansible.builtin.include_role:
+        name: password_management
+      vars:
+        pm_action: delete
+        pm_type: ansible
+        pm_target: test_svc_account

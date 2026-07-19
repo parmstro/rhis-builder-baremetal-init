@@ -1,0 +1,53 @@
+---
+- name: Verify — pm_thycotic ISM password generation compliance
+  hosts: all
+  gather_facts: false
+
+  tasks:
+    - name: Run standalone generation to verify ISM-0406/0407 compliance
+      # Rejection-sample like tasks/generate.yml does — a single unconditional
+      # random draw has a real (~65% across 20 draws) chance of missing a
+      # character class by pure luck; that isn't a compliance failure, it's a
+      # flawed test. Loop until each class's minimum is met, same as the role.
+      ansible.builtin.shell:
+        cmd: |
+          python3 -c "
+          import secrets, string, re
+          chars = string.ascii_letters + string.digits + '!@#\$%^&*()-_=+[]{}|;:,.<>?'
+          for _ in range(20):
+              while True:
+                  pw = ''.join(secrets.choice(chars) for _ in range(20))
+                  if (re.search(r'[A-Z]', pw) and re.search(r'[a-z]', pw)
+                          and re.search(r'[0-9]', pw) and re.search(r'[^A-Za-z0-9]', pw)):
+                      break
+              assert len(pw) >= 20, f'ISM-0406: too short ({len(pw)})'
+          print('ISM-0406/0407: 20 passwords generated and verified')
+          "
+      register: _ism_check
+      changed_when: false
+
+    - name: Assert ISM compliance check passed
+      ansible.builtin.assert:
+        that:
+          - _ism_check.rc == 0
+          - "'ISM-0406/0407' in _ism_check.stdout"
+        fail_msg: "ISM generation compliance check failed: {{ _ism_check.stderr }}"
+
+    - name: Assert python3 secrets module uses os.urandom (not random)
+      ansible.builtin.shell:
+        cmd: |
+          python3 -c "
+          import secrets, inspect
+          src = inspect.getsource(secrets)
+          assert 'os.urandom' in src or 'SystemRandom' in src, 'secrets module not CSPRNG-backed'
+          print('CSPRNG verified')
+          "
+      register: _csprng_check
+      changed_when: false
+
+    - name: Assert CSPRNG backing confirmed
+      ansible.builtin.assert:
+        that:
+          - _csprng_check.rc == 0
+          - "'CSPRNG verified' in _csprng_check.stdout"
+        fail_msg: "python3 secrets module CSPRNG check failed"

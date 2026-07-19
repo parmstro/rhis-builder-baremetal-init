@@ -1,0 +1,42 @@
+---
+# Interactive molecule scenario — for MANUAL testing only, not in CI.
+# Requires a real TTY and the 'newt' package (provides whiptail).
+# Run:  molecule test -s interactive
+# or:   molecule converge -s interactive  (leaves container running for inspect)
+# Collection-hosted scenario: molecule's collection-under-test auto-install
+# (prerun) would try to ansible-galaxy-install this collection and its
+# dependency into the workspace collections path, clobbering the loader
+# symlink at collections/ansible_collections/rhism/<name> ("Cannot call
+# rmtree on a symbolic link"). Disabled — local collection checkouts already
+# resolve via ANSIBLE_COLLECTIONS_PATH.
+prerun: false
+
+dependency:
+  name: galaxy
+  enabled: false
+
+driver:
+  name: docker
+
+platforms:
+  - name: wizard-interactive
+    image: registry.access.redhat.com/ubi9/ubi:latest
+    pre_build_image: true
+    override_command: true
+    docker_host: unix:///var/run/docker.sock
+    # newt (whiptail) must be installed before converge
+    command: |
+      sh -c 'microdnf -y install newt && tail -f /dev/null'
+
+provisioner:
+  name: ansible
+
+scenario:
+  # Do NOT include in the default CI test_sequence.
+  # Run manually with: cd roles/wizard && molecule converge -s interactive
+  test_sequence:
+    - dependency
+    - destroy
+    - create
+    - converge
+    - destroy

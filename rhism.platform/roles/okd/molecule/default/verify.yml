@@ -1,0 +1,26 @@
+---
+- name: Verify standalone variable contract
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Load role defaults
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../../defaults/main.yml"
+      delegate_to: localhost
+
+    - name: Assert shared interface defaults resolve for standalone use
+      ansible.builtin.assert:
+        that:
+          - action == 'present'
+          - cp_install_dir == '/opt/openshift-install'
+          - not (cp_install_execute | bool)
+          - not (cp_destroy_confirm | bool)
+          - cp_node_replicas | int == 1
+          - cp_base_domain == 'example.com'
+        fail_msg: "okd defaults did not resolve to the expected standalone contract"
+      delegate_to: localhost
+
+    - name: Report verification passed
+      ansible.builtin.debug:
+        msg: "PASS — okd standalone contract verified"
+      delegate_to: localhost

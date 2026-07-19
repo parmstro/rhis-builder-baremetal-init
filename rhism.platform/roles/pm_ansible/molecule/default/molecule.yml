@@ -1,0 +1,46 @@
+---
+# Collection-hosted scenario: molecule's collection-under-test auto-install
+# (prerun) would try to ansible-galaxy-install this collection and its
+# dependency into the workspace collections path, clobbering the loader
+# symlink at collections/ansible_collections/rhism/<name> ("Cannot call
+# rmtree on a symbolic link"). Disabled — local collection checkouts already
+# resolve via ANSIBLE_COLLECTIONS_PATH.
+prerun: false
+
+dependency:
+  name: galaxy
+  enabled: false
+
+driver:
+  name: docker
+platforms:
+  - name: pm-ansible-el9
+    image: docker.io/almalinux:9
+    pre_build_image: true
+provisioner:
+  name: ansible
+  inventory:
+    group_vars:
+      all:
+        ansible_python_interpreter: /usr/bin/python3
+        ansible_remote_tmp: /tmp
+        pm_ansible_become: false
+        pm_ansible_cred_dir: /tmp/pm_test_creds
+verifier:
+  name: ansible
+
+scenario:
+  # `create` always generates a fresh random password and overwrites the
+  # credential/history files by design — a true idempotence step (re-run,
+  # expect zero changes) fails structurally, not from a bug. Double-converge
+  # instead (established pattern in this repo for non-idempotent modules).
+  test_sequence:
+    - dependency
+    - destroy
+    - syntax
+    - create
+    - prepare
+    - converge
+    - converge
+    - verify
+    - destroy

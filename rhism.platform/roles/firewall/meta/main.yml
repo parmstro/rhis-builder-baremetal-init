@@ -1,0 +1,19 @@
+---
+galaxy_info:
+  author: rhism
+  description: Declarative firewalld rule management (zones, sources, services, ports, rich rules)
+  company: rhism
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: EL
+      versions:
+        - "9"
+        - "10"
+  galaxy_tags:
+    - firewall
+    - firewalld
+    - security
+    - networking
+
+dependencies: []

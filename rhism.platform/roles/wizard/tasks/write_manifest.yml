@@ -1,0 +1,14 @@
+---
+- name: Write deployment manifest
+  ansible.builtin.template:
+    src: deployment-manifest.yml.j2
+    dest: "{{ wizard_output_dir }}/{{ wizard_output_file }}"
+    mode: "0640"
+  tags: infra_wizard
+
+- name: Display manifest path
+  ansible.builtin.debug:
+    msg: >-
+      Deployment manifest written to:
+      {{ wizard_output_dir }}/{{ wizard_output_file }}
+  tags: infra_wizard

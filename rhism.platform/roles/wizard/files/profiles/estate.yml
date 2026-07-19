@@ -1,0 +1,82 @@
+---
+profile_name: rhism Governed RHEL Estate
+profile_description: >-
+  The standard governed-RHEL estate this wizard exists to stand up: IdM +
+  Satellite (core + capsules) + AAP + KVM hypervisors + Tang/NBDE key
+  escrow + declared test hosts, expressed as one wizard -> builder ->
+  deployer flow over this platform's own standalone-first roles (see
+  docs/rhism-alignment-plan.md). Requires active Red Hat subscriptions for
+  IdM, Satellite, and AAP.
+profile_license_required: true
+
+components:
+  hypervisor:
+    enabled: true
+    type: kvm
+  identity:
+    enabled: true
+    type: rh_idm
+  provisioning:
+    enabled: true
+    type: satellite_proxy
+  secrets:
+    enabled: false
+    type: none
+  content:
+    enabled: true
+    type: satellite
+  mail:
+    enabled: false
+    type: none
+  scm:
+    enabled: true
+    type: gitlab_ce         # CORE: the GitOps CaC content store / SCM (bootstrap-first)
+  backup:
+    enabled: false
+    type: none
+  container_platform:
+    enabled: false
+    type: none
+  monitoring:
+    enabled: false
+    type: none
+  automation:
+    enabled: true
+    type: aap
+  security:
+    enabled: true
+    type: default
+  # NBDE/Tang key escrow — dispatched in
+  # collections/rhism/platform/roles/builder/tasks/deploy.yml directly to
+  # the standalone roles/tang role (not a platform-collection product
+  # family — tang has no dispatcher/type selection of its own).
+  tang:
+    enabled: true
+    type: default
+
+# Real S/M/L capacity tiers (docs/capacity-planning.md convention) — which
+# one is used is picked by wizard_estate_sizing_tier (defaults/main.yml),
+# read in tasks/interactive.yml. ADDITIVE figures, OS baseline excluded (1
+# vCPU / 2 GB RAM / 20 GB disk, RHEL 9). Per-server figures are this
+# platform's own measured/estimated sizing for these workloads (no single
+# vendor doc covers "IdM + Satellite + AAP + KVM + Tang as one estate" —
+# labeled honestly per capacity-planning.md's no-vendor-guidance rule);
+# hypervisor_host/tang_host counts reflect real deployment minimums (2+
+# Tang servers so a single server loss never blocks disk-encryption
+# unlock; 2+ hypervisors for the KVM estate itself).
+sizing_defaults:
+  s:
+    identity_server: {cores: 4, memory_mb: 8192, disk_gb: 100}
+    content_server: {cores: 4, memory_mb: 8192, disk_gb: 500}
+    hypervisor_host: {cores: 8, memory_mb: 32768, disk_gb: 500, count: 2}
+    tang_host: {cores: 1, memory_mb: 2048, disk_gb: 20, count: 2}
+  m:
+    identity_server: {cores: 8, memory_mb: 16384, disk_gb: 100}
+    content_server: {cores: 8, memory_mb: 16384, disk_gb: 500}
+    hypervisor_host: {cores: 16, memory_mb: 65536, disk_gb: 1000, count: 2}
+    tang_host: {cores: 2, memory_mb: 4096, disk_gb: 20, count: 2}
+  l:
+    identity_server: {cores: 8, memory_mb: 16384, disk_gb: 100}
+    content_server: {cores: 8, memory_mb: 16384, disk_gb: 500}
+    hypervisor_host: {cores: 16, memory_mb: 65536, disk_gb: 1000, count: 3}
+    tang_host: {cores: 2, memory_mb: 4096, disk_gb: 20, count: 3}

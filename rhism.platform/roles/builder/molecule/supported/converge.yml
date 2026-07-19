@@ -1,0 +1,54 @@
+---
+- name: Converge — rhism plan (supported-profile manifest load and display)
+  # builder is a control-node orchestrator; playbook_dir-relative pb_manifest_path
+  # must resolve on the controller, not the docker test container.
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    pb_action: plan
+    pb_manifest_path: "{{ playbook_dir }}/files/supported-manifest.yml"
+  roles:
+    - role: rhism.platform.builder
+
+- name: Converge — rhism deploy dry-run (all components, all sub-toggles false)
+  # builder is a control-node orchestrator; playbook_dir-relative pb_manifest_path
+  # must resolve on the controller, not the docker test container.
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    pb_action: deploy
+    pb_manifest_path: "{{ playbook_dir }}/files/supported-manifest.yml"
+    pb_deploy_execute: false
+    # linux_security (step 1) and monitoring_stack (step 9) have no apply-gate —
+    # unlike every other step they run for real whenever enabled, regardless of
+    # pb_deploy_execute. The supported profile legitimately enables both, but running
+    # them against the control-node connection (no dnf/sudo here) isn't what this
+    # scenario tests; disable them here — the manifest fixture's enabled: true is
+    # still asserted by verify.yml.
+    pb_enable_security: false
+    pb_enable_monitoring: false
+    # identity_management asserts idm_domain unconditionally at role entry,
+    # even when every apply_* flag below is false — a dry-run still needs one.
+    idm_domain: supported.lab.example.com
+    pb_idm_apply_server: false
+    pb_idm_apply_dns: false
+    pb_idm_apply_client: false
+    pb_idm_apply_trust: false
+    pb_content_apply_install: false
+    pb_content_apply_configure: false
+    pb_content_apply_repos: false
+    pb_content_apply_sync: false
+    pb_scm_apply_install: false
+    pb_scm_apply_configure: false
+    pb_scm_apply_runners: false
+    pb_backup_apply_server: false
+    pb_backup_apply_client: false
+    pb_cp_apply_install: false
+    pb_cp_apply_configure: false
+    pb_cp_apply_storage: false
+    pb_cp_apply_registry: false
+    pb_cp_apply_ingress: false
+  roles:
+    - role: rhism.platform.builder

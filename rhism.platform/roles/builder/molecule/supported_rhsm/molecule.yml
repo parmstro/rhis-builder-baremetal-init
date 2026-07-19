@@ -1,0 +1,60 @@
+---
+# rhism RHSM scenario — real RHSM registration + RH IDM server install.
+# This scenario requires a pre-provisioned RHEL 9 VM and active subscriptions.
+# It does NOT run in CI — execute manually or on a scheduled pipeline.
+#
+# Prerequisites:
+#   1. RHEL 9 VM reachable via SSH (minimum: 4 vCPU, 8 GB RAM, 50 GB disk)
+#   2. SSH key-based access to the VM configured for your ansible user
+#   3. Update inventory/hosts.ini with the VM's IP and SSH user
+#   4. Populate vault.yml with your RHSM credentials:
+#        ansible-vault encrypt_string 'YOUR_ORG_ID' --name 'vault_rhsm_org_id'
+#        ansible-vault encrypt_string 'YOUR_KEY' --name 'vault_rhsm_activation_key'
+#        ansible-vault encrypt_string 'AdminPass123!' --name 'vault_idm_admin_password'
+#        ansible-vault encrypt_string 'DirPass123!' --name 'vault_idm_ds_password'
+#
+# Run:
+#   cd collections/rhism/platform/roles/builder
+#   molecule converge -s supported_rhsm -- --vault-password-file ~/.vault_pass.txt
+#   molecule verify  -s supported_rhsm -- --vault-password-file ~/.vault_pass.txt
+#
+# What this tests:
+#   - RHSM registration via community.general.redhat_subscription
+#   - RH IDM package install from RHSM repos (ipa-server, ipa-server-dns)
+#   - ipa-server-install (real Kerberos + LDAP + DNS provisioning ~10 min)
+#   - Functional verify: kinit admin, ipa user-find, HTTPS probe to /ipa/ui/
+# Collection-hosted scenario: molecule's collection-under-test auto-install
+# (prerun) would try to ansible-galaxy-install this collection and its
+# dependency into the workspace collections path, clobbering the loader
+# symlink at collections/ansible_collections/rhism/<name> ("Cannot call
+# rmtree on a symbolic link"). Disabled — local collection checkouts already
+# resolve via ANSIBLE_COLLECTIONS_PATH.
+prerun: false
+
+dependency:
+  name: galaxy
+  enabled: false
+
+driver:
+  name: default
+  options:
+    managed: false
+    login_cmd_template: "ssh -o StrictHostKeyChecking=no {instance}"
+
+platforms:
+  - name: supported-rhsm-01
+
+provisioner:
+  name: ansible
+  inventory:
+    links:
+      hosts: inventory/hosts.ini
+
+scenario:
+  create_sequence: []
+  destroy_sequence: []
+  test_sequence:
+    - dependency
+    - syntax
+    - converge
+    - verify

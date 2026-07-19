@@ -1,0 +1,19 @@
+---
+# gitlab_ee — firewall rules
+# Shared sub-task: enables or disables firewall services.
+# Included from present.yml and absent.yml.
+# Expects: _firewall_state ('enabled' or 'disabled')
+
+- name: Manage GitLab EE firewall rules
+  ansible.posix.firewalld:
+    service: "{{ item }}"
+    state: "{{ _firewall_state }}"
+    permanent: true
+    immediate: true
+  become: true
+  loop: >-
+    {{
+      (['http']  if (scm_open_http  | default(true))  else []) +
+      (['https'] if (scm_open_https | default(true)) else []) +
+      (['ssh']   if (scm_open_ssh   | default(true))  else [])
+    }}

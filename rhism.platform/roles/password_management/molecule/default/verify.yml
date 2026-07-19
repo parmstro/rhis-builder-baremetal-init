@@ -1,0 +1,17 @@
+---
+- name: Verify — dispatcher routes to correct backend
+  hosts: pm-el9
+  gather_facts: false
+  tasks:
+    - name: Verify credential directory is absent after delete
+      ansible.builtin.stat:
+        path: /root/.pm_credentials/test_svc_account.meta.yml
+      register: _meta_stat
+      delegate_to: localhost
+
+    - name: Assert credential metadata removed
+      ansible.builtin.assert:
+        that:
+          - not _meta_stat.stat.exists
+        fail_msg: "Credential metadata file should have been removed by delete action"
+      delegate_to: localhost

@@ -1,0 +1,17 @@
+---
+# --------------------------------------------------------------------------- #
+# lifecycle — standalone lifecycle environment management                     #
+# --------------------------------------------------------------------------- #
+- name: Manage lifecycle environment
+  theforeman.foreman.lifecycle_environment:
+    server_url: "{{ content_server_url }}"
+    username: "{{ content_username }}"
+    password: "{{ content_password }}"
+    validate_certs: "{{ content_validate_certs }}"
+    organization: "{{ content_organization }}"
+    name: "{{ item.name }}"
+    prior: "{{ item.prior | default('Library') }}"
+    state: present
+  loop: "{{ content_lifecycle_environments }}"
+  no_log: "{{ content_no_log }}"
+  when: content_lifecycle_environments | length > 0

@@ -1,0 +1,78 @@
+---
+# Action + variable interface are validated by meta/argument_specs.yml (ansible-core
+# runs the validation automatically at role entry — no manual assert needed).
+
+# present / storage: deploy the NFS subdir external provisioner via Helm.
+- name: Deploy NFS subdir external provisioner
+  when:
+    - action in ['storage', 'present']
+    - cp_storage_execute | bool
+  block:
+    - name: Validate NFS server and path are defined
+      ansible.builtin.assert:
+        that:
+          - cp_storage_nfs_server | length > 0
+          - cp_storage_nfs_path | length > 0
+        fail_msg: >-
+          cp_storage_nfs_server and cp_storage_nfs_path are required for NFS storage.
+
+    - name: Install nfs-utils on all nodes
+      ansible.builtin.package:
+        name: nfs-utils
+        state: present
+      become: true
+
+    - name: Add NFS subdir external provisioner Helm repository
+      kubernetes.core.helm_repository:
+        name: nfs-subdir-external-provisioner
+        repo_url: https://kubernetes-sigs.github.io/nfs-subdir-external-provisioner/
+
+    - name: Deploy NFS subdir external provisioner via Helm
+      kubernetes.core.helm:
+        kubeconfig: "{{ cp_kubeconfig_path }}"
+        name: nfs-subdir-external-provisioner
+        chart_ref: nfs-subdir-external-provisioner/nfs-subdir-external-provisioner
+        release_namespace: nfs-provisioner
+        create_namespace: true
+        wait: true
+        values:
+          nfs:
+            server: "{{ cp_storage_nfs_server }}"
+            path: "{{ cp_storage_nfs_path }}"
+          storageClass:
+            name: "{{ cp_storage_class_name }}"
+            defaultClass: "{{ cp_storage_make_default | bool }}"
+            reclaimPolicy: "{{ cp_storage_nfs_reclaim_policy }}"
+            archiveOnDelete: "{{ cp_storage_nfs_archive_on_delete | bool }}"
+      become: true
+      notify: storage_nfs - configure storage
+
+# absent: remove Helm release, namespace, and nfs-utils.
+- name: Remove NFS subdir external provisioner
+  when:
+    - action == 'absent'
+    - cp_storage_execute | bool
+  block:
+    - name: Remove NFS provisioner Helm release
+      kubernetes.core.helm:
+        kubeconfig: "{{ cp_kubeconfig_path }}"
+        name: nfs-subdir-external-provisioner
+        release_namespace: nfs-provisioner
+        state: absent
+        wait: true
+      become: true
+
+    - name: Remove NFS provisioner namespace
+      kubernetes.core.k8s:
+        kubeconfig: "{{ cp_kubeconfig_path }}"
+        api_version: v1
+        kind: Namespace
+        name: nfs-provisioner
+        state: absent
+      become: true
+
+    - name: Remove nfs-utils
+      ansible.builtin.package:
+        name: nfs-utils
+        state: absent
+      become: true

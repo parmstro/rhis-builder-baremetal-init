@@ -1,0 +1,34 @@
+---
+- name: Install NRPE and Nagios plugins
+  ansible.builtin.package:
+    name:
+      - nrpe
+      - nagios-plugins-all
+    state: present
+  become: true
+
+- name: Deploy NRPE configuration
+  ansible.builtin.template:
+    src: nrpe.cfg.j2
+    dest: /etc/nagios/nrpe.cfg
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  notify: monitoring_stack - restart nrpe
+
+- name: Enable and start NRPE
+  ansible.builtin.service:
+    name: nrpe
+    state: started
+    enabled: true
+  become: true
+
+- name: Open firewall for NRPE
+  ansible.posix.firewalld:
+    port: 5666/tcp
+    permanent: true
+    immediate: true
+    state: enabled
+  become: true
+  failed_when: false

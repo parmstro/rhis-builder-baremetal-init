@@ -1,0 +1,11 @@
+---
+galaxy_info:
+  author: rhism
+  description: SCM deployment role — GitLab CE/EE with runners, backup, and restore
+  license: Apache-2.0
+  min_ansible_version: "2.14"
+  platforms:
+    - name: EL
+      versions: ["8", "9"]
+  galaxy_tags: [gitlab, scm, git, ci, devops, runners]
+dependencies: []

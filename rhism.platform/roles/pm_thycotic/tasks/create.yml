@@ -1,0 +1,35 @@
+---
+# pm_thycotic — create action.
+# Generates an ISM-compliant password locally, then creates a new secret in
+# Delinea/Thycotic Secret Server using the delinea.tss collection.
+
+- name: Validate create prerequisites
+  ansible.builtin.assert:
+    that:
+      - pm_thycotic_folder_id | length > 0
+      - pm_thycotic_template_id | length > 0
+    fail_msg: >-
+      pm_thycotic_folder_id and pm_thycotic_template_id must be set for the create action.
+      Find these IDs in the Secret Server web UI under Admin > Secret Templates / Folders.
+  when: not pm_thycotic_skip_api | bool
+
+- name: Generate ISM-compliant password
+  ansible.builtin.include_tasks: generate.yml
+
+- name: Set password fact
+  ansible.builtin.set_fact:
+    _pm_password: "{{ _pm_generated.stdout }}"
+  no_log: true
+
+- name: Push password to Thycotic Secret Server
+  ansible.builtin.include_tasks: tss_create.yml
+  when: not pm_thycotic_skip_api | bool
+
+- name: Expose result (no_log on callers)
+  ansible.builtin.set_fact:
+    pm_result:
+      password: "{{ _pm_password }}"
+      target: "{{ pm_target }}"
+      backend: thycotic
+      secret_id: "{{ _pm_tss_result.secret.id if _pm_tss_result is defined else 'dry-run' }}"
+  no_log: true

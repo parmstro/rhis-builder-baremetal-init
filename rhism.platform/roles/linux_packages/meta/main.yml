@@ -1,0 +1,24 @@
+---
+galaxy_info:
+  role_name: linux_packages
+  namespace: cx_ansible_galaxy
+  author: cx_ansible_galaxy
+  description: >-
+    Security-focused package management for EL systems — removes insecure legacy
+    packages and installs hardening/auditing tooling. Dispatcher driven by
+    linux_packages_action variable.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: EL
+      versions:
+        - "8"
+        - "9"
+        - "10"
+  galaxy_tags:
+    - linux
+    - security
+    - packages
+    - hardening
+
+dependencies: []

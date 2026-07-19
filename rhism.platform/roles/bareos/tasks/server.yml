@@ -1,0 +1,28 @@
+---
+# server — full Bareos director + storage + file daemon installation.
+# Chains: install packages → configure → start all services.
+
+- name: Install Bareos server packages
+  ansible.builtin.package:
+    name: "{{ _bareos_director_packages + _bareos_fd_packages }}"
+    state: present
+  become: true
+
+- name: Configure Bareos director, storage, and file daemon
+  ansible.builtin.include_tasks: configure.yml
+
+- name: Initialize the catalog schema (idempotent)
+  ansible.builtin.include_tasks: init_catalog.yml
+  when: backup_bareos_initialize_catalog | bool
+
+- name: Start Bareos services
+  ansible.builtin.service:
+    name: "{{ item }}"
+    state: started
+    enabled: true
+  loop:
+    - bareos-dir
+    - bareos-sd
+    - bareos-fd
+  become: true
+  when: backup_bareos_manage_service | bool

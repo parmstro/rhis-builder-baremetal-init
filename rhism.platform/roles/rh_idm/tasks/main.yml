@@ -1,0 +1,14 @@
+---
+# Action + variable interface are validated by meta/argument_specs.yml (ansible-core
+# runs the validation automatically at role entry — no manual assert needed).
+
+- name: Set action file
+  ansible.builtin.set_fact:
+    _rh_idm_action_file: >-
+      {{ 'present.yml' if action in ['present', 'absent']
+         else 'service.yml' if action in ['started', 'stopped', 'restarted']
+         else action ~ '.yml' }}
+
+- name: "Execute {{ action }}"
+  ansible.builtin.include_tasks:
+    file: "{{ _rh_idm_action_file }}"

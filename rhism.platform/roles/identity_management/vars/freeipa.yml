@@ -1,0 +1,18 @@
+---
+# FreeIPA-specific package names and installer commands.
+# Loaded dynamically when idm_type=freeipa via include_vars in tasks/main.yml.
+
+_idm_server_packages:
+  - freeipa-server
+  - freeipa-server-dns
+  - freeipa-server-trust-ad
+
+_idm_client_packages:
+  - freeipa-client
+
+_idm_installer_cmd: ipa-server-install
+_idm_client_installer_cmd: ipa-client-install
+_idm_replica_installer_cmd: ipa-replica-install
+_idm_admin_cmd: ipa
+_idm_service_name: ipa
+_idm_rhsm_required: false

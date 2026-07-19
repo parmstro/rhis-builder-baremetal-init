@@ -1,0 +1,14 @@
+---
+# Action: destroy — run openshift-install destroy cluster
+
+- name: Assert destroy confirmation flag is set
+  ansible.builtin.assert:
+    that: cp_destroy_confirm | bool
+    fail_msg: "Set cp_destroy_confirm: true to confirm OCP cluster destruction"
+
+- name: Run openshift-install destroy cluster
+  ansible.builtin.command:
+    cmd: "openshift-install destroy cluster --dir {{ cp_install_dir }} --log-level info"
+  register: _ocp_destroy_result
+  changed_when: true
+  become: true

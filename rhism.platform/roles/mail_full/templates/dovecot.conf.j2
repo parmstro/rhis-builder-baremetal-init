@@ -1,0 +1,88 @@
+{# Managed by Ansible — role mail_full. Do not edit by hand. #}
+# Dovecot configuration — managed by Ansible (mail_full role)
+# Do not edit manually; changes will be overwritten.
+
+{# The shared interface lists listener flavours (imap/imaps/pop3/pop3s), but
+   dovecot's `protocols` setting only knows base protocols — "imaps"/"pop3s"
+   are inet_listeners of imap/pop3, and an unknown protocol name is a FATAL
+   config error. Map and de-duplicate here. #}
+{% set _dovecot_protocols = mail_dovecot_protocols
+     | map('replace', 'imaps', 'imap')
+     | map('replace', 'pop3s', 'pop3')
+     | unique | list %}
+protocols = {{ _dovecot_protocols | join(' ') }}
+
+listen = {{ mail_dovecot_listen }}
+
+# Authentication — plaintext mechanisms are only allowed in the clear when
+# TLS is explicitly disabled (lab scope); any TLS mode keeps them TLS-only.
+disable_plaintext_auth = {{ 'no' if mail_dovecot_ssl == 'no' else 'yes' }}
+auth_mechanisms = plain login
+
+# Virtual mailbox users (flat passwd file, see add_user task)
+passdb {
+  driver = passwd-file
+  args = scheme=SHA512-CRYPT username_format=%u {{ mail_dovecot_passwd_file }}
+}
+
+userdb {
+  driver = static
+  args = uid={{ mail_vmail_user }} gid={{ mail_vmail_user }} home={{ mail_virtual_mailbox_base }}/%d/%n
+}
+
+# Mail location
+mail_location = {{ mail_dovecot_mail_location }}
+mail_uid = {{ mail_vmail_user }}
+mail_gid = {{ mail_vmail_user }}
+first_valid_uid = {{ mail_vmail_uid }}
+first_valid_gid = {{ mail_vmail_gid }}
+
+# SSL / TLS
+ssl = {{ mail_dovecot_ssl }}
+{% if mail_tls_cert_file | length > 0 %}
+ssl_cert = <{{ mail_tls_cert_file }}
+ssl_key = <{{ mail_tls_key_file }}
+{% endif %}
+{% if mail_dovecot_ssl != 'no' %}
+ssl_min_protocol = TLSv1.2
+ssl_prefer_server_ciphers = yes
+{% endif %}
+
+{% if 'imap' in _dovecot_protocols %}
+# IMAP service (implicit-TLS listener only when TLS is on — an ssl=yes
+# listener with global ssl=no is a fatal dovecot config error)
+service imap-login {
+  inet_listener imap {
+    port = {{ ('imap' in mail_dovecot_protocols) | ternary(mail_imap_port, 0) }}
+  }
+  inet_listener imaps {
+    port = {{ ('imaps' in mail_dovecot_protocols and mail_dovecot_ssl != 'no') | ternary(mail_imaps_port, 0) }}
+    ssl = yes
+  }
+}
+{% endif %}
+
+{% if 'pop3' in _dovecot_protocols %}
+# POP3 service
+service pop3-login {
+  inet_listener pop3 {
+    port = {{ ('pop3' in mail_dovecot_protocols) | ternary(mail_pop3_port, 0) }}
+  }
+  inet_listener pop3s {
+    port = {{ ('pop3s' in mail_dovecot_protocols and mail_dovecot_ssl != 'no') | ternary(mail_pop3s_port, 0) }}
+    ssl = yes
+  }
+}
+{% endif %}
+
+# SASL socket for Postfix submission (smtpd_sasl_type=dovecot)
+service auth {
+  unix_listener /var/spool/postfix/private/auth {
+    mode = 0660
+    user = postfix
+    group = postfix
+  }
+}
+
+# Logging to stdout for container/journald friendliness
+log_path = /dev/stderr

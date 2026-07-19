@@ -1,0 +1,155 @@
+---
+# Action + variable interface are validated by meta/argument_specs.yml (ansible-core
+# runs the validation automatically at role entry — no manual assert needed).
+
+# present / storage: deploy the ODF operator via OLM subscription + StorageCluster CR.
+# Guarded by BOTH the shared cp_storage_execute dry-run gate AND the OCS-specific
+# cp_ocs_install_execute hard gate (default false) that prevents accidental OLM installs.
+- name: Deploy OpenShift Data Foundation (OCS/ODF)
+  when:
+    - action in ['storage', 'present']
+    - cp_storage_execute | bool
+  block:
+    - name: Validate OCS requires OCP or OKD
+      ansible.builtin.assert:
+        that:
+          - cp_type in ['ocp', 'okd']
+        fail_msg: >-
+          OCS/ODF storage is only supported with cp_type: ocp or okd.
+          Current cp_type: {{ cp_type }}
+
+    - name: OCS install gate check
+      ansible.builtin.assert:
+        that:
+          - cp_ocs_install_execute | bool
+        fail_msg: >-
+          cp_ocs_install_execute is false (default). Set cp_ocs_install_execute: true to deploy OCS/ODF.
+          This gate prevents accidental OLM operator installation.
+
+    - name: Create openshift-storage namespace
+      kubernetes.core.k8s:
+        kubeconfig: "{{ cp_kubeconfig_path }}"
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: openshift-storage
+            labels:
+              openshift.io/cluster-monitoring: "true"
+      become: true
+
+    - name: Create ODF OperatorGroup
+      kubernetes.core.k8s:
+        kubeconfig: "{{ cp_kubeconfig_path }}"
+        state: present
+        definition:
+          apiVersion: operators.coreos.com/v1
+          kind: OperatorGroup
+          metadata:
+            name: openshift-storage-operatorgroup
+            namespace: openshift-storage
+          spec:
+            targetNamespaces:
+              - openshift-storage
+      become: true
+
+    - name: Create ODF OLM Subscription
+      kubernetes.core.k8s:
+        kubeconfig: "{{ cp_kubeconfig_path }}"
+        state: present
+        definition:
+          apiVersion: operators.coreos.com/v1alpha1
+          kind: Subscription
+          metadata:
+            name: odf-operator
+            namespace: openshift-storage
+          spec:
+            channel: stable-4.16
+            installPlanApproval: Automatic
+            name: odf-operator
+            source: redhat-operators
+            sourceNamespace: openshift-marketplace
+      become: true
+      notify: storage_ocs - configure storage
+
+    - name: Wait for ODF operator CSV to be ready
+      kubernetes.core.k8s_info:
+        kubeconfig: "{{ cp_kubeconfig_path }}"
+        api_version: operators.coreos.com/v1alpha1
+        kind: ClusterServiceVersion
+        namespace: openshift-storage
+      register: _storage_ocs_csv
+      until: >-
+        _storage_ocs_csv.resources | default([]) |
+        selectattr('status.phase', 'defined') |
+        selectattr('status.phase', 'equalto', 'Succeeded') |
+        list | length > 0
+      retries: 30
+      delay: 20
+      become: true
+
+    - name: Create StorageCluster CR
+      kubernetes.core.k8s:
+        kubeconfig: "{{ cp_kubeconfig_path }}"
+        state: present
+        definition:
+          apiVersion: ocs.openshift.io/v1
+          kind: StorageCluster
+          metadata:
+            name: ocs-storagecluster
+            namespace: openshift-storage
+          spec:
+            storageDeviceSets:
+              - name: ocs-deviceset
+                count: 1
+                dataPVCTemplate:
+                  spec:
+                    accessModes:
+                      - ReadWriteOnce
+                    resources:
+                      requests:
+                        storage: "{{ cp_storage_ocs_size }}"
+                    storageClassName: "{{ cp_storage_ocs_storage_class }}"
+                    volumeMode: Block
+                placement: {}
+                portable: true
+                replica: 3
+      become: true
+
+# absent: remove StorageCluster, subscription, and namespace.
+- name: Remove OpenShift Data Foundation (OCS/ODF)
+  when:
+    - action == 'absent'
+    - cp_storage_execute | bool
+    - cp_type in ['ocp', 'okd']
+    - cp_ocs_install_execute | bool
+  block:
+    - name: Remove StorageCluster CR
+      kubernetes.core.k8s:
+        kubeconfig: "{{ cp_kubeconfig_path }}"
+        api_version: ocs.openshift.io/v1
+        kind: StorageCluster
+        name: ocs-storagecluster
+        namespace: openshift-storage
+        state: absent
+      become: true
+
+    - name: Remove ODF OLM Subscription
+      kubernetes.core.k8s:
+        kubeconfig: "{{ cp_kubeconfig_path }}"
+        api_version: operators.coreos.com/v1alpha1
+        kind: Subscription
+        name: odf-operator
+        namespace: openshift-storage
+        state: absent
+      become: true
+
+    - name: Remove openshift-storage namespace
+      kubernetes.core.k8s:
+        kubeconfig: "{{ cp_kubeconfig_path }}"
+        api_version: v1
+        kind: Namespace
+        name: openshift-storage
+        state: absent
+      become: true

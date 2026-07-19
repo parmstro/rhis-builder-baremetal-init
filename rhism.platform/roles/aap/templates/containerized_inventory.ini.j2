@@ -1,0 +1,46 @@
+{{ '{#' }} Rendered by rhism.platform.aap for the Red Hat containerized AAP installer.
+   Group model comes from vars/versions/{{ aap_version }}.yml
+   (gateway_era={{ aap_version_profile.gateway_era }}). This inventory is fed to
+   Red Hat's own installer playbook — the role never reimplements the install.
+
+   Secret values are written as PLACEHOLDER tokens (__…__) so no credential ever
+   lands on disk. A real (aap_execute: true) run injects the true secrets into
+   the installer via a vault-sourced vars file / --extra-vars, keyed to these
+   same names — see tasks/containerized_install.yml. {{ '#}' }}
+{% for group in aap_version_profile.containerized.inventory_groups %}
+[{{ group }}]
+{% if group == 'automationgateway' %}
+{% for h in aap_gateway_hosts %}
+{{ h }}
+{% endfor %}
+{% elif group == 'automationcontroller' %}
+{% for h in aap_controller_hosts %}
+{{ h }}
+{% endfor %}
+{% elif group == 'automationhub' %}
+{% for h in aap_hub_hosts %}
+{{ h }}
+{% endfor %}
+{% elif group == 'automationeda' %}
+{% for h in aap_eda_hosts %}
+{{ h }}
+{% endfor %}
+{% elif group == 'database' %}
+{% if aap_database_host | length > 0 %}
+{{ aap_database_host }}
+{% endif %}
+{% endif %}
+
+{% endfor %}
+[all:vars]
+postgresql_admin_username={{ aap_pg_username }}
+postgresql_admin_password=__PG_ADMIN_PASSWORD__
+postgresql_port={{ aap_pg_port }}
+controller_admin_password=__ADMIN_PASSWORD__
+{% if aap_version_profile.gateway_era %}
+gateway_admin_password=__ADMIN_PASSWORD__
+{% endif %}
+hub_admin_password=__ADMIN_PASSWORD__
+registry_url={{ aap_registry_host }}
+registry_username=__REGISTRY_USERNAME__
+registry_password=__REGISTRY_PASSWORD__

@@ -1,0 +1,25 @@
+---
+- name: Validate mail_action
+  ansible.builtin.assert:
+    that:
+      - mail_action is defined
+      - mail_action in _mail_valid_actions
+    fail_msg: >-
+      mail_action must be one of: {{ _mail_valid_actions | join(', ') }}.
+      Got '{{ mail_action | default('undefined') }}'.
+
+- name: Validate mail_type
+  ansible.builtin.assert:
+    that:
+      - mail_type is defined
+      - mail_type in _mail_valid_types
+    fail_msg: >-
+      mail_type must be one of: {{ _mail_valid_types | join(', ') }}.
+      Got '{{ mail_type | default('undefined') }}'.
+
+- name: Load {{ mail_type }} type vars
+  ansible.builtin.include_vars:
+    file: "{{ mail_type }}.yml"
+
+- name: "Execute task file for: {{ mail_action }}"
+  ansible.builtin.include_tasks: "{{ mail_action }}.yml"

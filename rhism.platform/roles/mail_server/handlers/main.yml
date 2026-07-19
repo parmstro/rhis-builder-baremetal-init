@@ -1,0 +1,34 @@
+---
+- name: mail_server - restart postfix
+  ansible.builtin.service:
+    name: postfix
+    state: restarted
+  become: true
+  listen: mail_server - restart postfix
+
+- name: mail_server - restart dovecot
+  ansible.builtin.service:
+    name: dovecot
+    state: restarted
+  become: true
+  listen: mail_server - restart dovecot
+
+- name: mail_server - restart spamassassin
+  ansible.builtin.service:
+    name: spamassassin
+    state: restarted
+  become: true
+  listen: mail_server - restart spamassassin
+
+- name: mail_server - restart opendkim
+  ansible.builtin.service:
+    name: opendkim
+    state: restarted
+  become: true
+  listen: mail_server - restart opendkim
+
+- name: mail_server - rebuild sasl db
+  ansible.builtin.command:
+    cmd: postmap /etc/postfix/sasl_passwd
+  become: true
+  listen: mail_server - rebuild sasl db

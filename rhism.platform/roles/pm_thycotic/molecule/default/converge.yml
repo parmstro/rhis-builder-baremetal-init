@@ -1,0 +1,63 @@
+---
+# pm_thycotic_skip_api: true skips all delinea.tss module calls.
+# This tests ISM-compliant generation, the action dispatcher bridge, and
+# the audit/rotate local logic. TSS API integration is tested on real instances.
+- name: Converge — pm_thycotic local generation and dispatcher (skip_api mode)
+  hosts: all
+  gather_facts: true
+
+  vars:
+    _tss_skip: true
+
+  tasks:
+    - name: Create (generate password locally, skip TSS create)
+      ansible.builtin.include_role:
+        name: pm_thycotic
+      vars:
+        pm_thycotic_action: create
+        pm_target: test_db_user
+        pm_service: postgresql
+        pm_thycotic_skip_api: "{{ _tss_skip }}"
+
+    - name: Assert pm_result set after create
+      ansible.builtin.assert:
+        that:
+          - pm_result is defined
+          - pm_result.password is defined
+          - pm_result.password | length >= 20
+          - pm_result.backend == 'thycotic'
+        fail_msg: "pm_result not populated correctly after create: {{ pm_result | default('undefined') }}"
+
+    - name: Audit (dry-run — generates report without TSS fetch)
+      ansible.builtin.include_role:
+        name: pm_thycotic
+      vars:
+        pm_thycotic_action: audit
+        pm_target: test_db_user
+        pm_thycotic_skip_api: "{{ _tss_skip }}"
+
+    - name: Rotate (generate new password locally, skip TSS update)
+      ansible.builtin.include_role:
+        name: pm_thycotic
+      vars:
+        pm_thycotic_action: rotate
+        pm_target: test_db_user
+        pm_thycotic_skip_api: "{{ _tss_skip }}"
+
+    - name: Assert rotated result is a valid ISM password
+      ansible.builtin.assert:
+        that:
+          - pm_result.password | length >= 20
+          - pm_result.password is regex('[A-Z]')
+          - pm_result.password is regex('[a-z]')
+          - pm_result.password is regex('[0-9]')
+          - pm_result.password is regex('[^A-Za-z0-9]')
+        fail_msg: "Rotated password does not meet ISM-0406/0407 requirements"
+
+    - name: Delete (skip TSS retire)
+      ansible.builtin.include_role:
+        name: pm_thycotic
+      vars:
+        pm_thycotic_action: delete
+        pm_target: test_db_user
+        pm_thycotic_skip_api: "{{ _tss_skip }}"

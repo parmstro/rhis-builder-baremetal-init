@@ -1,0 +1,48 @@
+---
+# OADP product role — action-driven dispatch.
+#
+# OADP (OpenShift API for Data Protection) is the Red Hat-supported operator for
+# application-level backup/restore on OpenShift, built on upstream Velero. This role
+# installs and configures the whole Velero stack via the DataProtectionApplication (DPA)
+# operator CR and drives the Velero Backup/Restore/Schedule lifecycle.
+#
+# Standalone-first: runnable on its own in a playbook (roles: [oadp]) and also selectable
+# by the backup_management dispatcher (backup_type: oadp), which passes the action via
+# include_role vars: {action: "..."}.
+#
+# The action + variable interface is validated by meta/argument_specs.yml — ansible-core
+# runs the validation at role entry, so no manual assert is needed here.
+
+# ---------------------------------------------------------------------------
+# Dispatch — flat fan-out. Each action gets its own file; shared sub-steps
+# (DPA assembly, Backup-spec assembly) live in named shared files that action
+# files include.
+# ---------------------------------------------------------------------------
+
+- name: Include server tasks
+  ansible.builtin.include_tasks: server.yml
+  when: action == 'server'
+
+- name: Include client tasks
+  ansible.builtin.include_tasks: client.yml
+  when: action == 'client'
+
+- name: Include schedule tasks
+  ansible.builtin.include_tasks: schedule.yml
+  when: action == 'schedule'
+
+- name: Include backup tasks
+  ansible.builtin.include_tasks: backup.yml
+  when: action == 'backup'
+
+- name: Include restore tasks
+  ansible.builtin.include_tasks: restore.yml
+  when: action == 'restore'
+
+- name: Include verify tasks
+  ansible.builtin.include_tasks: verify.yml
+  when: action == 'verify'
+
+- name: Include baseline tasks
+  ansible.builtin.include_tasks: baseline.yml
+  when: action == 'baseline'

@@ -1,0 +1,30 @@
+---
+- name: Verify standalone variable contract
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Load role defaults
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../../defaults/main.yml"
+      delegate_to: localhost
+
+    - name: Assert shared interface defaults resolve for standalone use
+      ansible.builtin.assert:
+        that:
+          - action == 'configure'
+          - prov_execute | bool
+          - prov_cobbler_server == 'localhost'
+          - prov_cobbler_manage_dhcp | bool
+          - prov_cobbler_manage_dns | bool
+          - prov_cobbler_manage_tftp | bool
+          - prov_cobbler_distros | length == 0
+          - prov_cobbler_profiles | length == 0
+          - prov_cobbler_distro == {}
+          - prov_cobbler_system == {}
+        fail_msg: "cobbler defaults did not resolve to the expected standalone contract"
+      delegate_to: localhost
+
+    - name: Report verification passed
+      ansible.builtin.debug:
+        msg: "PASS — cobbler standalone contract verified"
+      delegate_to: localhost

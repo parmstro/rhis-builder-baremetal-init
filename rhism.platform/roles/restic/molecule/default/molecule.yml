@@ -1,0 +1,41 @@
+---
+# Default scenario — validates standalone dispatch + the restic variable contract in
+# check_mode (no packages installed, no repository touched). No backup_management dispatcher.
+# Collection-hosted scenario: molecule's collection-under-test auto-install
+# (prerun) would try to ansible-galaxy-install this collection and its
+# dependency into the workspace collections path, clobbering the loader
+# symlink at collections/ansible_collections/rhism/<name> ("Cannot call
+# rmtree on a symbolic link"). Disabled — local collection checkouts already
+# resolve via ANSIBLE_COLLECTIONS_PATH.
+prerun: false
+
+dependency:
+  name: galaxy
+  enabled: false
+
+driver:
+  name: docker
+
+platforms:
+  - name: restic-test
+    image: registry.access.redhat.com/ubi9/ubi:latest
+    pre_build_image: true
+    override_command: true
+    privileged: true
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    cgroupns_mode: host
+    command: /sbin/init
+
+provisioner:
+  name: ansible
+
+scenario:
+  test_sequence:
+    - dependency
+    - destroy
+    - syntax
+    - create
+    - converge
+    - verify
+    - destroy

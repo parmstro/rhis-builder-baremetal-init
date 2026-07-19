@@ -1,0 +1,6 @@
+---
+- name: Manage content views ({{ content_type }})
+  ansible.builtin.include_role:
+    name: "{{ content_type }}"
+  vars:
+    action: content_views

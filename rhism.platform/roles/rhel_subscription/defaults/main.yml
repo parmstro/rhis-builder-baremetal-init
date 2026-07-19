@@ -1,0 +1,28 @@
+---
+# Whether to register or unregister: register | unregister
+rhel_subscription_action: register
+
+# Registration method (only used when rhel_subscription_action == register):
+# activation_key | username_password
+rhel_subscription_method: activation_key
+
+# --- activation_key method ---
+rhel_subscription_org_id: ""
+rhel_subscription_activation_key: ""
+
+# --- username_password method ---
+rhel_subscription_username: ""
+rhel_subscription_password: ""
+
+# --- Common to either method ---
+rhel_subscription_pool_ids: []
+rhel_subscription_consumer_name: ""
+rhel_subscription_server_hostname: ""
+rhel_subscription_force_register: false
+# rhel_subscription_auto_attach intentionally has no default here — see
+# meta/argument_specs.yml (left unset so the module's own default applies unless a caller
+# opts in explicitly).
+
+# Master off switch — no real community.general.redhat_subscription call is made for
+# either register or unregister when true.
+rhel_subscription_skip: false

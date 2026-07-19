@@ -1,0 +1,71 @@
+---
+# verify — read-only health assertion of the OADP/Velero backup stack. Confirms the
+# BackupStorageLocation is Available, the Velero + node-agent pods are Ready, and — when a
+# specific Backup/Restore name is supplied — that it reached .status.phase == Completed.
+# Makes no changes.
+
+- name: Gather BackupStorageLocation status
+  kubernetes.core.k8s_info:
+    kubeconfig: "{{ backup_oadp_kubeconfig | default(omit) }}"
+    api_version: velero.io/v1
+    kind: BackupStorageLocation
+    namespace: "{{ backup_oadp_namespace }}"
+  register: _oadp_bsl
+
+- name: Gather Velero pods
+  kubernetes.core.k8s_info:
+    kubeconfig: "{{ backup_oadp_kubeconfig | default(omit) }}"
+    api_version: v1
+    kind: Pod
+    namespace: "{{ backup_oadp_namespace }}"
+    label_selectors:
+      - app.kubernetes.io/name=velero
+  register: _oadp_velero_pods
+
+- name: Gather node-agent pods
+  kubernetes.core.k8s_info:
+    kubeconfig: "{{ backup_oadp_kubeconfig | default(omit) }}"
+    api_version: v1
+    kind: Pod
+    namespace: "{{ backup_oadp_namespace }}"
+    label_selectors:
+      - name=node-agent
+  register: _oadp_node_agent_pods
+  when: backup_oadp_node_agent_enable | bool
+
+- name: Gather the named Backup status
+  kubernetes.core.k8s_info:
+    kubeconfig: "{{ backup_oadp_kubeconfig | default(omit) }}"
+    api_version: velero.io/v1
+    kind: Backup
+    name: "{{ backup_oadp_backup_name }}"
+    namespace: "{{ backup_oadp_namespace }}"
+  register: _oadp_named_backup
+  when: backup_oadp_backup_name | length > 0
+
+- name: Assert the OADP backup stack is healthy
+  ansible.builtin.assert:
+    that:
+      - >-
+        _oadp_bsl['resources'] | default([])
+        | selectattr('status.phase', 'defined')
+        | selectattr('status.phase', 'equalto', 'Available')
+        | list | length > 0
+      - >-
+        _oadp_velero_pods['resources'] | default([])
+        | selectattr('status.phase', 'equalto', 'Running')
+        | list | length > 0
+    fail_msg: "OADP stack unhealthy — BackupStorageLocation not Available or Velero pod not Running"
+    success_msg: "OADP stack healthy — BackupStorageLocation Available and Velero running"
+
+- name: Assert the named Backup completed
+  ansible.builtin.assert:
+    that:
+      - >-
+        _oadp_named_backup['resources'] | default([])
+        | selectattr('status.phase', 'defined')
+        | selectattr('status.phase', 'equalto', 'Completed')
+        | list | length > 0
+    fail_msg: "Backup '{{ backup_oadp_backup_name }}' did not reach Completed"
+    success_msg: "Backup '{{ backup_oadp_backup_name }}' Completed"
+  when: backup_oadp_backup_name | length > 0

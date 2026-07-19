@@ -1,0 +1,53 @@
+---
+# roles/pm_ansible/defaults/main.yml
+# Variable contract for the pure-Ansible password management role.
+# Standalone role — set pm_ansible_action directly, OR call via password_management.
+
+# --- Action dispatcher ---
+# pm_ansible_action: create | delete | audit | rotate
+pm_ansible_action: ""
+
+# Shared family dry-run gate (pm_ansible/pm_vault/pm_thycotic all honour it) —
+# set false to validate inputs without writing credentials/calling the backend.
+# Used by rhism.platform.builder's Phase 3.5 secrets dry-run.
+pm_execute: true
+
+# --- Target identity ---
+pm_target: ""
+pm_service: ""
+
+# --- ISM policy ---
+pm_length: 20
+pm_min_uppercase: 1
+pm_min_lowercase: 1
+pm_min_digits: 1
+pm_min_special: 1
+pm_special_chars: "!@#$%^&*()-_=+[]{}|;:,.<>?"
+pm_expiry_days: 90
+pm_history_count: 5
+
+# --- Audit report ---
+pm_audit_report_path: /tmp/pm_ansible_audit_report.txt
+pm_audit_report_format: text
+
+# Credential store — files are written with mode 0600.
+pm_ansible_cred_dir: /root/.pm_credentials
+
+# Whether to use become (sudo) when writing credential files on the controller.
+# Set to false in molecule/CI environments where the EE user cannot sudo.
+pm_ansible_become: true
+
+# Whether to also manage the OS system user account (set password hash).
+# If false, the role only manages the credential file (useful for service passwords).
+pm_ansible_manage_system_user: false
+
+# System user to manage when pm_ansible_manage_system_user is true.
+# Defaults to pm_target (the logical service name).
+pm_ansible_system_user: "{{ pm_target }}"
+
+# Shell for created system user — /sbin/nologin for service accounts.
+pm_ansible_user_shell: /sbin/nologin
+
+# Python interpreter used for ISM-compliant password generation.
+# Must have the secrets module (Python 3.6+). Delegate runs on localhost.
+pm_ansible_python: python3

@@ -1,0 +1,12 @@
+---
+- name: Install mail server
+  ansible.builtin.include_tasks: install.yml
+  when: mail_apply_install | bool
+
+- name: Configure mail server
+  ansible.builtin.include_tasks: configure.yml
+  when: mail_apply_configure | bool
+
+- name: Secure mail server
+  ansible.builtin.include_tasks: secure.yml
+  when: mail_apply_secure | bool

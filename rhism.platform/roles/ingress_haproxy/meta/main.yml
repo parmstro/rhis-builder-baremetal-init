@@ -1,0 +1,23 @@
+---
+galaxy_info:
+  namespace: rhism
+  role_name: ingress_haproxy
+  author: rhism
+  description: >-
+    Deploy the HAProxy Kubernetes ingress controller via Helm and set it as the default
+    IngressClass (status-only on OCP/OKD, where HAProxy is the built-in router).
+    Standalone-first product role, also selectable by the container_platform dispatcher
+    (cp_ingress_type: haproxy).
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: EL
+      versions:
+        - "9"
+  galaxy_tags:
+    - kubernetes
+    - ingress
+    - haproxy
+    - helm
+    - networking
+dependencies: []

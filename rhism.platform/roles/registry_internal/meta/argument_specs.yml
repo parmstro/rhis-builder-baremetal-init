@@ -1,0 +1,53 @@
+---
+argument_specs:
+  main:
+    short_description: Enable and expose the platform built-in container registry.
+    description: >-
+      Standalone-first registry backend for container_platform. On OCP/OKD it enables the
+      OpenShift image-registry operator, exposes its default route, and provisions a service
+      account for push/pull; on k3s/rke2 (which have no built-in registry) it defers to
+      registry_generic. Consumes the shared registry-backend interface (action, cp_* vars)
+      so the container_platform dispatcher can select any backend with identical code.
+    options:
+      action:
+        description: >-
+          Lifecycle action, shared across all registry backends. 'registry' (and its alias
+          'present') enable the built-in registry; 'absent' removes it.
+        type: str
+        default: registry
+        choices:
+          - registry
+          - present
+          - absent
+      cp_type:
+        description: >-
+          Container platform selector. The built-in registry mechanism differs per platform:
+          'ocp'/'okd' use the OpenShift image-registry operator; 'k3s'/'rke2' have no built-in
+          registry and defer to registry_generic. Shared registry-interface var.
+        type: str
+        default: k3s
+        choices:
+          - ocp
+          - okd
+          - k3s
+          - rke2
+      cp_kubeconfig_path:
+        description: Path to the cluster kubeconfig (or oc binary kubeconfig). Shared interface var.
+        type: str
+        default: /etc/rancher/k3s/k3s.yaml
+      cp_registry_execute:
+        description: >-
+          Dry-run gate honoured by every registry backend. false validates action dispatch and
+          variable resolution without changing the node or cluster (used by molecule).
+        type: bool
+        default: true
+      cp_registry_namespace:
+        description: Namespace of the platform built-in registry (OCP/OKD image-registry operator).
+        type: str
+        default: openshift-image-registry
+      cp_registry_url:
+        description: >-
+          External registry endpoint. Read by registry_generic; declared here so the shared
+          interface is complete for standalone use of either backend.
+        type: str
+        default: ""

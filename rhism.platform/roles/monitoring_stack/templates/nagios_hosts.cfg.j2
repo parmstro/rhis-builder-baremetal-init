@@ -1,0 +1,9 @@
+{% for host in mon_nagios_hosts %}
+define host {
+    use                             {{ host.template | default('linux-server') }}
+    host_name                       {{ host.name }}
+    alias                           {{ host.alias | default(host.name) }}
+    address                         {{ host.address }}
+}
+
+{% endfor %}

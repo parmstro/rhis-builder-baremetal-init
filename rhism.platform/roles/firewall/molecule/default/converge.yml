@@ -1,0 +1,56 @@
+---
+# Contract converge — hosts: localhost (control-host pattern, cf. bareos/k3s):
+# validates defaults, the argument-spec negative path, and the string-vs-list
+# normalisation that guards BUG-098, without needing a firewalld-capable host.
+- name: Converge — contract checks on the control host
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Load the role's defaults
+      ansible.builtin.include_vars:
+        file: ../../defaults/main.yml
+
+    - name: Assert the default interface shape
+      ansible.builtin.assert:
+        that:
+          - firewall is defined
+          - firewall | type_debug == 'list'
+          - firewall | length == 0
+        fail_msg: "defaults must ship an empty firewall list (clean no-op standalone run)"
+
+    - name: Assert dispatch and rule files exist
+      ansible.builtin.stat:
+        path: "{{ playbook_dir }}/../../tasks/{{ item }}"
+      register: _fw_files
+      failed_when: not _fw_files.stat.exists
+      loop:
+        - main.yml
+        - firewalld.yml
+
+    - name: Exercise the string-vs-list normalisation (BUG-098 guard)
+      ansible.builtin.assert:
+        that:
+          # a scalar string must normalise to a one-element list, NOT iterate per-character
+          - "([_entry.service] if _entry.service is string else _entry.service) == ['https']"
+          - "([_entry_list.service] if _entry_list.service is string else _entry_list.service) == ['http', 'https']"
+          - "([_entry.port] if _entry.port is string else _entry.port) == ['8080/tcp']"
+        fail_msg: "string values must be wrapped, never character-iterated"
+      vars:
+        _entry: {service: "https", port: "8080/tcp"}
+        _entry_list: {service: ["http", "https"]}
+
+    - name: Negative test — a non-list firewall value must be rejected by the spec
+      block:
+        - name: Call the role with an invalid firewall type
+          ansible.builtin.include_role:
+            name: firewall
+          vars:
+            firewall: "not-a-list"
+        - name: Fail if the invalid value was accepted
+          ansible.builtin.fail:
+            msg: "argument_specs should have rejected a non-list firewall value"
+      rescue:
+        - name: Confirm rejection
+          ansible.builtin.debug:
+            msg: "argument spec correctly rejected the invalid firewall value"

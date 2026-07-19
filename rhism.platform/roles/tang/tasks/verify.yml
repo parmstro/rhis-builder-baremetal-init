@@ -1,0 +1,33 @@
+---
+# verify — prove a deployed Tang server actually works with a real
+# clevis encrypt/decrypt round-trip (the same functional check upstream
+# RHIS itself uses — not a TCP-connect/config-check smoke test).
+
+- name: Install clevis (needed to drive the round-trip)
+  ansible.builtin.package:
+    name: clevis
+    state: present
+  when: tang_manage_packages | bool
+  become: true
+
+- name: Run a real clevis encrypt/decrypt round-trip against the live Tang server
+  ansible.builtin.shell:
+    cmd: >-
+      set -o pipefail &&
+      echo '{{ tang_verify_test_string }}' |
+      clevis encrypt tang '{"url":"{{ tang_verify_url }}"}' -y |
+      clevis decrypt
+  args:
+    executable: /bin/bash
+  register: _tang_verify_roundtrip
+  changed_when: false
+
+- name: Assert the round-trip returned the original plaintext unchanged
+  ansible.builtin.assert:
+    that:
+      - _tang_verify_roundtrip.stdout | trim == tang_verify_test_string
+    fail_msg: >-
+      Tang round-trip failed — expected '{{ tang_verify_test_string }}',
+      got '{{ _tang_verify_roundtrip.stdout | trim }}'. The server at
+      {{ tang_verify_url }} is not correctly serving key material.
+    success_msg: "PASS — Tang served a working NBDE round-trip at {{ tang_verify_url }}"

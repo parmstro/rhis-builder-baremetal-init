@@ -1,0 +1,43 @@
+---
+# pm_thycotic molecule — tests local password generation and validation.
+# TSS API calls are skipped via pm_thycotic_skip_api: true.
+# Integration tests against a real Thycotic/Delinea Secret Server instance
+# must be run separately on a test environment with TSS access.
+# Collection-hosted scenario: molecule's collection-under-test auto-install
+# (prerun) would try to ansible-galaxy-install this collection and its
+# dependency into the workspace collections path, clobbering the loader
+# symlink at collections/ansible_collections/rhism/<name> ("Cannot call
+# rmtree on a symbolic link"). Disabled — local collection checkouts already
+# resolve via ANSIBLE_COLLECTIONS_PATH.
+prerun: false
+
+dependency:
+  name: galaxy
+  enabled: false
+
+driver:
+  name: docker
+platforms:
+  - name: pm-thycotic-el9
+    image: docker.io/almalinux:9
+    pre_build_image: true
+provisioner:
+  name: ansible
+  inventory:
+    group_vars:
+      all:
+        ansible_python_interpreter: /usr/bin/python3
+        ansible_remote_tmp: /tmp
+verifier:
+  name: ansible
+scenario:
+  test_sequence:
+    - dependency
+    - destroy
+    - syntax
+    - create
+    - prepare
+    - converge
+    - converge
+    - verify
+    - destroy

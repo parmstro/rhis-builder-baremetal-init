@@ -1,0 +1,40 @@
+---
+# Permissive baseline. Start green, then raise `profile` toward `production`
+# as the repo's older tasks are modernised (FQCN, loop vs with_items, etc.).
+# Run locally with: ansible-lint
+profile: basic
+
+exclude_paths:
+  - .molecule/
+  - roles/*/files/    # forked application source (e.g. rhism_ui's node.js app + node_modules) — not Ansible content
+
+# Collections declared in the EE but not yet installed in the current image.
+# Mock the modules so syntax-check passes for roles that use them.
+mock_modules:
+  - ansible.windows.win_optional_feature
+  - ansible.windows.win_regedit
+  - ansible.windows.win_service
+  - ansible.windows.win_shell
+  - ansible.windows.win_template
+  - ansible.windows.win_updates
+  - chocolatey.chocolatey.win_chocolatey
+  - chocolatey.chocolatey.win_chocolatey_config
+  - community.windows.win_firewall
+  - community.windows.win_firewall_rule
+  - community.windows.win_scheduled_task
+
+# Conventions documented in CLAUDE.md that older code still uses. Remove entries
+# here as the corresponding code is migrated to the "going forward" conventions.
+skip_list:
+  - fqcn[action-core]   # existing tasks use short module names (copy, yum, ...)
+  - fqcn[action]
+  - name[casing]        # don't fail on task-name capitalisation
+  - var-naming[no-role-prefix]
+  - var-naming[no-reserved]  # dispatcher pattern passes `action` to product roles
+  - name[template]           # task names include mid-string vars for clarity
+
+# Treat these as warnings rather than hard failures during the initial rollout.
+warn_list:
+  - yaml               # defer to .yamllint for YAML style
+  - no-changed-when
+  - risky-shell-pipe

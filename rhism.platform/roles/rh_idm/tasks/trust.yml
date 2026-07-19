@@ -1,0 +1,19 @@
+---
+# action: trust — establish AD trust
+
+- name: Configure AD trust
+  become: true
+  block:
+    - name: Establish AD trust with ipa trust-add
+      ansible.builtin.command:
+        cmd: >-
+          ipa trust-add
+          --type={{ idm_trust_type | default('ad') }}
+          --admin={{ idm_ad_trust_admin }}
+          --password
+          {{ idm_ad_trust_domain }}
+      args:
+        stdin: "{{ idm_ad_trust_password }}"
+      register: _idm_trust_result
+      changed_when: "'Re-established' not in _idm_trust_result.stdout"
+      no_log: true

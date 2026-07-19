@@ -1,0 +1,30 @@
+---
+# Containerized install path — render the installer inventory from role vars,
+# then invoke Red Hat's containerized installer playbook (gated by aap_execute).
+
+- name: Render the containerized installer inventory
+  ansible.builtin.template:
+    src: containerized_inventory.ini.j2
+    dest: "{{ aap_work_dir }}/installer_inventory.ini"
+    mode: "0600"
+
+- name: Invoke Red Hat's containerized AAP installer (real run)
+  ansible.builtin.command:
+    cmd: >-
+      ansible-playbook -i {{ aap_work_dir }}/installer_inventory.ini
+      {{ aap_version_profile.containerized.installer_install_playbook }}
+    chdir: "{{ aap_work_dir }}"
+  register: aap_installer_run
+  # Real secrets are injected to the installer here for a true run — a vaulted
+  # extra-vars file keyed to the placeholder names in the rendered inventory.
+  # TODO: wire the vaulted secret source before the first aap_execute: true run.
+  changed_when: aap_installer_run.rc == 0
+  no_log: true
+  when: aap_execute | bool
+
+- name: Report dry-run (installer NOT invoked)
+  ansible.builtin.debug:
+    msg: >-
+      aap_execute is false — rendered {{ aap_work_dir }}/installer_inventory.ini
+      for AAP {{ aap_version }} (containerized) but did NOT run the installer.
+  when: not (aap_execute | bool)

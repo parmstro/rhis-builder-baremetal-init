@@ -1,0 +1,21 @@
+---
+galaxy_info:
+  role_name: rhel_subscription
+  namespace: rhism
+  author: rhism
+  description: >-
+    Red Hat Subscription Manager registration (activation-key or username/password),
+    consumed standalone or by other product roles that need RHSM registration.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: EL
+      versions:
+        - "9"
+  galaxy_tags:
+    - rhsm
+    - subscription-manager
+    - red-hat
+    - entitlement
+
+dependencies: []

@@ -1,0 +1,12 @@
+---
+_scm_valid_actions:
+  - install
+  - configure
+  - runners
+  - backup
+  - restore
+  - baseline
+
+_scm_valid_types:
+  - gitlab_ce
+  - gitlab_ee

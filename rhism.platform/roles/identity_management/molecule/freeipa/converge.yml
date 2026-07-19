@@ -1,0 +1,20 @@
+---
+- name: Converge — FreeIPA server dry-run on RHEL9 container
+  hosts: all
+  gather_facts: true
+  vars:
+    idm_action: server
+    idm_type: freeipa
+    idm_domain: freeipa-test.local
+    idm_realm: FREEIPA-TEST.LOCAL
+    idm_admin_password: TestAdminPassword123!
+    idm_ds_password: TestDsPassword123!
+    idm_server_install: false     # dry-run — no actual install, validates packages only
+    idm_setup_dns: true
+    idm_forwarders:
+      - 8.8.8.8
+    idm_idstart: 50000
+    idm_idmax: 199999
+    idm_mkhomedir: true
+  roles:
+    - role: rhism.platform.identity_management

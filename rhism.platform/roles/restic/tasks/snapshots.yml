@@ -1,0 +1,18 @@
+---
+# snapshots: list snapshots and display output
+
+- name: Include restic environment
+  ansible.builtin.include_tasks: env.yml
+
+- name: Run restic snapshots
+  ansible.builtin.command:
+    cmd: restic snapshots
+  environment: "{{ _restic_env }}"
+  become: true
+  no_log: true
+  register: _restic_snapshots
+  changed_when: false
+
+- name: Report snapshots
+  ansible.builtin.debug:
+    msg: "{{ _restic_snapshots.stdout_lines | default([]) }}"

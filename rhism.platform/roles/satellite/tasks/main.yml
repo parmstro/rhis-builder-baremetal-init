@@ -1,0 +1,163 @@
+---
+# --------------------------------------------------------------------------- #
+# satellite — content product role entry point                                #
+#                                                                             #
+# Standalone-first: run directly (roles: [satellite], vars: {action: ...}) or #
+# via the content_management dispatcher, which selects it with the same call: #
+#   include_role: name: "{{ content_type }}"   vars: { action: "<action>" }   #
+#                                                                             #
+# Valid actions:                                                              #
+#   present, absent          — package lifecycle (state maps to action)       #
+#   started, stopped,        — service lifecycle (state maps to action)       #
+#     restarted                                                               #
+#   install                  — full install (RHSM + packages + firewall +     #
+#                              installer + manifest)                          #
+#   configure                — org, location, global settings via API         #
+#   cdn_repos                — Red Hat CDN repository sets (satellite-only)   #
+#   repos                    — custom products and repositories               #
+#   sync                     — sync plans + immediate sync                    #
+#   content_views            — lifecycle envs, CVs, publish, promote          #
+#   activation_keys          — host collections + activation keys             #
+#   lifecycle                — standalone lifecycle environment management    #
+#   smart_proxy              — smart proxy registration                       #
+#   compute_resource         — compute resource registration                  #
+#   host                     — bare-host create + PXE build                   #
+#   export_content,          — disconnected/air-gapped content pipeline       #
+#     transfer_media,                                                        #
+#     import_content                                                         #
+#   soe_bundles              — SOE bundle model (composes content_views/     #
+#                              activation_keys from one-OS-build specs)       #
+#   status                   — service + API health check                     #
+#                                                                             #
+# The action + variable interface is validated by meta/argument_specs.yml     #
+# (ansible-core runs the validation automatically at role entry — no manual   #
+# assert needed).                                                             #
+# --------------------------------------------------------------------------- #
+
+# --------------------------------------------------------------------------- #
+# Package lifecycle — state maps directly to action                           #
+# --------------------------------------------------------------------------- #
+- name: Manage satellite packages
+  ansible.builtin.include_tasks: packages.yml
+  when: action in ['present', 'absent']
+
+# --------------------------------------------------------------------------- #
+# Service lifecycle — state maps directly to action                           #
+# --------------------------------------------------------------------------- #
+- name: Manage satellite services
+  ansible.builtin.include_tasks: services.yml
+  when: action in ['started', 'stopped', 'restarted']
+
+# --------------------------------------------------------------------------- #
+# install                                                                      #
+# --------------------------------------------------------------------------- #
+- name: Install satellite
+  ansible.builtin.include_tasks: install.yml
+  when: action == 'install'
+
+# --------------------------------------------------------------------------- #
+# configure                                                                    #
+# --------------------------------------------------------------------------- #
+- name: Configure satellite
+  ansible.builtin.include_tasks: configure.yml
+  when: action == 'configure'
+
+# --------------------------------------------------------------------------- #
+# cdn_repos (satellite-only)                                                  #
+# --------------------------------------------------------------------------- #
+- name: Manage CDN repository sets
+  ansible.builtin.include_tasks: cdn_repos.yml
+  when: action == 'cdn_repos'
+
+# --------------------------------------------------------------------------- #
+# repos                                                                        #
+# --------------------------------------------------------------------------- #
+- name: Manage products and repositories
+  ansible.builtin.include_tasks: repos.yml
+  when: action == 'repos'
+
+# --------------------------------------------------------------------------- #
+# sync                                                                         #
+# --------------------------------------------------------------------------- #
+- name: Sync repositories
+  ansible.builtin.include_tasks: sync.yml
+  when: action == 'sync'
+
+# --------------------------------------------------------------------------- #
+# content_views                                                                #
+# --------------------------------------------------------------------------- #
+- name: Manage content views
+  ansible.builtin.include_tasks: content_views.yml
+  when: action == 'content_views'
+
+# --------------------------------------------------------------------------- #
+# activation_keys                                                              #
+# --------------------------------------------------------------------------- #
+- name: Manage activation keys
+  ansible.builtin.include_tasks: activation_keys.yml
+  when: action == 'activation_keys'
+
+# --------------------------------------------------------------------------- #
+# lifecycle                                                                    #
+# --------------------------------------------------------------------------- #
+- name: Manage lifecycle environments
+  ansible.builtin.include_tasks: lifecycle.yml
+  when: action == 'lifecycle'
+
+# --------------------------------------------------------------------------- #
+# smart_proxy                                                                  #
+# --------------------------------------------------------------------------- #
+- name: Manage smart proxies
+  ansible.builtin.include_tasks: smart_proxy.yml
+  when: action == 'smart_proxy'
+
+# --------------------------------------------------------------------------- #
+# compute_resource                                                             #
+# --------------------------------------------------------------------------- #
+- name: Manage compute resources
+  ansible.builtin.include_tasks: compute_resource.yml
+  when: action == 'compute_resource'
+
+# --------------------------------------------------------------------------- #
+# host — bare-host create + PXE build (rhism alignment Phase C item 2,        #
+# the heavy/Satellite-integrated path)                                       #
+# --------------------------------------------------------------------------- #
+- name: Manage bare hosts (create + PXE build)
+  ansible.builtin.include_tasks: host.yml
+  when: action == 'host'
+
+# --------------------------------------------------------------------------- #
+# export_content / transfer_media / import_content — disconnected/air-gapped #
+# content pipeline (rhism alignment Phase C item 3): 3 independent stages,   #
+# each callable on its own so a real air-gap boundary can sit between them.  #
+# --------------------------------------------------------------------------- #
+- name: Export disconnected content
+  ansible.builtin.include_tasks: export_content.yml
+  when: action == 'export_content'
+
+- name: Transfer exported content onto media
+  ansible.builtin.include_tasks: transfer_media.yml
+  when: action == 'transfer_media'
+
+- name: Import disconnected content
+  ansible.builtin.include_tasks: import_content.yml
+  when: action == 'import_content'
+
+# --------------------------------------------------------------------------- #
+# soe_bundles — SOE (Standard Operating Environment) bundle model             #
+# (docs/rhism-alignment-plan.md reuse-map item 1): a composability layer that #
+# transforms each content_soe_bundles entry into the SAME shapes             #
+# content_views.yml/activation_keys.yml already consume, and dispatches      #
+# through those SAME task files. Not a new content-management concern —      #
+# it's a convenience input shape over the three concerns above.              #
+# --------------------------------------------------------------------------- #
+- name: Manage SOE (Standard Operating Environment) bundles
+  ansible.builtin.include_tasks: soe_bundles.yml
+  when: action == 'soe_bundles'
+
+# --------------------------------------------------------------------------- #
+# status                                                                       #
+# --------------------------------------------------------------------------- #
+- name: Check satellite status
+  ansible.builtin.include_tasks: status.yml
+  when: action == 'status'

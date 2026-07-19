@@ -1,0 +1,12 @@
+---
+- name: Manage Red Hat IDM server packages
+  ansible.builtin.package:
+    name: "{{ _idm_server_packages }}"
+    state: "{{ action }}"
+  become: true
+
+- name: Manage Red Hat IDM client packages
+  ansible.builtin.package:
+    name: "{{ _idm_client_packages }}"
+    state: "{{ action }}"
+  become: true

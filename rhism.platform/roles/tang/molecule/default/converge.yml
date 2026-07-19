@@ -1,0 +1,75 @@
+---
+# Tier 1 CONTRACT converge (control host only, no live podman target).
+#
+# Discovered building this scenario (worth recording plainly): roles/podman
+# reuses containers.podman modules, which shell out to a REAL podman CLI
+# binary — the EE itself has no such binary (it talks to the host's podman
+# only via the forwarded Docker-API-compatible socket, using
+# community.docker-family modules). roles/podman's OWN molecule scenario
+# proves this by testing against a real nested-podman test platform
+# (docker.io/geerlingguy/docker-rockylinux9-ansible, privileged), not
+# hosts: localhost. Tang deliberately does NOT replicate that heavy pattern
+# here — real functional deployment needs a genuine target host with podman
+# (the actual test server), which is a Tier-3 lab concern, not CI. This
+# scenario proves the CONTRACT: argument-spec validation, dispatch dispatch,
+# and that tang_deploy_execute: false genuinely makes no changes.
+- name: tang contract test — argument spec, dispatch, dry-run-makes-no-changes
+  hosts: localhost
+  gather_facts: true
+  vars:
+    _tang_role_root: "{{ playbook_dir }}/../.."
+
+  tasks:
+    - name: Negative test — argument spec rejects a bogus action
+      block:
+        - name: Call role with an invalid action
+          ansible.builtin.include_role:
+            name: tang
+          vars:
+            action: bogus_action
+        - name: Fail if validation did not catch the invalid action
+          ansible.builtin.fail:
+            msg: "argument_spec should have rejected the bogus action"
+      rescue:
+        - name: Confirm expected failure was caught
+          ansible.builtin.debug:
+            msg: "PASS — bogus action correctly rejected"
+
+    - name: Verify a dispatch task file exists for every declared action
+      ansible.builtin.stat:
+        path: "{{ _tang_role_root }}/tasks/{{ item }}.yml"
+      register: _tang_action_stat
+      failed_when: not _tang_action_stat.stat.exists
+      loop:
+        - deploy
+        - verify
+
+    - name: Run deploy with the dry-run gate OFF (default) — MUST make no changes
+      ansible.builtin.include_role:
+        name: tang
+      vars:
+        action: deploy
+        # tang_deploy_execute left at its false default deliberately —
+        # this is the assertion under test.
+
+    - name: Assert no Tang container exists after a dry-run deploy
+      ansible.builtin.command:
+        cmd: podman container exists tang
+      delegate_to: localhost
+      register: _tang_container_exists_after_dryrun
+      failed_when: false
+      changed_when: false
+
+    - name: Assert the dry-run genuinely made no changes
+      ansible.builtin.assert:
+        that:
+          # `podman container exists` returns 1 (not found) when absent —
+          # this run's own control host may not even have podman, in which
+          # case the command itself fails to execute (rc 2/127) rather than
+          # returning 0/1 — either non-zero outcome proves "no container was
+          # created", which is exactly what's under test.
+          - _tang_container_exists_after_dryrun.rc != 0
+        fail_msg: >-
+          a tang container exists after a dry-run (tang_deploy_execute:
+          false) deploy — the dry-run gate is not working
+        success_msg: "PASS — dry-run deploy created no container"

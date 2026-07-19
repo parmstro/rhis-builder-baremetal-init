@@ -1,0 +1,23 @@
+---
+- name: Validate add_system variables
+  ansible.builtin.assert:
+    that:
+      - prov_cobbler_system is defined
+      - prov_cobbler_system.name is defined
+      - prov_cobbler_system.profile is defined
+      - prov_cobbler_system.mac is defined
+      - prov_cobbler_system.ip is defined
+      - prov_cobbler_system.hostname is defined
+    fail_msg: "add_system requires prov_cobbler_system with name, profile, mac, ip, and hostname"
+
+- name: Add cobbler system
+  ansible.builtin.command:
+    cmd: >-
+      cobbler system add
+      --name="{{ prov_cobbler_system.name }}"
+      --profile="{{ prov_cobbler_system.profile }}"
+      --mac="{{ prov_cobbler_system.mac }}"
+      --ip-address="{{ prov_cobbler_system.ip }}"
+      --hostname="{{ prov_cobbler_system.hostname }}"
+  become: true
+  changed_when: true

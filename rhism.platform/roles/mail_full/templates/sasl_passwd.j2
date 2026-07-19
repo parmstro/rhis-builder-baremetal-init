@@ -1,0 +1,5 @@
+{# Managed by Ansible — role mail_full. Do not edit by hand. #}
+# Postfix SASL relay credentials — managed by Ansible (mail_full role)
+# Do not edit manually; changes will be overwritten.
+# Format: [relayhost]:port  user:password
+[{{ mail_relay_host }}]:{{ mail_relay_port }}    {{ mail_relay_user }}:{{ mail_relay_password }}

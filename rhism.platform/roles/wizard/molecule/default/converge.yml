@@ -1,0 +1,96 @@
+---
+- name: Converge — estate profile manifest generation (small tier)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    wizard_action: interactive
+    wizard_profile: estate
+    wizard_estate_sizing_tier: s
+    wizard_output_dir: /tmp/wizard-test
+    wizard_output_file: estate-small-manifest.yml
+    wizard_skip_confirm: true
+    wizard_network:
+      domain: test.local
+      realm: TEST.LOCAL
+      subnet: 10.0.1.0/24
+      gateway: 10.0.1.1
+      dns:
+        - 8.8.8.8
+    wizard_credentials:
+      admin_password: TestPassword123!
+  roles:
+    - role: rhism.platform.wizard
+
+- name: Converge — estate profile manifest generation (large tier, the real default)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    wizard_action: interactive
+    wizard_profile: estate
+    wizard_output_dir: /tmp/wizard-test
+    wizard_output_file: estate-large-manifest.yml
+    wizard_skip_confirm: true
+    wizard_network:
+      domain: estate.local
+      realm: ESTATE.LOCAL
+      subnet: 10.0.2.0/24
+      gateway: 10.0.2.1
+      dns:
+        - 8.8.8.8
+    wizard_credentials:
+      admin_password: TestPassword123!
+  roles:
+    - role: rhism.platform.wizard
+
+- name: Converge — validate action on generated manifest
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    wizard_action: validate
+    wizard_output_dir: /tmp/wizard-test
+    wizard_output_file: estate-large-manifest.yml
+  roles:
+    - role: rhism.platform.wizard
+
+- name: Converge — show_plan and generate_inventory actions on generated manifest
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    wizard_output_dir: /tmp/wizard-test
+    wizard_output_file: estate-large-manifest.yml
+  tasks:
+    - name: Run show_plan
+      ansible.builtin.include_role:
+        name: rhism.platform.wizard
+      vars:
+        wizard_action: show_plan
+
+    - name: Run generate_inventory
+      ansible.builtin.include_role:
+        name: rhism.platform.wizard
+      vars:
+        wizard_action: generate_inventory
+
+- name: Converge — negative test dispatcher rejects invalid action
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Attempt invalid wizard_action
+      block:
+        - name: Run role with invalid wizard_action
+          ansible.builtin.include_role:
+            name: rhism.platform.wizard
+          vars:
+            wizard_action: invalid_action
+        - name: Fail if dispatcher did not reject
+          ansible.builtin.fail:
+            msg: "Dispatcher should have rejected 'invalid_action'"
+      rescue:
+        - name: Confirm dispatcher correctly rejected invalid_action
+          ansible.builtin.debug:
+            msg: "PASS — dispatcher correctly rejected invalid_action"

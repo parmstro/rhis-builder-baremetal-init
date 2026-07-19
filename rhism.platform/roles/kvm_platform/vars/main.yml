@@ -1,0 +1,16 @@
+---
+# Role-internal package map (NOT part of the caller variable interface — override
+# kvm_platform_packages in defaults/ instead of editing this map).
+_kvm_platform_packages_map:
+  RedHat:
+    - qemu-kvm
+    - libvirt
+    - libvirt-client
+    - virt-install
+    - libguestfs-tools
+  Debian:
+    - qemu-kvm
+    - libvirt-daemon-system
+    - libvirt-clients
+    - virtinst
+    - libguestfs-tools

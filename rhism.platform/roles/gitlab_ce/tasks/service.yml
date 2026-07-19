@@ -1,0 +1,13 @@
+---
+# ---------------------------------------------------------------------------
+# gitlab_ce — service: manage service state (started / stopped / restarted)
+#
+# Consolidated file — the three actions differ only by the state parameter.
+# ---------------------------------------------------------------------------
+
+- name: Manage GitLab CE service
+  ansible.builtin.service:
+    name: "{{ _scm_service_name }}"
+    state: "{{ action }}"
+    enabled: "{{ action == 'started' }}"
+  become: true

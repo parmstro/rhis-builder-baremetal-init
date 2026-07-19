@@ -1,0 +1,28 @@
+---
+galaxy_info:
+  role_name: linux_hardening
+  namespace: cx_ansible_galaxy
+  author: cx_ansible_galaxy
+  description: >-
+    OS-level security hardening for EL 8/9/10 — sysctl kernel parameters, SSH
+    configuration, PAM/password quality policy, and kernel module blacklisting.
+    Dispatcher driven by linux_hardening_action variable.
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: EL
+      versions:
+        - "8"
+        - "9"
+        - "10"
+  galaxy_tags:
+    - linux
+    - security
+    - hardening
+    - ssh
+    - sysctl
+    - pam
+    - cis
+    - stig
+
+dependencies: []

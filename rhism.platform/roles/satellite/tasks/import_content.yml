@@ -1,0 +1,69 @@
+---
+# --------------------------------------------------------------------------- #
+# import_content — disconnected/air-gapped content import (rhism alignment   #
+# Phase C item 3), the third and final pipeline stage:                       #
+#   export_content -> transfer_media -> import_content                      #
+#                                                                             #
+# Replaces upstream RHIS's remaining shell script (the import-side sibling   #
+# of build_sat_disconnected_export.sh — also just a thin wrapper around a    #
+# playbook not present in the vendored tree) with the real theforeman.foreman#
+# content_import_* modules. Unlike the export side, all 3 import modules     #
+# take an IDENTICAL parameter set (organization + path, +optional            #
+# metadata/metadata_file) — the import auto-detects what it's importing from #
+# the metadata Satellite wrote alongside the content at export time, so the  #
+# only reason to keep a per-type dispatch here (rather than one shared task) #
+# is that they are still 3 distinct API-backed modules/endpoints.            #
+#                                                                             #
+# `path` defaults to content_transfer_media_path so the 3-stage pipeline     #
+# chains together with zero extra vars when run end-to-end in one play; a    #
+# content_imports entry can still override path to import from anywhere.     #
+#                                                                             #
+# List-guarded no-op with the empty content_imports default.                 #
+# --------------------------------------------------------------------------- #
+- name: Import library content
+  theforeman.foreman.content_import_library:
+    server_url: "{{ content_server_url }}"
+    username: "{{ content_username }}"
+    password: "{{ content_password }}"
+    validate_certs: "{{ content_validate_certs }}"
+    organization: "{{ item.organization | default(content_organization) }}"
+    path: "{{ item.path | default(content_transfer_media_path) }}"
+    metadata: "{{ item.metadata | default(omit) }}"
+    metadata_file: "{{ item.metadata_file | default(omit) }}"
+  loop: "{{ content_imports | selectattr('type', 'equalto', 'library') | list }}"
+  loop_control:
+    label: "{{ item.name | default('library') }}"
+  no_log: "{{ content_no_log }}"
+  when: content_imports | length > 0
+
+- name: Import repository content
+  theforeman.foreman.content_import_repository:
+    server_url: "{{ content_server_url }}"
+    username: "{{ content_username }}"
+    password: "{{ content_password }}"
+    validate_certs: "{{ content_validate_certs }}"
+    organization: "{{ item.organization | default(content_organization) }}"
+    path: "{{ item.path | default(content_transfer_media_path) }}"
+    metadata: "{{ item.metadata | default(omit) }}"
+    metadata_file: "{{ item.metadata_file | default(omit) }}"
+  loop: "{{ content_imports | selectattr('type', 'equalto', 'repository') | list }}"
+  loop_control:
+    label: "{{ item.name | default('repository') }}"
+  no_log: "{{ content_no_log }}"
+  when: content_imports | length > 0
+
+- name: Import content view version
+  theforeman.foreman.content_import_version:
+    server_url: "{{ content_server_url }}"
+    username: "{{ content_username }}"
+    password: "{{ content_password }}"
+    validate_certs: "{{ content_validate_certs }}"
+    organization: "{{ item.organization | default(content_organization) }}"
+    path: "{{ item.path | default(content_transfer_media_path) }}"
+    metadata: "{{ item.metadata | default(omit) }}"
+    metadata_file: "{{ item.metadata_file | default(omit) }}"
+  loop: "{{ content_imports | selectattr('type', 'equalto', 'version') | list }}"
+  loop_control:
+    label: "{{ item.name | default('version') }}"
+  no_log: "{{ content_no_log }}"
+  when: content_imports | length > 0

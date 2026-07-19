@@ -1,0 +1,45 @@
+---
+argument_specs:
+  main:
+    short_description: Configure the platform's built-in ingress controller.
+    description: >-
+      Standalone-first ingress backend for container_platform. Manages the platform's
+      built-in ingress controller (Traefik on k3s via HelmChartConfig; reports status on
+      other platforms). Consumes the shared ingress-backend interface (action, cp_* vars)
+      so the container_platform dispatcher can select any backend with identical code.
+    options:
+      action:
+        description: >-
+          Lifecycle action, shared across all ingress backends. 'ingress' verifies and
+          reports the built-in controller; 'present' applies the built-in ingress config;
+          'absent' removes it.
+        type: str
+        default: ingress
+        choices:
+          - ingress
+          - present
+          - absent
+      cp_kubeconfig_path:
+        description: Path to the cluster kubeconfig. Shared ingress-interface var.
+        type: str
+        default: /etc/rancher/k3s/k3s.yaml
+      cp_type:
+        description: >-
+          Container platform type. 'k3s' manages the built-in Traefik via HelmChartConfig;
+          other platforms only get a status report. Shared ingress-interface var.
+        type: str
+        default: k3s
+      cp_ingress_domain:
+        description: Apps/ingress base domain, used in status reporting. Shared interface var.
+        type: str
+        default: ""
+      cp_ingress_execute:
+        description: >-
+          Dry-run gate honoured by every ingress backend. false validates action dispatch and
+          variable resolution without changing the node or cluster (used by molecule).
+        type: bool
+        default: true
+      _cp_builtin_ingress_name:
+        description: Name of the platform's built-in ingress controller deployment.
+        type: str
+        default: traefik

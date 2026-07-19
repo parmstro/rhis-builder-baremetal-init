@@ -1,0 +1,45 @@
+---
+# The dns/user/group/hbac/sudo actions no-op with empty list defaults, so they exercise
+# dispatch + argument-spec validation with no live IdM domain and no RHSM. The server/replica/
+# client actions register with RHSM, install packages and open firewalld unconditionally, so
+# they are NOT dry-run-safe in a bare container and are covered by argument-spec validation +
+# the gates instead.
+
+- name: Converge — dns action (empty lists, dispatch-only)
+  hosts: all
+  gather_facts: false
+  vars:
+    action: dns
+  roles:
+    - role: rhism.platform.rh_idm
+
+- name: Converge — directory-object actions (empty lists, dispatch-only)
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Dispatch user/group/hbac/sudo with empty defaults
+      ansible.builtin.include_role:
+        name: rhism.platform.rh_idm
+      vars:
+        action: "{{ item }}"
+      loop:
+        - user
+        - group
+        - hbac
+        - sudo
+
+- name: Converge — negative test (bogus action must fail)
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Attempt bogus action
+      block:
+        - name: Call role with invalid action
+          ansible.builtin.include_role:
+            name: rhism.platform.rh_idm
+          vars:
+            action: bogus_action
+      rescue:
+        - name: Confirm expected failure was caught
+          ansible.builtin.debug:
+            msg: "PASS — bogus action correctly rejected"

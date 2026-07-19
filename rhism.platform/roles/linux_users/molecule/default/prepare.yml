@@ -1,0 +1,8 @@
+---
+- name: Prepare
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Ensure PAM is installed (creates /etc/security)
+      ansible.builtin.raw: dnf install -y pam 2>/dev/null
+      changed_when: false

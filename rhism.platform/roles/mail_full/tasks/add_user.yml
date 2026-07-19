@@ -1,0 +1,51 @@
+---
+# tasks/add_user.yml — Add a virtual mailbox user to Postfix + Dovecot.
+
+- name: Add virtual mailbox user
+  become: true
+  block:
+    - name: Validate mail_new_user is set
+      ansible.builtin.assert:
+        that:
+          - mail_new_user | length > 0
+          - mail_new_user_password_hash | length > 0
+        fail_msg: "mail_new_user and mail_new_user_password_hash must be set for the add_user action"
+
+    - name: Add user to vmailbox map
+      ansible.builtin.lineinfile:
+        path: /etc/postfix/vmailbox
+        line: "{{ mail_new_user }}  {{ mail_new_user.split('@')[1] }}/{{ mail_new_user.split('@')[0] }}/Maildir/"
+        state: present
+        create: true
+        owner: root
+        group: root
+        mode: "0644"
+      notify: mail_full - postmap vmailbox
+      when: mail_execute | bool
+
+    - name: Add user to Dovecot passwd.db
+      ansible.builtin.lineinfile:
+        path: "{{ mail_dovecot_passwd_file }}"
+        line: "{{ mail_new_user }}:{{ mail_new_user_password_hash }}"
+        state: present
+        create: true
+        owner: root
+        group: dovecot
+        mode: "0640"
+      no_log: true
+      when: mail_execute | bool
+
+    - name: Run postmap on vmailbox
+      ansible.builtin.command:
+        cmd: postmap {{ mail_db_type }}:/etc/postfix/vmailbox
+      changed_when: true
+      when: mail_execute | bool
+
+    - name: Create Maildir for new user
+      ansible.builtin.file:
+        path: "{{ mail_virtual_mailbox_base }}/{{ mail_new_user.split('@')[1] }}/{{ mail_new_user.split('@')[0] }}/Maildir"
+        state: directory
+        owner: "{{ mail_vmail_user }}"
+        group: "{{ mail_vmail_user }}"
+        mode: "0700"
+      when: mail_execute | bool

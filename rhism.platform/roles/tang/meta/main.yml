@@ -1,0 +1,24 @@
+---
+galaxy_info:
+  role_name: tang
+  namespace: rhism
+  author: rhism
+  description: >-
+    Tang / NBDE (Network-Bound Disk Encryption) key-escrow server — deploys
+    the official Red Hat rhel9/tang container, and verifies it with a real
+    clevis encrypt/decrypt round-trip. rhism alignment Phase C item.
+  company: rhism
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: EL
+      versions:
+        - "9"
+  galaxy_tags:
+    - tang
+    - nbde
+    - clevis
+    - disk-encryption
+    - security
+
+dependencies: []

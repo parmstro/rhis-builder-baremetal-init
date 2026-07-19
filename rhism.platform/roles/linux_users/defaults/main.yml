@@ -1,0 +1,28 @@
+---
+# Dispatcher variable — selects which task file(s) to run.
+# 'all' runs sudo, faillock, and uid_standards in sequence.
+linux_users_action: all
+
+# --- faillock (account lockout)
+# Lock account after N consecutive authentication failures.
+linux_users_faillock_deny: 5
+# Seconds before a locked account is automatically unlocked (0 = manual unlock).
+linux_users_faillock_unlock_time: 900
+# Count failures within this many seconds of each other.
+linux_users_faillock_fail_interval: 900
+
+# --- sudo policy
+# Groups granted passwordless sudo (NOPASSWD). Each entry is a string group name.
+linux_users_sudo_nopasswd_groups: []
+# Users granted passwordless sudo (NOPASSWD). Each entry is a string user name.
+linux_users_sudo_nopasswd_users: []
+
+# --- uid/gid standards
+# List of {name, uid, gid, groups, shell, comment} dicts to enforce.
+# Example:
+#   - name: appuser
+#     uid: 1500
+#     gid: 1500
+#     groups: []
+#     shell: /sbin/nologin
+linux_users_uid_standards: []

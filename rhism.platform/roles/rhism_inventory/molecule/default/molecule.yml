@@ -1,0 +1,40 @@
+---
+# Tier 2 functional scenario — this role's REAL target is the control node:
+# every play runs on localhost and exercises all four actions for real
+# (catalogue load, validation, aggregation with dedup, /22 network derivation,
+# publish). The platform container below exists only to satisfy molecule.
+#
+# Collection-hosted scenario: molecule's collection-under-test auto-install
+# (prerun) would try to ansible-galaxy-install this collection into the
+# workspace collections path, clobbering the loader symlink at
+# collections/ansible_collections/rhism/platform ("Cannot call rmtree on a
+# symbolic link"). Disabled — local collection checkouts already resolve via
+# ANSIBLE_COLLECTIONS_PATH.
+prerun: false
+
+dependency:
+  name: galaxy
+  enabled: false
+
+driver:
+  name: docker
+
+platforms:
+  - name: rhism-inventory-el9
+    image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+    pre_build_image: true
+    override_command: true
+    command: sleep infinity
+
+provisioner:
+  name: ansible
+
+scenario:
+  test_sequence:
+    - dependency
+    - destroy
+    - syntax
+    - create
+    - converge
+    - verify
+    - destroy

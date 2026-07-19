@@ -1,0 +1,7 @@
+---
+# install — manage the ReaR package (present/absent). State maps to the action.
+- name: Manage ReaR package
+  ansible.builtin.package:
+    name: "{{ _rear_packages }}"
+    state: "{{ action }}"
+  become: true

@@ -1,0 +1,13 @@
+# {{ ansible_managed }}
+# rhism.platform.rear (action: schedule) — unattended ReaR protection service.
+[Unit]
+Description=Relax-and-Recover scheduled backup
+Documentation=man:rear(8)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c '{{ backup_rear_schedule_command }}'
+Nice=19
+IOSchedulingClass=idle

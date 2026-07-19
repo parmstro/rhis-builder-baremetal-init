@@ -1,0 +1,25 @@
+---
+- name: Validate content_action
+  ansible.builtin.assert:
+    that:
+      - content_action is defined
+      - content_action in _content_valid_actions
+    fail_msg: >-
+      content_action must be one of: {{ _content_valid_actions | join(', ') }}.
+      Got '{{ content_action | default('undefined') }}'.
+
+- name: Validate content_type
+  ansible.builtin.assert:
+    that:
+      - content_type is defined
+      - content_type in _content_valid_types
+    fail_msg: >-
+      content_type must be one of: {{ _content_valid_types | join(', ') }}.
+      Got '{{ content_type | default('undefined') }}'.
+
+- name: Load {{ content_type }} type vars
+  ansible.builtin.include_vars:
+    file: "{{ content_type }}.yml"
+
+- name: "Execute task file for: {{ content_action }}"
+  ansible.builtin.include_tasks: "{{ content_action }}.yml"

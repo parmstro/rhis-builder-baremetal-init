@@ -1,0 +1,26 @@
+---
+# --------------------------------------------------------------------------- #
+# status — service health and API connectivity check                          #
+# --------------------------------------------------------------------------- #
+- name: Check satellite service status
+  ansible.builtin.service_facts:
+
+- name: Report foreman service state (satellite)
+  ansible.builtin.debug:
+    msg: "foreman service state: {{ ansible_facts.services[_content_service_name + '.service'] | default({'state': 'not found'}) }}"
+
+- name: Test satellite API connectivity
+  ansible.builtin.uri:
+    url: "{{ content_server_url }}/api/v2/status"
+    method: GET
+    user: "{{ content_username }}"
+    password: "{{ content_password }}"
+    validate_certs: "{{ content_validate_certs }}"
+    force_basic_auth: true
+    status_code: 200
+  no_log: "{{ content_no_log }}"
+  register: _content_api_status
+
+- name: Report API status
+  ansible.builtin.debug:
+    msg: "Satellite API status: {{ _content_api_status.json | default({}) }}"

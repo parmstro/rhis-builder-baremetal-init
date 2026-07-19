@@ -1,0 +1,164 @@
+---
+- name: Validate monitoring_stack dispatcher and variable contract
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Validate dispatcher rejects invalid action
+      block:
+        - name: Attempt invalid action
+          ansible.builtin.include_role:
+            name: monitoring_stack
+          vars:
+            mon_action: invalid_action
+
+        - name: Fail if invalid action was accepted
+          ansible.builtin.fail:
+            msg: "Dispatcher should have rejected invalid mon_action"
+      rescue:
+        - name: Assert invalid action was rejected
+          ansible.builtin.assert:
+            that: true
+            success_msg: "Dispatcher correctly rejected invalid mon_action"
+
+    - name: Validate all action values are accepted
+      ansible.builtin.assert:
+        that:
+          - "'nagios_server' in valid_actions"
+          - "'nagios_client' in valid_actions"
+          - "'splunk_server' in valid_actions"
+          - "'splunk_forwarder' in valid_actions"
+          - "'elastic_server' in valid_actions"
+          - "'elastic_agent' in valid_actions"
+          - "'eda_rulebooks' in valid_actions"
+          - "'baseline' in valid_actions"
+      vars:
+        valid_actions:
+          - nagios_server
+          - nagios_client
+          - splunk_server
+          - splunk_forwarder
+          - elastic_server
+          - elastic_agent
+          - eda_rulebooks
+          - baseline
+
+    - name: Load role defaults for the variable contract check
+      # The only role inclusion above is task-level (inside a rescue block),
+      # which does not expose role defaults to the rest of this play.
+      # Load defaults/main.yml directly instead of running the role for
+      # real, so mon_action and friends resolve without exercising any
+      # dispatch tasks (BUG-050).
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/../../defaults/main.yml"
+
+    - name: Validate default variable contract
+      ansible.builtin.assert:
+        that:
+          - mon_action == 'baseline'
+          - mon_nagios_host_templates | length > 0
+          - mon_nagios_service_checks | length > 0
+          - mon_nrpe_checks | length > 0
+          - mon_splunk_indexes | length > 0
+          - mon_splunk_alerts | length > 0
+          - mon_splunk_fwd_inputs | length > 0
+          - mon_elastic_ilm_policies | length > 0
+          - mon_elastic_index_templates | length > 0
+          - mon_filebeat_modules | length > 0
+          - mon_filebeat_inputs | length > 0
+          - mon_eda_response_playbooks is defined
+          - mon_eda_response_playbooks | length > 0
+          - mon_apply_nagios_server | type_debug == 'bool'
+          - mon_apply_splunk_server | type_debug == 'bool'
+          - mon_apply_elastic_server | type_debug == 'bool'
+          - mon_apply_eda_rulebooks | type_debug == 'bool'
+        fail_msg: "Default variables not properly defined"
+
+    - name: Validate Nagios template rendering
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../../templates/{{ item }}.j2"
+        dest: "/tmp/{{ item }}"
+        mode: "0644"
+      loop:
+        - nagios_contacts.cfg
+        - nagios_templates.cfg
+        - nagios_services.cfg
+        - nrpe.cfg
+
+    - name: Validate Splunk template rendering
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../../templates/{{ item }}.j2"
+        dest: "/tmp/{{ item }}"
+        mode: "0644"
+      loop:
+        - splunk_savedsearches.conf
+        - splunk_inputs.conf
+
+    - name: Validate Elasticsearch template rendering
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../../templates/{{ item }}.j2"
+        dest: "/tmp/{{ item }}"
+        mode: "0644"
+      loop:
+        - elasticsearch.yml
+        - elasticsearch_jvm.options
+        - kibana.yml
+        - filebeat.yml
+        - filebeat_module_system.yml
+        - filebeat_module_auditd.yml
+
+    - name: Validate EDA rulebook rendering
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../../templates/{{ item }}.j2"
+        dest: "/tmp/{{ item }}"
+        mode: "0644"
+      loop:
+        - eda_security_events.yml
+        - eda_infrastructure_events.yml
+        - eda_service_health.yml
+
+    - name: Verify rendered Nagios config content
+      ansible.builtin.slurp:
+        src: /tmp/nagios_templates.cfg
+      register: nagios_tmpl
+
+    - name: Assert Nagios templates have expected host types
+      ansible.builtin.assert:
+        that:
+          - "'linux-server' in nagios_tmpl.content | b64decode"
+          - "'windows-server' in nagios_tmpl.content | b64decode"
+          - "'network-device' in nagios_tmpl.content | b64decode"
+
+    - name: Verify rendered EDA rulebook content
+      ansible.builtin.slurp:
+        src: /tmp/eda_security_events.yml
+      register: eda_sec
+
+    - name: Assert EDA rulebook has event sources and actions
+      ansible.builtin.assert:
+        that:
+          - "'ansible.eda.webhook' in eda_sec.content | b64decode"
+          - "'run_playbook' in eda_sec.content | b64decode"
+          - "'event_response' in eda_sec.content | b64decode"
+
+    - name: Verify rendered Splunk alerts content
+      ansible.builtin.slurp:
+        src: /tmp/splunk_savedsearches.conf
+      register: splunk_alerts
+
+    - name: Assert Splunk alerts cover security events
+      ansible.builtin.assert:
+        that:
+          - "'Failed SSH Authentication' in splunk_alerts.content | b64decode"
+          - "'High CPU Usage' in splunk_alerts.content | b64decode"
+          - "'Unauthorized Privilege Escalation' in splunk_alerts.content | b64decode"
+
+    - name: Validate EDA response playbook mappings are consistent
+      ansible.builtin.assert:
+        that:
+          - mon_eda_response_playbooks.failed_ssh is defined
+          - mon_eda_response_playbooks.high_cpu is defined
+          - mon_eda_response_playbooks.disk_critical is defined
+          - mon_eda_response_playbooks.privilege_escalation is defined
+          - mon_eda_response_playbooks.service_down is defined
+          - mon_eda_response_playbooks.host_unreachable is defined
+        fail_msg: "Missing EDA response playbook mappings"

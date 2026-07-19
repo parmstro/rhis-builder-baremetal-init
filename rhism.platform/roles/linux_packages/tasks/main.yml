@@ -1,0 +1,21 @@
+---
+- name: Validate linux_packages_action
+  ansible.builtin.assert:
+    that:
+      - linux_packages_action is defined
+      - linux_packages_action in ['remove', 'install', 'all', 'patch']
+    fail_msg: >-
+      linux_packages_action must be one of: remove, install, all, patch
+      (got '{{ linux_packages_action | default("undefined") }}')
+
+- name: Remove insecure legacy packages
+  ansible.builtin.include_tasks: remove.yml
+  when: linux_packages_action in ['remove', 'all']
+
+- name: Install security tooling
+  ansible.builtin.include_tasks: install.yml
+  when: linux_packages_action in ['install', 'all']
+
+- name: Patch CVE-affected packages
+  ansible.builtin.include_tasks: patch.yml
+  when: linux_packages_action == 'patch'

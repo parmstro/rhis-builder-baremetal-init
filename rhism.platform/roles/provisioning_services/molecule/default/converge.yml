@@ -1,0 +1,77 @@
+---
+- name: Converge — dnsmasq baseline no-op (dispatcher + var loading)
+  hosts: all
+  gather_facts: false
+  vars:
+    prov_action: baseline
+    prov_type: dnsmasq
+    prov_apply_install: false
+    prov_apply_configure: false
+  roles:
+    - role: rhism.platform.provisioning_services
+
+- name: Converge — cobbler baseline no-op (dispatcher + var loading)
+  hosts: all
+  gather_facts: false
+  vars:
+    prov_action: baseline
+    prov_type: cobbler
+    prov_apply_install: false
+    prov_apply_configure: false
+  roles:
+    - role: rhism.platform.provisioning_services
+
+- name: Converge — foreman_proxy baseline no-op (dispatcher + var loading)
+  hosts: all
+  gather_facts: false
+  vars:
+    prov_action: baseline
+    prov_type: foreman_proxy
+    prov_apply_install: false
+    prov_apply_configure: false
+  roles:
+    - role: rhism.platform.provisioning_services
+
+- name: Converge — dnsmasq install dry-run (prov_execute false)
+  hosts: all
+  gather_facts: false
+  vars:
+    prov_action: install
+    prov_type: dnsmasq
+    prov_execute: false
+  roles:
+    - role: rhism.platform.provisioning_services
+
+- name: Converge — negative test (bogus action)
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Attempt bogus prov_action (must fail)
+      block:
+        - name: Call role with invalid action
+          ansible.builtin.include_role:
+            name: rhism.platform.provisioning_services
+          vars:
+            prov_action: bogus_action
+            prov_type: dnsmasq
+      rescue:
+        - name: Confirm expected failure was caught
+          ansible.builtin.debug:
+            msg: "PASS — bogus prov_action correctly rejected"
+
+- name: Converge — negative test (bogus type)
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Attempt bogus prov_type (must fail)
+      block:
+        - name: Call role with invalid type
+          ansible.builtin.include_role:
+            name: rhism.platform.provisioning_services
+          vars:
+            prov_action: baseline
+            prov_type: bogus_type
+      rescue:
+        - name: Confirm expected failure was caught
+          ansible.builtin.debug:
+            msg: "PASS — bogus prov_type correctly rejected"

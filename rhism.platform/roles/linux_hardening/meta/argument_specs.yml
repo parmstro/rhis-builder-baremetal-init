@@ -1,0 +1,81 @@
+---
+argument_specs:
+  main:
+    short_description: OS-level security hardening for EL 8/9/10.
+    options:
+      linux_hardening_action:
+        type: str
+        required: true
+        choices:
+          - sysctl
+          - ssh
+          - pam
+          - kernel_modules
+          - all
+        description: >-
+          Selects which task file(s) to run. 'all' runs sysctl, ssh, pam,
+          and kernel_modules in sequence.
+      linux_hardening_manage_ssh:
+        type: bool
+        default: true
+        description: Whether to deploy the sshd_config template.
+      linux_hardening_ssh_port:
+        type: int
+        default: 22
+        description: SSH port number to configure in sshd_config.
+      linux_hardening_ssh_permit_root_login:
+        type: str
+        default: "no"
+        description: Value for PermitRootLogin in sshd_config.
+      linux_hardening_ssh_password_auth:
+        type: str
+        default: "no"
+        description: Value for PasswordAuthentication in sshd_config.
+      linux_hardening_sysctl_params:
+        type: dict
+        description: >-
+          Dict of sysctl parameter name → value pairs applied via
+          ansible.posix.sysctl. Merged with the role defaults.
+      linux_hardening_ssh_install_server:
+        type: bool
+        default: true
+        description: >-
+          Install openssh-server before deploying sshd_config. Set false
+          for container/image builds baking config only, or where the
+          package module can't run (EL8 + python3.11).
+      linux_hardening_ssh_validate:
+        type: bool
+        default: true
+        description: >-
+          Validate sshd_config via `sshd -t` before install. Set false where
+          no SSH host keys exist (image builds, containers) — sshd -t
+          requires them, and a shared base image must not bake them in.
+      linux_hardening_sysctl_apply:
+        type: bool
+        default: true
+        description: >-
+          When true, set parameters live (sysctl -p reload). When false,
+          write configuration only — no live apply and no dependency on the
+          sysctl binary (procps-ng), so minimal/container images work (BUG-103).
+      linux_hardening_sysctl_file:
+        type: str
+        default: /etc/sysctl.conf
+        description: Destination file for hardening parameters (both modes).
+      linux_hardening_blacklisted_modules:
+        type: list
+        elements: str
+        description: >-
+          Kernel modules to blacklist via community.general.modprobe with
+          state=absent persistent=present. Set to [] in container tests.
+      linux_hardening_modules_apply:
+        type: bool
+        default: true
+        description: >-
+          When true, unload + persistently blacklist via modprobe. When
+          false, write /etc/modprobe.d/ blacklist config only — no live
+          unload and no dependency on the modprobe binary (kmod), so
+          minimal/container image builds work.
+      linux_hardening_pwquality_minlen:
+        type: int
+        default: 14
+        description: Minimum password length (pwquality.conf minlen).

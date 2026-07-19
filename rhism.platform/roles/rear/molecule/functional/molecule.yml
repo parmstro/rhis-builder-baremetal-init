@@ -1,0 +1,54 @@
+---
+# Functional (Tier 2) scenario — actually installs ReaR, renders /etc/rear config
+# pointing OUTPUT+BACKUP at a local file:// target, resolves the config (rear dump),
+# checks the layout, and produces a REAL recovery artifact, asserted in verify.yml.
+# Complements the fast `default` contract scenario. See docs/testing-efficacy.md.
+#
+# Honest container caveat: `rear mkrescue` reads live block/bootloader/kernel-module
+# context and can be fragile inside a container; `rear mkbackuponly` (tar NETFS to a
+# file:// target) is container-friendly and gives a genuine functional signal. The
+# converge attempts mkrescue but does NOT depend on it, and always produces the
+# reliable data backup — verify asserts whatever real artifact was produced.
+# rear recover is NOT run here — it is Tier-3 KVM-lab only.
+#
+# Collection-hosted scenario: prerun disabled to protect the loader symlink
+# (see the default scenario for the full rationale).
+prerun: false
+
+dependency:
+  name: galaxy
+  enabled: false
+
+driver:
+  name: docker
+
+platforms:
+  - name: rear-func-el9
+    image: docker.io/almalinux:9
+    command: /sbin/init
+    privileged: true
+    pre_build_image: true
+    tmpfs:
+      - /run
+      - /tmp
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
+
+provisioner:
+  name: ansible
+  inventory:
+    group_vars:
+      all:
+        ansible_python_interpreter: /usr/bin/python3
+        ansible_remote_tmp: /tmp
+
+scenario:
+  test_sequence:
+    - dependency
+    - destroy
+    - syntax
+    - create
+    - prepare
+    - converge
+    - verify
+    - destroy

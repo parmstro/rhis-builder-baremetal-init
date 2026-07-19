@@ -1,0 +1,66 @@
+---
+# Dispatcher variable — selects which task file(s) to run.
+# 'all' runs sysctl, ssh, pam, and kernel_modules in sequence.
+linux_hardening_action: all
+
+# --- SSH hardening
+linux_hardening_manage_ssh: true
+linux_hardening_ssh_port: 22
+linux_hardening_ssh_permit_root_login: "no"
+linux_hardening_ssh_password_auth: "no"
+linux_hardening_ssh_max_auth_tries: 4
+linux_hardening_ssh_client_alive_interval: 300
+linux_hardening_ssh_client_alive_count_max: 0
+# Groups allowed to log in via SSH. Empty = no AllowGroups restriction.
+linux_hardening_ssh_allowed_groups: []
+# Whether to manage the sftp subsystem line (false = leave upstream default).
+linux_hardening_ssh_manage_sftp: false
+# Install openssh-server before deploying sshd_config. Set false for
+# container/image builds that bake config only (no running sshd), or where
+# the package module can't run (EL8 + python3.11, BUG-018 class).
+linux_hardening_ssh_install_server: true
+# Validate sshd_config with `sshd -t` before install. Requires host keys —
+# set false for image builds/containers where sshd-keygen has never run
+# (generating keys there would bake identical host keys into a base image).
+linux_hardening_ssh_validate: true
+
+# --- Kernel parameters (sysctl)
+# Set to false to write sysctl.conf without live-reloading via sysctl -p.
+# Useful in containers where kernel security params are protected even as root.
+linux_hardening_sysctl_apply: true
+# Destination file for the hardening parameters (both modes).
+linux_hardening_sysctl_file: /etc/sysctl.conf
+
+linux_hardening_sysctl_params:
+  kernel.dmesg_restrict: 1
+  kernel.kptr_restrict: 2
+  kernel.randomize_va_space: 2
+  net.ipv4.conf.all.accept_redirects: 0
+  net.ipv4.conf.default.accept_redirects: 0
+  net.ipv4.conf.all.send_redirects: 0
+  net.ipv4.conf.all.rp_filter: 1
+  net.ipv4.icmp_echo_ignore_broadcasts: 1
+  net.ipv6.conf.all.accept_ra: 0
+  net.ipv6.conf.default.accept_ra: 0
+
+# --- Kernel module blacklisting
+# Set to false to write /etc/modprobe.d/ blacklist config without live
+# unloading via modprobe (which needs kmod — absent on minimal images).
+linux_hardening_modules_apply: true
+# Set to [] in molecule converge to avoid modprobe errors inside containers.
+linux_hardening_blacklisted_modules:
+  - usb-storage
+  - cramfs
+  - freevxfs
+  - jffs2
+  - hfs
+  - hfsplus
+  - squashfs
+  - udf
+
+# --- PAM / password quality (pwquality.conf)
+linux_hardening_pwquality_minlen: 14
+linux_hardening_pwquality_dcredit: -1
+linux_hardening_pwquality_ucredit: -1
+linux_hardening_pwquality_ocredit: -1
+linux_hardening_pwquality_lcredit: -1

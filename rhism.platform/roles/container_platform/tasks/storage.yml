@@ -1,0 +1,6 @@
+---
+- name: Configure storage class ({{ cp_storage_type }})
+  ansible.builtin.include_role:
+    name: "storage_{{ cp_storage_type | replace('-', '_') }}"
+  vars:
+    action: storage

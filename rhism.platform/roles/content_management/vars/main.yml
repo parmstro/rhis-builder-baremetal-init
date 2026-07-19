@@ -1,0 +1,13 @@
+---
+_content_valid_actions:
+  - install
+  - configure
+  - repos
+  - sync
+  - content_views
+  - activation_keys
+  - baseline
+
+_content_valid_types:
+  - satellite
+  - foreman

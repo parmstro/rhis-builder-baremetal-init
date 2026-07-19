@@ -1,0 +1,130 @@
+---
+argument_specs:
+  main:
+    short_description: Cobbler PXE / DHCP / DNS provisioning service.
+    description: >-
+      Standalone-first provisioning backend for provisioning_services. Installs and configures
+      Cobbler to drive network installs (distros, profiles, systems) over PXE/DHCP/DNS/TFTP.
+      Consumes the shared provisioning-services interface (bare action, prov_* vars) so the
+      provisioning_services dispatcher can select any backend with identical code.
+    options:
+      action:
+        description: >-
+          Lifecycle action, shared across all provisioning backends. 'present'/'absent'
+          install or remove packages + firewall; 'configure' deploys settings.yaml and syncs;
+          'add_distro'/'add_profile' register a distro or profile; 'add_system'/'remove_system'
+          register or remove a system; 'add_systems' bulk-registers a list of systems
+          (rhism alignment Phase C item 2 — the light/no-Satellite PXE path); 'sync' runs
+          `cobbler sync`; 'status' queries `cobbler status`; 'started'/'stopped'/'restarted'
+          manage the service.
+        type: str
+        default: configure
+        choices:
+          - present
+          - absent
+          - started
+          - stopped
+          - restarted
+          - configure
+          - add_distro
+          - add_profile
+          - add_system
+          - add_systems
+          - remove_system
+          - sync
+          - status
+      prov_execute:
+        description: >-
+          Dry-run gate honoured by every provisioning backend. false validates action dispatch
+          and variable resolution without installing packages or running the cobbler CLI (used
+          by molecule).
+        type: bool
+        default: true
+      prov_manage_service:
+        description: >-
+          Provisioning-family service-management toggle. Guards the
+          started/stopped/restarted action and the restart handler so non-systemd
+          contexts (containers) can skip service management.
+        type: bool
+        default: true
+      prov_cobbler_server:
+        description: Cobbler server address rendered into settings.yaml.
+        type: str
+        default: localhost
+      prov_cobbler_next_server:
+        description: PXE next-server (TFTP) address rendered into settings.yaml.
+        type: str
+        default: ""
+      prov_cobbler_manage_dhcp:
+        description: Let Cobbler manage DHCP.
+        type: bool
+        default: true
+      prov_cobbler_manage_dns:
+        description: Let Cobbler manage DNS.
+        type: bool
+        default: true
+      prov_cobbler_manage_tftp:
+        description: Let Cobbler manage TFTP (also creates the tftpboot dir on configure).
+        type: bool
+        default: true
+      prov_cobbler_client_use_localhost:
+        description: >-
+          Set cobbler's client_use_localhost so the local `cobbler` CLI reaches the
+          API over 127.0.0.1 rather than the advertised `server` address. True is the
+          robust posture for a cobbler host managing itself; without it every CLI
+          action fails to connect when `server` is a routable IP that is not a local
+          address on the host.
+        type: bool
+        default: true
+      prov_cobbler_tftpboot_dir:
+        description: TFTP root directory ensured on configure (cobbler tftpboot_location).
+        type: str
+        default: /var/lib/tftpboot
+      prov_cobbler_settings_group:
+        description: >-
+          Group owning settings.yaml — cobbler's mod_wsgi cobbler_api reads it as this
+          group (root:apache 0640 as shipped).
+        type: str
+        default: apache
+      prov_cobbler_distros:
+        description: Reference list of distros for bulk provisioning workflows.
+        type: list
+        elements: dict
+        default: []
+      prov_cobbler_profiles:
+        description: Reference list of profiles for bulk provisioning workflows.
+        type: list
+        elements: dict
+        default: []
+      prov_cobbler_distro:
+        description: >-
+          Distro to register for the add_distro action. Requires name, kernel, initrd,
+          os_version; arch and breed are defaulted in the task.
+        type: dict
+        default: {}
+      prov_cobbler_profile:
+        description: >-
+          Profile to register for the add_profile action. Requires name and distro; kickstart
+          is optional.
+        type: dict
+        default: {}
+      prov_cobbler_system:
+        description: >-
+          System to register for the add_system action. Requires name, profile, mac, ip,
+          hostname.
+        type: dict
+        default: {}
+      prov_cobbler_systems:
+        description: >-
+          Systems to bulk-register for the add_systems action (rhism alignment Phase C
+          item 2 — the light/no-Satellite PXE path, matching the same per-host shape
+          roles/satellite's content_hosts uses for the heavy path: name, profile, mac,
+          ip, hostname per entry). Empty = no-op. Loops the existing add_system logic —
+          no new registration mechanism, just bulk input.
+        type: list
+        elements: dict
+        default: []
+      prov_cobbler_system_name:
+        description: Name of the system to drop for the remove_system action.
+        type: str
+        default: ""
